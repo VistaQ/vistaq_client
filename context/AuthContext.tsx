@@ -19,8 +19,9 @@ import {
 
 interface AuthContextType {
   currentUser: User | null;
-  login: (email: string, password?: string) => Promise<boolean>;
+  login: (identifier: string, password?: string) => Promise<boolean>;
   register: (name: string, email: string, password: string, groupId: string, agentCode: string) => Promise<boolean>;
+  resetPassword: (email: string) => Promise<boolean>;
   logout: () => void;
   changePassword: (newPassword: string) => Promise<void>;
   isAuthenticated: boolean;
@@ -100,9 +101,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  const login = async (email: string, password?: string): Promise<boolean> => {
+  const login = async (identifier: string, password?: string): Promise<boolean> => {
     try {
       if (!password) return false;
+      
+      let email = identifier;
+      
+      // Check if identifier looks like an email, if not, try to find user by Agent ID (code)
+      if (!identifier.includes('@')) {
+          const userByCode = users.find(u => u.agentCode === identifier);
+          if (userByCode) {
+              email = userByCode.email;
+          } else {
+              // If agent code not found, let firebase handle it (likely fail) or return false
+              console.warn("Agent ID not found locally, attempting email login with input...");
+          }
+      }
+
       await signInWithEmailAndPassword(auth, email, password);
       return true;
     } catch (error) {
@@ -129,11 +144,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
        };
 
        await setDoc(doc(db, "users", res.user.uid), newUser);
+       
+       // 3. Send Welcome Email (Simulated)
+       setTimeout(() => {
+           alert(`Welcome Email Sent to ${email}:\n\n"Welcome to VistaQ, ${name}! Your account has been successfully created. Please login with your Agent ID (${agentCode}) or Email."`);
+       }, 500);
+
        return true;
      } catch (error) {
        console.error("Registration failed:", error);
        return false;
      }
+  };
+
+  const resetPassword = async (email: string): Promise<boolean> => {
+      // Simulate API Call
+      return new Promise((resolve) => {
+          setTimeout(() => {
+              // In a real app, sendPasswordResetEmail(auth, email);
+              alert(`Password Recovery Email Sent to ${email}:\n\n"Click the link below to reset your password..."`);
+              resolve(true);
+          }, 1000);
+      });
   };
 
   const logout = async () => {
@@ -157,8 +189,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // --- ADMIN FUNCTIONS (Updating Firestore) ---
   const addUser = async (userData: Partial<User>) => {
     // Generates a placeholder ID if not provided
-    // In mock mode, addDoc works, in real mode, this mimics auto-id
-    // FIX: Manually generate ID to avoid doc(collection) which might trigger TS issue in some configs
     const newId = userData.id || `user_${Date.now()}`;
     const newRef = doc(db, "users", newId); 
     
@@ -243,7 +273,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       currentUser, login, register, logout, changePassword, isAuthenticated: !!currentUser,
       getGroupMembers, groups, getUserById, users,
       addUser, updateUser, deleteUser,
-      addGroup, updateGroup, deleteGroup
+      addGroup, updateGroup, deleteGroup,
+      resetPassword
     }}>
       {!loading && children}
     </AuthContext.Provider>

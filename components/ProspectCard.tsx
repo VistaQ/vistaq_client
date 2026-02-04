@@ -52,7 +52,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
         setFormData(prev => ({ ...prev, appointmentStatus: 'Not done' }));
     }
     
-    // Initialize Not Successful Reason Logic
+    // Initialize Non-Successful Reason Logic
     if (prospect.saleReason) {
         if (STANDARD_REASONS.includes(prospect.saleReason)) {
             setFailReasonSelectValue(prospect.saleReason);
@@ -560,7 +560,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                         <label className="block text-xs font-bold text-gray-500 uppercase">Manual Outcome Selection</label>
                         <div className="flex gap-3">
                              <button onClick={() => handleOutcomeChange('KIV')} disabled={isReadOnly} className="flex-1 py-2 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded hover:bg-yellow-100 font-medium text-sm">KIV</button>
-                             <button onClick={() => handleOutcomeChange('UNSUCCESSFUL')} disabled={isReadOnly} className="flex-1 py-2 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 font-medium text-sm">Not Successful</button>
+                             <button onClick={() => handleOutcomeChange('UNSUCCESSFUL')} disabled={isReadOnly} className="flex-1 py-2 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 font-medium text-sm">Non-Successful</button>
                         </div>
                     </div>
                   )}
@@ -568,7 +568,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                   {/* Fail Reason Logic */}
                   {formData.saleStatus === 'UNSUCCESSFUL' && (
                      <div className="animate-in fade-in slide-in-from-top-2 space-y-3 bg-red-50 p-4 rounded-lg border border-red-100">
-                        <label className="block text-xs font-bold text-red-700 uppercase">Reason for Not Successful</label>
+                        <label className="block text-xs font-bold text-red-700 uppercase">Reason for Non-Successful</label>
                         <select 
                            value={failReasonSelectValue}
                            onChange={e => {
@@ -656,7 +656,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                           <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                               <XCircle className="w-10 h-10 text-red-500" />
                           </div>
-                          <h2 className="text-2xl font-bold text-red-800 mb-2">Not Successful</h2>
+                          <h2 className="text-2xl font-bold text-red-800 mb-2">Non-Successful</h2>
                           <p className="text-red-600 italic mb-6">"Every 'No' brings you one step closer to a 'Yes'. Keep pushing forward!"</p>
                           <button onClick={onClose} className="bg-white text-red-600 border border-red-200 px-8 py-3 rounded-full font-bold shadow-sm hover:bg-red-50 transition-colors">
                               Close & Move On

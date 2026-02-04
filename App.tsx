@@ -18,6 +18,8 @@ import Events from './pages/Events';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import PdpaNotice from './pages/PdpaNotice';
 
 const AuthenticatedApp: React.FC = () => {
   // Default to dashboard
@@ -54,19 +56,33 @@ const AuthenticatedApp: React.FC = () => {
   );
 };
 
+type AuthView = 'login' | 'signup' | 'privacy' | 'pdpa';
+
 const AuthFlow: React.FC = () => {
     const { isAuthenticated } = useAuth();
-    const [isLogin, setIsLogin] = useState(true);
+    const [view, setView] = useState<AuthView>('login');
 
     if (isAuthenticated) {
         return <AuthenticatedApp />;
     }
 
-    if (isLogin) {
-        return <Login onSwitchToSignup={() => setIsLogin(false)} />;
+    switch (view) {
+        case 'login':
+            return <Login onSwitchToSignup={() => setView('signup')} />;
+        case 'signup':
+            return (
+              <Signup 
+                onSwitchToLogin={() => setView('login')} 
+                onNavigateToPolicy={(page) => setView(page)} 
+              />
+            );
+        case 'privacy':
+            return <PrivacyPolicy onBack={() => setView('signup')} />;
+        case 'pdpa':
+            return <PdpaNotice onBack={() => setView('signup')} />;
+        default:
+            return <Login onSwitchToSignup={() => setView('signup')} />;
     }
-
-    return <Signup onSwitchToLogin={() => setIsLogin(true)} />;
 }
 
 const App: React.FC = () => {

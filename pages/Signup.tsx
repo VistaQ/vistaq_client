@@ -1,19 +1,24 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Mail, User, Users, AlertCircle, Loader2, IdCard } from 'lucide-react';
+import { Lock, Mail, User, Users, AlertCircle, Loader2, IdCard, CheckSquare } from 'lucide-react';
 
 interface SignupProps {
   onSwitchToLogin: () => void;
+  onNavigateToPolicy: (page: 'privacy' | 'pdpa') => void;
 }
 
-const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
+const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) => {
   const { register, groups } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [agentCode, setAgentCode] = useState('');
   const [password, setPassword] = useState('');
   const [groupId, setGroupId] = useState('');
+  
+  // Consent State
+  const [isAgreed, setIsAgreed] = useState(false);
+  
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -25,12 +30,21 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
         setError('Please select a group.');
         return;
     }
+    
+    if (!isAgreed) {
+        setError('You must agree to the Privacy Policy and PDPA Notice to proceed.');
+        return;
+    }
 
     setLoading(true);
 
     try {
       const success = await register(name, email, password, groupId, agentCode);
-      if (!success) {
+      if (success) {
+          // Redirect to login handled by parent or success message flow, but usually user logs in after.
+          // For UX, we can switch them to login
+          setTimeout(() => onSwitchToLogin(), 2000); 
+      } else {
         setError('Account creation failed. Email might be already taken.');
       }
     } catch (err) {
@@ -138,11 +152,31 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin }) => {
               </div>
               <p className="text-xs text-gray-500 mt-1">Select the group assigned by your trainer.</p>
             </div>
+            
+            {/* COMPLIANCE CHECKBOX */}
+            <div className="pt-2">
+                <div className="flex items-start">
+                    <div className="flex items-center h-5">
+                        <input
+                            id="compliance"
+                            type="checkbox"
+                            checked={isAgreed}
+                            onChange={(e) => setIsAgreed(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                    </div>
+                    <div className="ml-3 text-sm">
+                        <label htmlFor="compliance" className="text-gray-600 leading-tight">
+                            I acknowledge that I have read and understood the <button type="button" onClick={() => onNavigateToPolicy('privacy')} className="text-blue-600 font-bold hover:underline">Privacy Policy</button> and <button type="button" onClick={() => onNavigateToPolicy('pdpa')} className="text-blue-600 font-bold hover:underline">PDPA Notice</button>, and I consent to the collection and processing of my Personal Data in accordance with the Personal Data Protection Act 2010 (Malaysia).
+                        </label>
+                    </div>
+                </div>
+            </div>
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-md shadow-blue-200 disabled:opacity-70 flex items-center justify-center mt-6"
+              disabled={loading || !isAgreed}
+              className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-md shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mt-6"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Register Account'}
             </button>

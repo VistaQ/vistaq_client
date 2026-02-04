@@ -1,10 +1,10 @@
+
 import React, { useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { UserRole, Prospect, ProspectStage } from '../types';
 import { 
   Calendar, 
-  Award, 
   Target, 
   Trophy, 
   Clock,
@@ -16,8 +16,6 @@ import {
   Layers,
   GraduationCap, 
   Crown,
-  Upload,
-  FileText,
   CalendarDays,
   MapPin
 } from 'lucide-react';
@@ -31,17 +29,16 @@ const COLORS = ['#23366F', '#3D6DB5', '#00C9B1'];
 
 const Dashboard: React.FC = () => {
   const { currentUser, groups, users } = useAuth();
-  const { prospects, getProspectsByScope, getGroupProspects, badgeTiers, getEventsForUser } = useData();
+  const { prospects, getProspectsByScope, getGroupProspects, getEventsForUser } = useData();
   
-  // --- MANAGEMENT DASHBOARD (Admin, Trainer, Group Leader) ---
+  // --- MANAGEMENT DASHBOARD (Admin & Trainer ONLY) ---
+  // Group Leaders now see Personal Dashboard by default, and access Group stats via "Group" page.
   const isManagementRole = currentUser?.role === UserRole.TRAINER || 
-                           currentUser?.role === UserRole.ADMIN || 
-                           currentUser?.role === UserRole.GROUP_LEADER;
+                           currentUser?.role === UserRole.ADMIN;
 
   if (isManagementRole) {
     const isAdmin = currentUser?.role === UserRole.ADMIN;
     const isTrainer = currentUser?.role === UserRole.TRAINER;
-    const isLeader = currentUser?.role === UserRole.GROUP_LEADER;
     
     // Use the robust scope filter from DataContext which now handles Leaders correctly
     const scopeProspects = getProspectsByScope(currentUser!);
@@ -50,15 +47,13 @@ const Dashboard: React.FC = () => {
     let relevantGroups = groups;
     if (isTrainer && currentUser?.managedGroupIds?.length) {
         relevantGroups = groups.filter(g => currentUser.managedGroupIds?.includes(g.id));
-    } else if (isLeader && currentUser?.groupId) {
-        relevantGroups = groups.filter(g => g.id === currentUser.groupId);
     }
     
     const totalGroups = relevantGroups.length;
     
     // --- 2. IDENTIFY RELEVANT AGENTS (For Count) ---
     // If Admin: All Agents/Leaders
-    // If Trainer/Leader: Filter by relevant groups
+    // If Trainer: Filter by relevant groups
     const relevantAgents = isAdmin 
         ? users.filter(u => u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
         : users.filter(u => (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) && relevantGroups.some(g => g.id === u.groupId));
@@ -76,62 +71,10 @@ const Dashboard: React.FC = () => {
        const gProspects = getGroupProspects(group.id);
        const gFYC = gProspects.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
        const gSales = gProspects.filter(p => p.saleStatus === 'SUCCESSFUL').length;
-       const gPoints = gProspects.reduce((sum, p) => sum + (p.pointsAwarded || 0), 0);
-       return { id: group.id, name: group.name, fyc: gFYC, sales: gSales, points: gPoints };
+       return { id: group.id, name: group.name, fyc: gFYC, sales: gSales };
     }).sort((a, b) => b.fyc - a.fyc);
 
-    // --- 5. AGENT LEADERBOARD (Rewards Focus) ---
-    const agentPerfMap = new Map<string, {name: string, fyc: number, sales: number, points: number, groupId: string}>();
-    
-    scopeProspects.forEach(p => {
-       if (!agentPerfMap.has(p.agentId)) {
-          agentPerfMap.set(p.agentId, { name: p.name, fyc: 0, sales: 0, points: 0, groupId: '' }); 
-       }
-       const curr = agentPerfMap.get(p.agentId)!;
-       curr.fyc += (p.policyAmountMYR || 0);
-       curr.points += (p.pointsAwarded || 0);
-       if (p.saleStatus === 'SUCCESSFUL') curr.sales += 1;
-    });
-
-    const topAgents = Array.from(agentPerfMap.entries()).map(([agentId, data]) => {
-        let agentName = "Unknown Agent";
-        let groupName = "Unknown Group";
-        
-        // Find user details
-        const user = users.find(u => u.id === agentId);
-        if (user) {
-            agentName = user.name;
-            const grp = groups.find(g => g.id === user.groupId);
-            groupName = grp ? grp.name : 'N/A';
-        } else {
-             // Fallback logic for mock IDs if user not found in main list
-             relevantGroups.forEach(g => {
-                if (g.leaderId === agentId) { agentName = `${g.name} Leader`; groupName = g.name; }
-                else if (agentId.includes(g.id)) { groupName = g.name; } // Loose match for demo
-             });
-             // Try to construct name from ID if still unknown
-             if(agentName === "Unknown Agent") agentName = agentId;
-        }
-
-        // Determine Badge
-        const sortedBadges = [...badgeTiers].sort((a, b) => a.threshold - b.threshold);
-        const badge = [...sortedBadges].reverse().find(m => data.points >= m.threshold) || sortedBadges[0];
-
-        return { 
-            id: agentId, 
-            name: agentName, 
-            group: groupName, 
-            fyc: data.fyc, 
-            sales: data.sales, 
-            points: data.points,
-            badge 
-        };
-    })
-    .filter(a => a.points > 0)
-    .sort((a, b) => b.points - a.points) // Sort by Points for Rewards Leaderboard
-    .slice(0, 10); // Top 10
-
-    // --- 6. CHART DATA ---
+    // --- 5. CHART DATA ---
     const funnelData = [
        { name: 'Prospects', value: scopeProspects.length },
        { name: 'Appointments', value: scopeProspects.filter(p => p.appointmentStatus === 'Completed').length },
@@ -143,13 +86,11 @@ const Dashboard: React.FC = () => {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                  {isAdmin ? 'System Admin Dashboard' : isLeader ? 'Group Leader Dashboard' : 'Trainer Overview'}
+                  {isAdmin ? 'System Admin Dashboard' : 'Trainer Overview'}
               </h1>
               <p className="text-sm text-gray-500">
                   {isAdmin 
-                    ? 'System-wide statistics, rewards tracking, and performance monitoring.' 
-                    : isLeader 
-                    ? `Performance statistics for ${relevantGroups[0]?.name || 'your group'}.`
+                    ? 'System-wide statistics and performance monitoring.' 
                     : `High-level analytics for ${relevantGroups.length} managed group(s).`}
               </p>
             </div>
@@ -193,7 +134,7 @@ const Dashboard: React.FC = () => {
           {/* Performance Metrics Row */}
           <h3 className="text-lg font-bold text-gray-800 flex items-center">
             <BarChart2 className="w-5 h-5 mr-2 text-gray-500" />
-            {isLeader ? 'Group Performance' : 'Performance Metrics'}
+            Performance Metrics
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -260,7 +201,7 @@ const Dashboard: React.FC = () => {
              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <h3 className="font-bold text-gray-800 mb-4 flex items-center">
                    <BarChart2 className="w-5 h-5 mr-2 text-blue-600" />
-                   {isLeader ? 'Group Sales Funnel' : 'Sales Funnel Aggregate'}
+                   Sales Funnel Aggregate
                 </h3>
                 <div className="h-64">
                    <ResponsiveContainer width="100%" height="100%">
@@ -279,115 +220,47 @@ const Dashboard: React.FC = () => {
                 </div>
              </div>
 
-             {/* Top Groups Leaderboard (Only if Multi-group) or Agent List */}
+             {/* Group Overview (No Points/Ranks) */}
              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <h3 className="font-bold text-gray-800 mb-4 flex items-center">
-                   <Trophy className="w-5 h-5 mr-2 text-yellow-500" />
-                   {totalGroups > 1 ? 'Group Rankings' : 'Group Agents Overview'}
+                   <Users className="w-5 h-5 mr-2 text-blue-600" />
+                   {totalGroups > 1 ? 'Group Overview' : 'Group Agents Overview'}
                 </h3>
                 <div className="overflow-y-auto max-h-64">
                    {totalGroups > 1 ? (
                        <table className="w-full">
                           <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
                              <tr>
-                                <th className="px-4 py-2 text-left">Rank</th>
                                 <th className="px-4 py-2 text-left">Group</th>
-                                <th className="px-4 py-2 text-right">Points</th>
+                                <th className="px-4 py-2 text-right">Sales Count</th>
                                 <th className="px-4 py-2 text-right">Total FYC</th>
                              </tr>
                           </thead>
                           <tbody>
                              {groupRankings.map((g, idx) => (
                                 <tr key={g.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
-                                   <td className="px-4 py-3 text-sm font-bold text-gray-500">#{idx + 1}</td>
                                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{g.name}</td>
-                                   <td className="px-4 py-3 text-sm text-right font-medium text-blue-600">{g.points.toLocaleString()}</td>
-                                   <td className="px-4 py-3 text-sm font-mono text-right">RM {g.fyc.toLocaleString()}</td>
+                                   <td className="px-4 py-3 text-sm text-right font-medium text-gray-600">{g.sales}</td>
+                                   <td className="px-4 py-3 text-sm font-mono text-right text-green-700">RM {g.fyc.toLocaleString()}</td>
                                 </tr>
                              ))}
                           </tbody>
                        </table>
                    ) : (
-                       // Simplified view for Leader (showing counts)
-                       <div className="space-y-4">
-                           <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                               <span className="text-sm font-medium text-gray-600">Total Agents in Group</span>
-                               <span className="font-bold text-gray-900">{relevantAgents.length}</span>
-                           </div>
-                           <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                               <span className="text-sm font-medium text-gray-600">Avg Sales per Agent</span>
-                               <span className="font-bold text-gray-900">{relevantAgents.length ? Math.round(totalSales / relevantAgents.length) : 0}</span>
-                           </div>
+                       <div className="p-8 text-center text-gray-500">
+                           <p>No groups found for current filters.</p>
                        </div>
                    )}
                 </div>
              </div>
           </div>
-
-          {/* Agent Rewards Leaderboard */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                 <h3 className="font-bold text-gray-800 flex items-center">
-                    <Award className="w-5 h-5 mr-2 text-blue-600" />
-                    Agent Rewards Leaderboard
-                 </h3>
-                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Top 10 by Points</span>
-              </div>
-              <table className="w-full text-left">
-                 <thead className="bg-white border-b border-gray-200">
-                    <tr>
-                       <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Rank</th>
-                       <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Agent</th>
-                       <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Current Badge</th>
-                       <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Points</th>
-                       <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">FYC</th>
-                    </tr>
-                 </thead>
-                 <tbody className="divide-y divide-gray-100">
-                    {topAgents.map((agent, idx) => (
-                       <tr key={agent.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4">
-                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                idx === 0 ? 'bg-yellow-400 text-white' : 
-                                idx === 1 ? 'bg-gray-300 text-white' :
-                                idx === 2 ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-500'
-                             }`}>
-                                {idx + 1}
-                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                             <div className="font-medium text-gray-900">{agent.name}</div>
-                             <div className="text-xs text-gray-500">{agent.group}</div>
-                          </td>
-                          <td className="px-6 py-4">
-                             <span className={`px-2 py-1 rounded text-xs font-bold border ${agent.badge.bg} ${agent.badge.color}`}>
-                                {agent.badge.name}
-                             </span>
-                          </td>
-                          <td className="px-6 py-4 text-right font-bold text-blue-600">
-                             {agent.points.toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 text-right font-mono text-gray-600 text-sm">
-                             RM {agent.fyc.toLocaleString()}
-                          </td>
-                       </tr>
-                    ))}
-                    {topAgents.length === 0 && (
-                        <tr><td colSpan={5} className="p-8 text-center text-gray-500">No data available yet.</td></tr>
-                    )}
-                 </tbody>
-              </table>
-          </div>
        </div>
     );
   }
 
-  // --- AGENT PERSONAL DASHBOARD (Also visible for Leaders if they want personal stats, but layout uses logic above) ---
-  // Note: Group Leaders are producers too, but the request emphasized "respective group prospects". 
-  // The code block above handles Leaders. Below handles standard Agents.
+  // --- AGENT & GROUP LEADER PERSONAL DASHBOARD ---
 
   // --- STRICTLY PERSONAL DATA ---
-  // Ensure we filter by current user ID specifically, regardless of scope
   const myProspects = prospects.filter(p => p.agentId === currentUser?.id);
   const myEvents = currentUser ? getEventsForUser(currentUser) : [];
 
@@ -396,8 +269,7 @@ const Dashboard: React.FC = () => {
   const completedAppointments = myProspects.filter(p => p.appointmentStatus === 'Completed').length;
   const closedSales = myProspects.filter(p => p.saleStatus === 'SUCCESSFUL').length;
   const totalPersonalFYC = myProspects.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
-  const totalPoints = myProspects.reduce((sum, p) => sum + (p.pointsAwarded || 0), 0);
-
+  
   // MDRT Progress
   const fycProgress = Math.min(100, (totalPersonalFYC / MDRT_TARGET_FYC) * 100);
   const prospectsProgress = Math.min(100, (totalProspects / MDRT_TARGET_PROSPECTS) * 100);
@@ -413,13 +285,11 @@ const Dashboard: React.FC = () => {
   next7Days.setDate(now.getDate() + 7);
 
   // 1. Process Appointments
-  // Relaxed filter: Either explicitly SCHEDULED, OR implicitly an Appointment stage with a future date
   const upcomingAppointments = myProspects
     .filter(p => {
         if (!p.appointmentDate) return false;
         const apptDate = new Date(p.appointmentDate);
         const isFuture = apptDate >= now && apptDate <= next7Days;
-        // Strict Check: Must be SCHEDULED or in APPOINTMENT Stage without completion
         const isActive = p.appointmentStatus === 'Not done' || (p.currentStage === ProspectStage.APPOINTMENT && p.appointmentStatus !== 'Completed');
         return isFuture && isActive;
     })
@@ -449,10 +319,6 @@ const Dashboard: React.FC = () => {
   const combinedSchedule = [...upcomingAppointments, ...upcomingEvents]
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // Current Badge (Dynamic)
-  const sortedBadges = [...badgeTiers].sort((a, b) => a.threshold - b.threshold);
-  const currentBadge = [...sortedBadges].reverse().find(m => totalPoints >= m.threshold) || sortedBadges[0];
-
   // Chart Data (Personal Funnel)
   const chartData = [
     { name: 'Prospects', value: totalProspects },
@@ -469,7 +335,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* KPI Cards */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
           <div className="flex justify-between items-start mb-2">
@@ -498,22 +364,6 @@ const Dashboard: React.FC = () => {
                </div>
             </div>
           </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-           <div className="flex justify-between items-start mb-4">
-             <div>
-                <h3 className="text-sm font-medium text-gray-500">Points & Rank</h3>
-                <div className="flex items-center mt-1">
-                   <h2 className="text-2xl font-bold text-gray-900 mr-2">{totalPoints.toLocaleString()}</h2>
-                   <span className={`px-2 py-0.5 rounded text-xs font-bold ${currentBadge.bg} ${currentBadge.color} border`}>
-                     {currentBadge.name}
-                   </span>
-                </div>
-             </div>
-             <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg"><Award className="w-6 h-6" /></div>
-           </div>
-           <p className="text-xs text-gray-500">Keep closing sales to reach the next tier!</p>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">

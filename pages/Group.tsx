@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -37,11 +38,7 @@ const Group: React.FC = () => {
   const isMultiGroupUser = isTrainer || isAdmin;
   
   // TRAINER / ADMIN VIEW: GROUP SELECTION GRID
-  // Show this if no specific group is selected yet
   if (isMultiGroupUser && !trainerSelectedGroupId) {
-      // Filter visible groups
-      // Trainer: Managed Groups
-      // Admin: All Groups
       const visibleGroups = (isTrainer && currentUser.managedGroupIds)
         ? groups.filter(g => currentUser.managedGroupIds!.includes(g.id))
         : groups;
@@ -133,32 +130,29 @@ const Group: React.FC = () => {
   const activeMembersCount = groupMembers.length + 1; // +1 for the leader
   const avgFYCPerAgent = activeMembersCount > 0 ? totalGroupFYC / activeMembersCount : 0;
 
-  // Add the leader to the leaderboard list
+  // Add the leader to the list
   const allGroupUsers = [...groupMembers];
-  // Find leader user object
   const leader = getUserById(myGroup?.leaderId || '');
   if (leader && !allGroupUsers.find(u => u.id === leader.id)) {
      allGroupUsers.push(leader);
   }
 
-  // Leaderboard Calculation
-  const leaderboard = allGroupUsers.map(member => {
+  // Sorting by FYC instead of Points
+  const agentList = allGroupUsers.map(member => {
     const memberProspects = groupProspects.filter(p => p.agentId === member.id);
-    const memberPoints = memberProspects.reduce((sum, p) => sum + (p.pointsAwarded || 0), 0);
     const memberFYC = memberProspects.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
     const memberSales = memberProspects.filter(p => p.saleStatus === 'SUCCESSFUL').length;
     return {
       ...member,
-      points: memberPoints,
       fyc: memberFYC,
       sales: memberSales
     };
   })
-  .sort((a, b) => b.points - a.points); // Sort by Points descending
+  .sort((a, b) => b.fyc - a.fyc); // Sort by FYC descending
 
   // --- AGENT DETAIL VIEW RENDERER ---
   if (selectedAgentId) {
-    const agent = leaderboard.find(u => u.id === selectedAgentId);
+    const agent = agentList.find(u => u.id === selectedAgentId);
     if (!agent) return <div>Agent not found</div>;
 
     const agentProspects = groupProspects.filter(p => p.agentId === selectedAgentId);
@@ -204,7 +198,7 @@ const Group: React.FC = () => {
 
         {activeTab === 'overview' && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                     <p className="text-sm text-gray-500">Total FYC</p>
                     <h3 className="text-2xl font-bold text-gray-900">RM {agent.fyc.toLocaleString()}</h3>
@@ -212,10 +206,6 @@ const Group: React.FC = () => {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                     <p className="text-sm text-gray-500">Total Sales</p>
                     <h3 className="text-2xl font-bold text-gray-900">{agent.sales}</h3>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <p className="text-sm text-gray-500">Total Points</p>
-                    <h3 className="text-2xl font-bold text-gray-900">{Math.floor(agent.points)}</h3>
                 </div>
             </div>
             
@@ -324,7 +314,7 @@ const Group: React.FC = () => {
     );
   }
 
-  // --- DEFAULT VIEW: LEADERBOARD & STATS ---
+  // --- DEFAULT VIEW: AGENT LIST & STATS ---
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -341,7 +331,7 @@ const Group: React.FC = () => {
              <Crown className="w-6 h-6 mr-3 text-yellow-500" />
              {myGroup?.name || 'My Group'}
           </h1>
-          <p className="text-sm text-gray-500">Team Performance & Leaderboard</p>
+          <p className="text-sm text-gray-500">Team Performance & Sales Overview</p>
         </div>
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg">
            <span className="text-xs uppercase font-semibold opacity-80">Total Group FYC</span>
@@ -382,37 +372,27 @@ const Group: React.FC = () => {
          </div>
       </div>
 
-      {/* Leaderboard Table */}
+      {/* Agent Performance Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
          <div className="px-6 py-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
             <h3 className="font-bold text-gray-800 flex items-center">
                <Trophy className="w-5 h-5 mr-2 text-yellow-600" />
-               Sales Leaderboard
+               Agent Sales Performance
             </h3>
             <span className="text-xs text-gray-500 italic">Click "View" to see agent details</span>
          </div>
          <table className="w-full text-left">
            <thead className="bg-white border-b border-gray-200">
              <tr>
-               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Rank</th>
                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Agent Name</th>
                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Sales Closed</th>
                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Total FYC (MYR)</th>
-               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Total Points</th>
                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Action</th>
              </tr>
            </thead>
            <tbody className="divide-y divide-gray-100">
-             {leaderboard.map((agent, index) => (
+             {agentList.map((agent) => (
                <tr key={agent.id} className={`hover:bg-blue-50 transition-colors ${agent.id === currentUser?.id ? 'bg-blue-50/50' : ''}`}>
-                 <td className="px-6 py-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold shadow-sm
-                       ${index === 0 ? 'bg-yellow-400 text-white' : 
-                         index === 1 ? 'bg-gray-300 text-gray-700' : 
-                         index === 2 ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                       {index + 1}
-                    </div>
-                 </td>
                  <td className="px-6 py-4">
                     <div className="flex items-center">
                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs mr-3">
@@ -433,11 +413,6 @@ const Group: React.FC = () => {
                  <td className="px-6 py-4 text-right">
                     <span className="font-mono font-medium text-gray-900">
                        {agent.fyc.toLocaleString()}
-                    </span>
-                 </td>
-                 <td className="px-6 py-4 text-right">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
-                       {Math.floor(agent.points)} pts
                     </span>
                  </td>
                  <td className="px-6 py-4 text-right">

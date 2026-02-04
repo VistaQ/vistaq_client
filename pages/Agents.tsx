@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -8,8 +9,7 @@ import {
   ChevronRight, 
   ArrowLeft, 
   Clock,
-  Target,
-  Award
+  Target
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -53,20 +53,18 @@ const Agents: React.FC = () => {
   const uniqueAgents = Array.from(new Set(allAgents.map(a => a.id)))
     .map(id => allAgents.find(a => a.id === id)!);
 
-  // 3. Compute Aggregates for Leaderboard
+  // 3. Compute Aggregates
   const agentPerformance = uniqueAgents.map(agent => {
     const agentProspects = prospects.filter(p => p.agentId === agent.id);
     const fyc = agentProspects.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
     const sales = agentProspects.filter(p => p.saleStatus === 'SUCCESSFUL').length;
-    const points = agentProspects.reduce((sum, p) => sum + (p.pointsAwarded || 0), 0);
     const group = groups.find(g => g.id === agent.groupId);
 
     return {
       ...agent,
       groupName: group ? group.name : 'N/A',
       fyc,
-      sales,
-      points
+      sales
     };
   });
 
@@ -127,7 +125,7 @@ const Agents: React.FC = () => {
 
         {activeTab === 'overview' && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                     <p className="text-sm text-gray-500">Total FYC</p>
                     <h3 className="text-2xl font-bold text-gray-900">RM {agent.fyc.toLocaleString()}</h3>
@@ -135,10 +133,6 @@ const Agents: React.FC = () => {
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                     <p className="text-sm text-gray-500">Total Sales</p>
                     <h3 className="text-2xl font-bold text-gray-900">{agent.sales}</h3>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <p className="text-sm text-gray-500">Total Points</p>
-                    <h3 className="text-2xl font-bold text-gray-900">{Math.floor(agent.points)}</h3>
                 </div>
             </div>
             
@@ -276,26 +270,16 @@ const Agents: React.FC = () => {
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Rank</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Agent Name</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Group</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Sales</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Total FYC (MYR)</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Points</th>
               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredAgents.map((agent, index) => (
+            {filteredAgents.map((agent) => (
               <tr key={agent.id} className="hover:bg-blue-50 transition-colors">
-                <td className="px-6 py-4">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold shadow-sm
-                       ${index === 0 ? 'bg-yellow-400 text-white' : 
-                         index === 1 ? 'bg-gray-300 text-gray-700' : 
-                         index === 2 ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                       {index + 1}
-                    </div>
-                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center">
                     <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mr-3 font-bold text-xs">
@@ -324,12 +308,6 @@ const Agents: React.FC = () => {
                     </span>
                 </td>
                 <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end text-blue-600 font-bold text-sm">
-                        <Award className="w-3 h-3 mr-1" />
-                        {Math.floor(agent.points)}
-                    </div>
-                </td>
-                <td className="px-6 py-4 text-right">
                   <button 
                     onClick={() => setSelectedAgentId(agent.id)}
                     className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center justify-end w-full"
@@ -341,7 +319,7 @@ const Agents: React.FC = () => {
             ))}
             {filteredAgents.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                    <UserCheck className="w-12 h-12 mx-auto mb-3 opacity-20" />
                    <p>No agents found matching your search.</p>
                 </td>

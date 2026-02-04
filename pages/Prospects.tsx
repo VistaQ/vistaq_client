@@ -81,28 +81,42 @@ const Prospects: React.FC = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const getStageBadge = (stage: ProspectStage) => {
-    const styles = {
-      [ProspectStage.INFO]: 'bg-gray-100 text-gray-600',
-      [ProspectStage.APPOINTMENT]: 'bg-blue-100 text-blue-600',
-      [ProspectStage.MEETING]: 'bg-indigo-100 text-indigo-600',
-      [ProspectStage.SALES]: 'bg-purple-100 text-purple-600',
-      [ProspectStage.POINTS]: 'bg-green-100 text-green-600',
-      [ProspectStage.CLOSED]: 'bg-red-100 text-red-600',
-    };
-    const labels = {
-      [ProspectStage.INFO]: 'Info',
-      [ProspectStage.APPOINTMENT]: 'Appointment',
-      [ProspectStage.MEETING]: 'Sales Meeting',
-      [ProspectStage.SALES]: 'Negotiation',
-      [ProspectStage.POINTS]: 'Won',
-      [ProspectStage.CLOSED]: 'Lost',
-    };
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${styles[stage]}`}>
-        {labels[stage]}
-      </span>
-    );
+  // UPDATED: Logic to handle new labeling requirements
+  const getStageBadge = (prospect: Prospect) => {
+    const { currentStage, appointmentStatus, saleStatus } = prospect;
+
+    // 1. Sales Outcome Priorities
+    if (saleStatus === 'SUCCESSFUL' || currentStage === ProspectStage.POINTS) {
+        return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Successful</span>;
+    }
+    if (saleStatus === 'UNSUCCESSFUL' || currentStage === ProspectStage.CLOSED) {
+        return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Non-Successful</span>;
+    }
+    if (saleStatus === 'KIV') {
+        return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">KIV</span>;
+    }
+
+    // 2. Appointment Statuses
+    if (appointmentStatus === 'Declined') {
+        return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-700">Appointment Declined</span>;
+    }
+    if (appointmentStatus === 'Completed') {
+        return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-700">Appointment Completed</span>;
+    }
+    
+    // 3. General Workflow Stages (Appointment / Meeting)
+    // Covers Scheduled, Rescheduled, Not Done, KIV (Appt level)
+    if (currentStage === ProspectStage.APPOINTMENT || currentStage === ProspectStage.MEETING) {
+        return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">Appointment</span>;
+    }
+
+    // 4. Basic Info (New)
+    if (currentStage === ProspectStage.INFO) {
+         return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">New</span>;
+    }
+
+    // Fallback
+    return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Info</span>;
   };
 
   // Logic: 
@@ -186,7 +200,7 @@ const Prospects: React.FC = () => {
                     {prospect.phone}
                     </td>
                     <td className="px-6 py-4">
-                    {getStageBadge(prospect.currentStage)}
+                    {getStageBadge(prospect)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                     {new Date(prospect.updatedAt).toLocaleDateString()}
