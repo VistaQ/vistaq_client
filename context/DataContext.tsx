@@ -27,6 +27,7 @@ interface DataContextType {
   
   // Event Methods
   addEvent: (evt: Partial<Event>) => Promise<void>;
+  updateEvent: (id: string, evt: Partial<Event>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
   getEventsForUser: (user: User) => Event[];
 }
@@ -205,6 +206,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await setDoc(ref, newEvent);
   };
 
+  const updateEvent = async (id: string, evt: Partial<Event>) => {
+      const ref = doc(db, "events", id);
+      await updateDoc(ref, evt);
+  };
+
   const deleteEvent = async (id: string) => {
       await deleteDoc(doc(db, "events", id));
   };
@@ -245,7 +251,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       prospects, badgeTiers, events, 
       addProspect, updateProspect, importProspects, deleteProspect,
       getProspectsByScope, getGroupProspects, updateBadgeTiers,
-      addEvent, deleteEvent, getEventsForUser
+      addEvent, updateEvent, deleteEvent, getEventsForUser
     }}>
       {children}
     </DataContext.Provider>

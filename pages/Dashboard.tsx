@@ -17,7 +17,8 @@ import {
   GraduationCap, 
   Crown,
   CalendarDays,
-  MapPin
+  MapPin,
+  ExternalLink
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -289,6 +290,7 @@ const Dashboard: React.FC = () => {
     .filter(p => {
         if (!p.appointmentDate) return false;
         const apptDate = new Date(p.appointmentDate);
+        if (isNaN(apptDate.getTime())) return false; // Safety check
         const isFuture = apptDate >= now && apptDate <= next7Days;
         const isActive = p.appointmentStatus === 'Not done' || (p.currentStage === ProspectStage.APPOINTMENT && p.appointmentStatus !== 'Completed');
         return isFuture && isActive;
@@ -298,13 +300,15 @@ const Dashboard: React.FC = () => {
         title: `Mtg: ${p.name}`,
         date: p.appointmentDate!,
         type: 'meeting',
-        meta: p.name
+        meta: p.name,
+        link: undefined
     }));
 
   // 2. Process Events
   const upcomingEvents = myEvents
     .filter(e => {
         const evtDate = new Date(e.date);
+        if (isNaN(evtDate.getTime())) return false; // Safety check
         return evtDate >= now && evtDate <= next7Days;
     })
     .map(e => ({
@@ -312,7 +316,8 @@ const Dashboard: React.FC = () => {
         title: e.title,
         date: e.date,
         type: 'event',
-        meta: e.venue
+        meta: e.venue,
+        link: e.link
     }));
 
   // 3. Combine & Sort
@@ -419,32 +424,54 @@ const Dashboard: React.FC = () => {
            <div className="flex-1 overflow-y-auto space-y-3">
              {combinedSchedule.length > 0 ? (
                 combinedSchedule.map(item => (
-                   <div key={item.id} className={`flex items-start p-3 rounded-lg border ${
+                   <div key={item.id} className={`flex flex-col p-3 rounded-lg border ${
                        item.type === 'event' ? 'bg-indigo-50 border-indigo-100' : 'bg-gray-50 border-gray-100'
                    }`}>
-                      <div className="mt-1 mr-3">
-                         {item.type === 'event' 
-                            ? <CalendarDays className="w-4 h-4 text-indigo-500" />
-                            : <Clock className="w-4 h-4 text-gray-400" />
-                         }
+                      <div className="flex items-start">
+                          <div className="mt-1 mr-3">
+                             {item.type === 'event' 
+                                ? <CalendarDays className="w-4 h-4 text-indigo-500" />
+                                : <Clock className="w-4 h-4 text-gray-400" />
+                             }
+                          </div>
+                          <div className="flex-1">
+                             <p className="text-sm font-semibold text-gray-900 line-clamp-1">{item.title}</p>
+                             <p className="text-xs text-gray-500 mb-1">
+                               {(() => {
+                                   try {
+                                       return new Date(item.date).toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit'});
+                                   } catch (e) {
+                                       return 'Invalid Date';
+                                   }
+                               })()}
+                             </p>
+                             {item.type === 'event' && (
+                                 <div className="flex items-center text-[10px] text-indigo-600">
+                                     <MapPin className="w-3 h-3 mr-1" />
+                                     {item.meta || 'Venue TBD'}
+                                 </div>
+                             )}
+                             {item.type === 'meeting' && (
+                                 <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-700 rounded uppercase tracking-wider">
+                                    Client Meeting
+                                 </span>
+                             )}
+                          </div>
                       </div>
-                      <div className="flex-1">
-                         <p className="text-sm font-semibold text-gray-900 line-clamp-1">{item.title}</p>
-                         <p className="text-xs text-gray-500 mb-1">
-                           {new Date(item.date).toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit'})}
-                         </p>
-                         {item.type === 'event' && (
-                             <div className="flex items-center text-[10px] text-indigo-600">
-                                 <MapPin className="w-3 h-3 mr-1" />
-                                 {item.meta || 'Venue TBD'}
-                             </div>
-                         )}
-                         {item.type === 'meeting' && (
-                             <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-700 rounded uppercase tracking-wider">
-                                Client Meeting
-                             </span>
-                         )}
-                      </div>
+                      
+                      {/* JOIN BUTTON FOR EVENTS */}
+                      {item.type === 'event' && item.link && (
+                          <div className="mt-2 ml-7">
+                              <a 
+                                href={item.link} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="inline-flex items-center text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded transition-colors"
+                              >
+                                  <ExternalLink className="w-3 h-3 mr-1" /> Join Here
+                              </a>
+                          </div>
+                      )}
                    </div>
                 ))
              ) : (

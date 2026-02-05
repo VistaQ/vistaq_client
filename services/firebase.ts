@@ -40,7 +40,9 @@ let writeBatch: any;
 // --- MOCK BACKEND INITIALIZATION (LocalStorage) ---
 console.warn("⚠️ Firebase imports removed: Running in DEMO MODE (LocalStorage Backend) ⚠️");
 
-const MOCK_STORAGE_KEY = 'vistaq_mock_data';
+// UPDATED KEY TO FORCE RE-SEED
+const MOCK_STORAGE_KEY = 'vistaq_mock_data_v3';
+
 const getStore = () => {
 try {
     const data = localStorage.getItem(MOCK_STORAGE_KEY);
@@ -53,14 +55,14 @@ const setStore = (data: any) => localStorage.setItem(MOCK_STORAGE_KEY, JSON.stri
 
 // --- SEED DATA GENERATION ---
 if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
-    console.log("🌱 Seeding Dummy Data...");
+    console.log("🌱 Seeding Dummy Data (v3)...");
     
     const users: Record<string, any> = {};
     const groups: Record<string, any> = {};
     const prospects: Record<string, any> = {};
     const events: Record<string, any> = {};
 
-    // 1. Define Groups
+    // 1. Define Groups (5 Groups)
     const groupDefs = [
         { id: 'g_star', name: 'MDRT STAR' },
         { id: 'g_legend', name: 'MDRT LEGEND' },
@@ -99,65 +101,105 @@ if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
 
     // Helper: Generate Prospects for an Agent
     const generateProspects = (agentId: string, performanceTier: 'HIGH' | 'MID' | 'LOW' | 'TOP') => {
-    let successCount = 0;
-    let prospectCount = 0;
-    
-    if (performanceTier === 'TOP') { successCount = 25; prospectCount = 40; } // High Achiever
-    else if (performanceTier === 'HIGH') { successCount = 12; prospectCount = 20; }
-    else if (performanceTier === 'MID') { successCount = 5; prospectCount = 10; }
-    else { successCount = 1; prospectCount = 5; } // LOW
-
-    const products = ['Life Insurance', 'Medical Card', 'Investment Link', 'Takaful Family'];
-    
-    for (let i = 0; i < prospectCount; i++) {
-        const pId = `p_${agentId}_${i}`;
-        const isWin = i < successCount;
-        const status = isWin ? 'SUCCESSFUL' : (Math.random() > 0.5 ? 'UNSUCCESSFUL' : 'APPOINTMENT'); // Mix of Won, Lost, Ongoing
-        const amount = isWin ? Math.floor(Math.random() * 5000) + 2000 : 0; // RM 2000 - 7000 FYC
+        let successCount = 0;
+        let prospectCount = 0;
         
-        // Random date in last 6 months
-        const date = new Date();
-        date.setDate(date.getDate() - Math.floor(Math.random() * 180));
-        
-        // Future Appointment for Demo
-        let appointmentDate = date.toISOString();
-        let apptStatus = 'Completed'; // was 'COMPLETED'
+        // Define Prospect Volume & Success Rates based on Tier
+        if (performanceTier === 'TOP') { successCount = 20; prospectCount = 40; } // 50% SR
+        else if (performanceTier === 'HIGH') { successCount = 10; prospectCount = 25; } // 40% SR
+        else if (performanceTier === 'MID') { successCount = 4; prospectCount = 15; }  // ~25% SR
+        else { successCount = 1; prospectCount = 8; } // Low Activity
 
-        // Make some appointments strictly in the future for "Upcoming" testing
-        if (i === prospectCount - 1) {
-            const futureDate = new Date();
-            futureDate.setDate(futureDate.getDate() + 2); // 2 days from now
-            appointmentDate = futureDate.toISOString();
-            apptStatus = 'Not done'; // was 'SCHEDULED'
+        const products = ['Life Insurance', 'Medical Card', 'Investment Link', 'Takaful Family'];
+        
+        for (let i = 0; i < prospectCount; i++) {
+            const pId = `p_${agentId}_${i}`;
+            
+            // Generate Random Date (Last 6 months)
+            const date = new Date();
+            date.setDate(date.getDate() - Math.floor(Math.random() * 180));
+            
+            // Logic to distribute stages realistically
+            let currentStage = 1;
+            let saleStatus: any = undefined;
+            let saleReason: any = undefined;
+            let appointmentStatus: any = 'Not done';
+            let appointmentDate: string | undefined = undefined;
+            let policyAmount = 0;
+            let paymentReceived = false;
+
+            // Determine if this specific prospect is a "Win" based on success count
+            // We use simple index logic for deterministic seeding of winners
+            const isWin = i < successCount;
+
+            if (isWin) {
+                currentStage = 5; // POINTS (Successful)
+                saleStatus = 'SUCCESSFUL';
+                paymentReceived = true;
+                policyAmount = Math.floor(Math.random() * 8000) + 2000;
+                appointmentStatus = 'Completed';
+                appointmentDate = date.toISOString();
+            } else {
+                // Non-winning prospects are distributed across other stages
+                const rand = Math.random();
+                
+                if (rand < 0.2) {
+                    // LOST / NON-SUCCESSFUL
+                    currentStage = 6; // CLOSED
+                    saleStatus = 'UNSUCCESSFUL';
+                    saleReason = 'Budget Constraints';
+                    appointmentStatus = 'Completed';
+                    appointmentDate = date.toISOString();
+                } else if (rand < 0.35) {
+                    // KIV
+                    currentStage = 4; // SALES
+                    saleStatus = 'KIV';
+                    appointmentStatus = 'Completed';
+                    appointmentDate = date.toISOString();
+                } else if (rand < 0.6) {
+                    // SALES MEETING (Active)
+                    currentStage = 3; // MEETING
+                    appointmentStatus = 'Completed';
+                    appointmentDate = date.toISOString();
+                } else if (rand < 0.8) {
+                    // APPOINTMENT (Scheduled)
+                    currentStage = 2; // APPOINTMENT
+                    appointmentStatus = 'Scheduled';
+                    // Future date
+                    const futureDate = new Date();
+                    futureDate.setDate(futureDate.getDate() + Math.floor(Math.random() * 7) + 1);
+                    appointmentDate = futureDate.toISOString();
+                } else {
+                    // NEW / INFO
+                    currentStage = 1; // INFO
+                    appointmentStatus = 'Not done';
+                }
+            }
+
+            prospects[pId] = {
+                id: pId,
+                agentId: agentId,
+                name: `Client ${agentId.substring(0,4)}_${i+1}`,
+                phone: `+6012${Math.floor(Math.random()*10000000)}`,
+                email: `client${i}@mail.com`,
+                currentStage: currentStage,
+                saleStatus: saleStatus,
+                saleReason: saleReason,
+                productType: products[Math.floor(Math.random() * products.length)],
+                policyAmountMYR: policyAmount,
+                pointsAwarded: isWin ? Math.floor(policyAmount * 0.1) : 0,
+                appointmentStatus: appointmentStatus,
+                appointmentDate: appointmentDate,
+                paymentReceived: paymentReceived,
+                meetingChecklist: { 
+                    rapport: currentStage >= 3, 
+                    factFinding: currentStage >= 3, 
+                    presentation: currentStage >= 3 
+                },
+                createdAt: date.toISOString(),
+                updatedAt: date.toISOString()
+            };
         }
-        
-        // Mapping old stage logic to new enum:
-        // INFO=1, APPT=2, MEETING=3, SALES=4, POINTS=5, CLOSED=6
-        let currentStage = 1;
-        if (isWin) currentStage = 5; // POINTS
-        else if (status === 'UNSUCCESSFUL') currentStage = 6; // CLOSED
-        else currentStage = 2; // APPOINTMENT
-
-        prospects[pId] = {
-            id: pId,
-            agentId: agentId,
-            name: `Client ${agentId.slice(-4)}_${i}`, // Simple names
-            phone: `+6012${Math.floor(Math.random()*10000000)}`,
-            email: `client${i}@mail.com`,
-            currentStage: currentStage,
-            saleStatus: (status === 'SUCCESSFUL' || status === 'UNSUCCESSFUL') ? status : undefined,
-            saleReason: status === 'UNSUCCESSFUL' ? 'Price too high' : undefined,
-            productType: products[Math.floor(Math.random() * products.length)],
-            policyAmountMYR: amount,
-            pointsAwarded: isWin ? Math.floor(amount * 0.1) : 0,
-            appointmentStatus: apptStatus as any,
-            appointmentDate: appointmentDate,
-            paymentReceived: isWin,
-            meetingChecklist: { rapport: true, factFinding: true, presentation: true }, // Assume done for seed
-            createdAt: date.toISOString(),
-            updatedAt: date.toISOString()
-        };
-    }
     };
 
     // 3. Generate Groups & Agents
@@ -166,8 +208,7 @@ if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
         const leaderId = `leader_${g.id}`;
         groups[g.id] = { id: g.id, name: g.name, leaderId: leaderId };
 
-        // --- Leader (Agent 01) ---
-        // For MDRT STAR, we name them specifically as requested. For others, generic Leader.
+        // --- Leader (acts as Top Performer) ---
         const isStarGroup = g.id === 'g_star';
         const leaderName = isStarGroup ? 'Agent 01 (Leader)' : `${g.name} Leader`;
         const leaderEmail = isStarGroup ? 'agent01@star.com' : `leader@${g.id}.com`;
@@ -179,31 +220,33 @@ if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
             role: 'GROUP_LEADER',
             groupId: g.id
         };
-        // Leaders are usually high performers
-        generateProspects(leaderId, 'HIGH');
+        // Leaders get TOP stats
+        generateProspects(leaderId, 'TOP');
 
-        // --- 19 Agents ---
-        // One "High Achiever" per group (TOP tier)
-        const topPerformerIndex = Math.floor(Math.random() * 19); 
-
-        for (let i = 0; i < 19; i++) {
-            const agentNum = i + 2; // Starts from Agent 02
+        // --- 10 Agents per Group ---
+        // Distribution: 2 High, 3 Intermediate, 5 Low
+        for (let i = 0; i < 10; i++) {
+            const agentNum = i + 2; // Agent 02, 03...
             const agentId = `agent_${g.id}_${agentNum}`;
             
             let agentName = `${g.name} Agent ${agentNum}`;
             let agentEmail = `agent${agentNum}@${g.id}.com`;
             
-            // Specific override for Agent 02 in MDRT STAR
-            if (isStarGroup && agentNum === 2) {
+            // Specific override for Agent 02 in MDRT STAR for demo Login
+            if (isStarGroup && i === 0) { // First agent in loop is Agent 02
                 agentName = 'Agent 02';
                 agentEmail = 'agent02@star.com';
             }
 
-            // Determine Performance Tier
+            // Determine Performance Tier based on index i (0 to 9)
             let tier: any = 'LOW';
-            if (i === topPerformerIndex) tier = 'TOP'; // The group Legend
-            else if (i < 4) tier = 'HIGH';
-            else if (i < 12) tier = 'MID';
+            if (i < 2) {
+                tier = 'HIGH'; // 2 High Performers
+            } else if (i < 5) {
+                tier = 'MID';  // 3 Intermediate Performers (Indices 2, 3, 4)
+            } else {
+                tier = 'LOW';  // 5 Low Performers (Indices 5, 6, 7, 8, 9)
+            }
 
             users[agentId] = {
                 id: agentId,
@@ -220,15 +263,18 @@ if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
     // 4. Generate Seed Events
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
     
     const nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 5);
+    nextWeek.setHours(14, 0, 0, 0);
 
     events['evt_1'] = {
         id: 'evt_1',
         title: 'Weekly Sales Huddle',
         description: 'Reviewing pipeline and targets for the week. Please update your prospect list beforehand.',
         venue: 'Meeting Room A',
+        link: '', // No link
         date: tomorrow.toISOString(),
         createdBy: 'master_trainer',
         createdByName: 'Master Trainer',
@@ -239,7 +285,8 @@ if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
         id: 'evt_2',
         title: 'MDRT Star Strategy Session',
         description: 'Exclusive strategy planning for MDRT Star group members.',
-        venue: 'Zoom Link',
+        venue: 'Online (Zoom)',
+        link: 'https://zoom.us/test-meeting', // With Link
         date: nextWeek.toISOString(),
         createdBy: 'group_trainer',
         createdByName: 'Group Coach (Star)',
@@ -247,7 +294,7 @@ if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
     };
 
     setStore({ users, groups, prospects, events });
-    console.log("✅ Seed Complete: 5 Groups, 100+ Users, ~1000 Prospects, 2 Events Generated.");
+    console.log("✅ Seed Complete: 5 Groups, 10 Agents/Group + Leaders, ~800 Prospects generated.");
 }
 
 // Auth State

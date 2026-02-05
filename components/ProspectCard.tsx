@@ -10,15 +10,28 @@ interface Props {
   onClose: () => void;
 }
 
+// Helper to safely format local date for input value (YYYY-MM-DD)
+const toLocalDateString = (date: Date): string => {
+  if (isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   const { updateProspect, addProspect, deleteProspect } = useData();
   const { currentUser } = useAuth();
   const [formData, setFormData] = useState<Partial<Prospect>>(prospect);
   
+  // Refs for inputs
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
   // Local state for split inputs
-  const [dateInput, setDateInput] = useState('');
+  const todayStr = toLocalDateString(new Date()); 
+  const [dateInput, setDateInput] = useState(todayStr);
   const [startTimeInput, setStartTimeInput] = useState('08:00'); 
-  const [endTimeInput, setEndTimeInput] = useState('17:00');
+  const [endTimeInput, setEndTimeInput] = useState('09:00');
   const [phoneSuffix, setPhoneSuffix] = useState('');
 
   // Local state for "Others" text input in outcome
@@ -37,13 +50,19 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   useEffect(() => {
     if (prospect.appointmentDate) {
       const d = new Date(prospect.appointmentDate);
-      const dateStr = d.toLocaleDateString('en-CA'); // YYYY-MM-DD
-      setDateInput(dateStr);
-      setStartTimeInput(d.toTimeString().slice(0, 5));
+      if (!isNaN(d.getTime())) {
+          setDateInput(toLocalDateString(d));
+          setStartTimeInput(d.toTimeString().slice(0, 5));
+      }
+    } else {
+      // Default to today if no date set
+      setDateInput(toLocalDateString(new Date()));
     }
+
     if (prospect.appointmentEndTime) {
       setEndTimeInput(prospect.appointmentEndTime);
     }
+    
     if (prospect.phone) {
       const clean = prospect.phone.replace(/^\+60|^60/, '');
       setPhoneSuffix(clean);
@@ -69,7 +88,10 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   useEffect(() => {
       if (!dateInput || !formData.id) return;
       
-      const combinedDate = new Date(`${dateInput}T${startTimeInput || '00:00'}`).toISOString();
+      const d = new Date(`${dateInput}T${startTimeInput || '00:00'}`);
+      if (isNaN(d.getTime())) return;
+
+      const combinedDate = d.toISOString();
       
       if (combinedDate !== formData.appointmentDate || endTimeInput !== formData.appointmentEndTime) {
           updateProspect(formData.id, {
@@ -87,6 +109,12 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   const canEdit = isAdmin || isOwner;
   const isReadOnly = !canEdit;
+
+  // --- TIME CONSTRAINTS HELPERS ---
+  const isDateToday = dateInput === todayStr;
+  const now = new Date();
+  // Current HH:MM in 24h format
+  const currentHm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
   // --- SAVE LOGIC ---
   const handleSave = (updates: Partial<Prospect>) => {
@@ -127,12 +155,15 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
           return;
       }
       if (dateInput && startTimeInput) {
-          const combined = new Date(`${dateInput}T${startTimeInput}`).toISOString();
-          handleSave({ 
-              appointmentDate: combined,
-              appointmentEndTime: endTimeInput,
-              phone: `+60${phoneSuffix}`
-          });
+          const d = new Date(`${dateInput}T${startTimeInput}`);
+          if (!isNaN(d.getTime())) {
+              const combined = d.toISOString();
+              handleSave({ 
+                  appointmentDate: combined,
+                  appointmentEndTime: endTimeInput,
+                  phone: `+60${phoneSuffix}`
+              });
+          }
       } else {
            handleSave({ phone: `+60${phoneSuffix}` });
       }
@@ -158,9 +189,19 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
 
   // --- WORKFLOW STATE HELPERS ---
   const isStep1Complete = !!formData.id && !!formData.name && !!formData.phone && Object.keys(errors).length === 0;
-  const areSteps2And3Unlocked = isStep1Complete;
-  const hasStartedMeeting = formData.meetingChecklist?.rapport || formData.meetingChecklist?.factFinding || formData.meetingChecklist?.presentation;
-  const isStep4Unlocked = isStep1Complete && hasStartedMeeting;
+  
+  // Step 2 is unlocked if Step 1 is valid
+  const isStep2Unlocked = isStep1Complete;
+
+  // Step 3 (Meeting) is unlocked ONLY if Step 2 status is "Completed"
+  const isStep3Unlocked = isStep1Complete && formData.appointmentStatus === 'Completed';
+
+  // Step 4 (Outcome) is unlocked ONLY if Step 3 is fully checked (All true)
+  const hasCompletedMeeting = formData.meetingChecklist?.rapport && 
+                              formData.meetingChecklist?.factFinding && 
+                              formData.meetingChecklist?.presentation;
+  const isStep4Unlocked = isStep3Unlocked && hasCompletedMeeting;
+
   const isOutcomeDecided = formData.saleStatus === 'SUCCESSFUL' || formData.saleStatus === 'UNSUCCESSFUL' || formData.saleStatus === 'KIV';
 
   // --- ACTIONS ---
@@ -174,15 +215,26 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   };
 
   const toggleChecklist = (field: keyof NonNullable<Prospect['meetingChecklist']>) => {
-      if (isReadOnly || !areSteps2And3Unlocked) return;
+      // Logic: Cannot toggle if Step 3 is locked (Appointment not completed)
+      if (isReadOnly || !isStep3Unlocked) return;
+      
       const currentList = formData.meetingChecklist || { rapport: false, factFinding: false, presentation: false };
       const updatedList = { ...currentList, [field]: !currentList[field] };
       handleSave({ meetingChecklist: updatedList });
       
-      if (!isNew) updateProspect(formData.id!, { currentStage: ProspectStage.SALES });
+      // Update stage if needed
+      if (!isNew) {
+          // If all are checked, we move to SALES stage logically
+          const allChecked = updatedList.rapport && updatedList.factFinding && updatedList.presentation;
+          if (allChecked) {
+              updateProspect(formData.id!, { currentStage: ProspectStage.SALES });
+          }
+      }
   };
 
   const handleOutcomeChange = (outcome: 'SUCCESSFUL' | 'UNSUCCESSFUL' | 'KIV') => {
+      if (!isStep4Unlocked) return; 
+
       let updates: Partial<Prospect> = { saleStatus: outcome };
       
       if (outcome === 'SUCCESSFUL') {
@@ -240,7 +292,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   const CustomCheckbox = ({ checked, onChange, label, disabled }: any) => (
       <div 
         onClick={() => !disabled && onChange()} 
-        className={`flex items-center p-3 rounded-lg border transition-all cursor-pointer hover:bg-gray-50 ${checked ? 'border-gray-300 bg-gray-50' : 'border-gray-200 bg-white'}`}
+        className={`flex items-center p-3 rounded-lg border transition-all cursor-pointer hover:bg-gray-50 ${checked ? 'border-gray-300 bg-gray-50' : 'border-gray-200 bg-white'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
           <div className={`w-5 h-5 rounded border flex items-center justify-center mr-3 transition-colors ${checked ? 'bg-gray-100 border-green-500' : 'bg-gray-100 border-gray-300'}`}>
               {checked && <Check className="w-3.5 h-3.5 text-green-600 stroke-[3]" />}
@@ -369,11 +421,11 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
               {/* STEP 2: Appointment */}
-              <div className={`bg-white border rounded-xl overflow-hidden shadow-sm transition-all ${!areSteps2And3Unlocked ? 'opacity-60 pointer-events-none grayscale' : ''}`}>
+              <div className={`bg-white border rounded-xl overflow-hidden shadow-sm transition-all ${!isStep2Unlocked ? 'opacity-60 pointer-events-none grayscale' : ''}`}>
                   <CardHeader 
                     number={2} 
                     title="Appointment Details" 
-                    isActive={areSteps2And3Unlocked && formData.appointmentStatus !== 'Completed'} 
+                    isActive={isStep2Unlocked && formData.appointmentStatus !== 'Completed'} 
                     isDone={formData.appointmentStatus === 'Completed'} 
                   />
                   <div className="p-5 space-y-4">
@@ -381,13 +433,20 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
                           <div className="relative">
                             <input 
+                                ref={dateInputRef}
                                 type="date"
+                                min={todayStr} // Restrict past dates
                                 value={dateInput}
                                 onChange={e => setDateInput(e.target.value)}
-                                className="block w-full pl-10 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                onClick={() => (dateInputRef.current as any)?.showPicker?.()} // Support browser native picker on click
+                                className="block w-full pl-10 bg-gray-50 hover:bg-blue-50 border border-gray-300 hover:border-blue-400 text-black rounded-lg p-2.5 text-sm focus:ring-blue-600 focus:border-blue-600 cursor-pointer transition-colors accent-blue-600"
                                 disabled={isReadOnly}
                             />
-                            <Calendar className="absolute left-3 top-2.5 text-gray-400 w-4 h-4 pointer-events-none"/>
+                            {/* Calendar Icon triggers picker */}
+                            <Calendar 
+                                onClick={() => (dateInputRef.current as any)?.showPicker?.()} 
+                                className="absolute left-3 top-2.5 text-blue-600 w-4 h-4 cursor-pointer hover:text-blue-800"
+                            />
                           </div>
                        </div>
                        
@@ -396,9 +455,24 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start</label>
                               <input 
                                   type="time"
+                                  min={isDateToday ? currentHm : undefined}
                                   value={startTimeInput}
-                                  onChange={e => setStartTimeInput(e.target.value)}
-                                  className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                  onChange={e => {
+                                      const val = e.target.value;
+                                      // Strict Time check for "Today"
+                                      if (isDateToday && val < currentHm) {
+                                          alert("Cannot select a time in the past.");
+                                          // Reset to current time
+                                          setStartTimeInput(currentHm);
+                                          return;
+                                      }
+                                      setStartTimeInput(val);
+                                      // Logic: Start time cannot start after end time. 
+                                      if (val > endTimeInput) {
+                                          setEndTimeInput(val);
+                                      }
+                                  }}
+                                  className="block w-full bg-gray-50 hover:bg-blue-50 border border-gray-300 hover:border-blue-400 text-black rounded-lg p-2.5 text-sm focus:ring-blue-600 focus:border-blue-600 cursor-pointer transition-colors accent-blue-600"
                                   disabled={isReadOnly}
                               />
                           </div>
@@ -406,9 +480,16 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">End</label>
                               <input 
                                   type="time"
+                                  min={startTimeInput}
                                   value={endTimeInput}
-                                  onChange={e => setEndTimeInput(e.target.value)}
-                                  className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                  onChange={e => {
+                                      const val = e.target.value;
+                                      if (val < startTimeInput) {
+                                          return;
+                                      }
+                                      setEndTimeInput(val);
+                                  }}
+                                  className="block w-full bg-gray-50 hover:bg-blue-50 border border-gray-300 hover:border-blue-400 text-black rounded-lg p-2.5 text-sm focus:ring-blue-600 focus:border-blue-600 cursor-pointer transition-colors accent-blue-600"
                                   disabled={isReadOnly}
                               />
                           </div>
@@ -444,6 +525,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                               <option value="KIV">KIV</option>
                               <option value="Declined">Declined</option>
                           </select>
+                          <p className="text-xs text-gray-400 mt-1">Set to <strong>Completed</strong> to unlock Sales Meeting.</p>
                        </div>
 
                        <button
@@ -457,15 +539,15 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
               </div>
 
               {/* STEP 3: Sales Meeting */}
-              <div className={`bg-white border rounded-xl overflow-hidden shadow-sm transition-all ${!areSteps2And3Unlocked ? 'opacity-60 pointer-events-none grayscale' : ''}`}>
+              <div className={`bg-white border rounded-xl overflow-hidden shadow-sm transition-all ${!isStep3Unlocked ? 'opacity-60 pointer-events-none grayscale' : ''}`}>
                   <CardHeader 
                     number={3} 
                     title="Sales Meeting" 
-                    isActive={areSteps2And3Unlocked && !isStep4Unlocked} 
+                    isActive={isStep3Unlocked && !isStep4Unlocked} 
                     isDone={isStep4Unlocked} 
                   />
                   <div className="p-5 space-y-3">
-                      <p className="text-xs text-gray-500 mb-2">Select steps completed to proceed to outcome.</p>
+                      <p className="text-xs text-gray-500 mb-2">Check all steps to proceed to Sales Outcome.</p>
                       
                       {[
                           { key: 'rapport', label: 'Social / Rapport' },
@@ -565,51 +647,56 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                     </div>
                   )}
 
-                  {/* Fail Reason Logic */}
+                  {/* Fail Reason Logic - REFACTORED */}
                   {formData.saleStatus === 'UNSUCCESSFUL' && (
-                     <div className="animate-in fade-in slide-in-from-top-2 space-y-3 bg-red-50 p-4 rounded-lg border border-red-100">
-                        <label className="block text-xs font-bold text-red-700 uppercase">Reason for Non-Successful</label>
-                        <select 
-                           value={failReasonSelectValue}
-                           onChange={e => {
-                               const val = e.target.value;
-                               setFailReasonSelectValue(val);
-                               if (val === 'Others') {
-                                   setCustomFailReason('');
-                                   handleSave({ saleReason: '' }); 
-                               } else {
-                                   handleSave({ saleReason: val });
-                               }
-                           }}
-                           disabled={isReadOnly}
-                           className="block w-full border-gray-300 text-gray-900 bg-white rounded-lg p-2.5 text-sm focus:ring-red-500 focus:border-red-500 shadow-sm"
-                        >
-                            <option value="">Select Reason...</option>
-                            {STANDARD_REASONS.map(r => (
-                                <option key={r} value={r}>{r}</option>
-                            ))}
-                            <option value="Others">Others (Please state)</option>
-                        </select>
-                        
-                        {/* Custom Reason Input */}
-                        {failReasonSelectValue === 'Others' && (
-                             <input 
-                                type="text"
-                                value={customFailReason}
+                     <div className="animate-in fade-in slide-in-from-top-2 space-y-2">
+                        {/* Styled to match the look of the 'First Payment' box somewhat, but as a form block */}
+                        <div className="bg-red-50 p-4 rounded-lg border border-red-200 space-y-3">
+                            <label className="block text-xs font-bold text-red-700 uppercase">Reason for Non-Successful</label>
+                            <select 
+                                value={failReasonSelectValue}
                                 onChange={e => {
-                                    setCustomFailReason(e.target.value);
-                                    handleSave({ saleReason: e.target.value });
+                                    const val = e.target.value;
+                                    setFailReasonSelectValue(val);
+                                    if (val === 'Others') {
+                                        setCustomFailReason('');
+                                        handleSave({ saleReason: '' }); 
+                                    } else {
+                                        handleSave({ saleReason: val });
+                                    }
                                 }}
-                                placeholder="Please state reason..."
-                                className="block w-full border-gray-300 text-gray-900 bg-white rounded-lg p-2.5 text-sm focus:ring-red-500 focus:border-red-500 shadow-sm"
                                 disabled={isReadOnly}
-                             />
-                        )}
+                                className="block w-full border-red-300 text-gray-900 bg-white rounded-lg p-2.5 text-sm focus:ring-red-500 focus:border-red-500 shadow-sm"
+                            >
+                                <option value="">Select Reason...</option>
+                                {STANDARD_REASONS.map(r => (
+                                    <option key={r} value={r}>{r}</option>
+                                ))}
+                                <option value="Others">Others (Please state)</option>
+                            </select>
+                            
+                            {/* Custom Reason Input */}
+                            {failReasonSelectValue === 'Others' && (
+                                <input 
+                                    type="text"
+                                    value={customFailReason}
+                                    onChange={e => {
+                                        setCustomFailReason(e.target.value);
+                                        handleSave({ saleReason: e.target.value });
+                                    }}
+                                    placeholder="Please state reason..."
+                                    className="block w-full border-red-300 text-gray-900 bg-white rounded-lg p-2.5 text-sm focus:ring-red-500 focus:border-red-500 shadow-sm"
+                                    disabled={isReadOnly}
+                                />
+                            )}
+                        </div>
                         
                         {!isReadOnly && (
-                            <button onClick={handleUndo} className="flex items-center text-sm text-red-600 hover:text-red-800 font-medium mt-2">
-                                <Undo2 className="w-4 h-4 mr-1" /> Undo / Change Status
-                            </button>
+                            <div className="flex justify-end">
+                                <button onClick={handleUndo} className="flex items-center text-sm text-gray-500 hover:text-gray-700 font-medium">
+                                    <Undo2 className="w-4 h-4 mr-1" /> Undo / Change Status
+                                </button>
+                            </div>
                         )}
                      </div>
                   )}

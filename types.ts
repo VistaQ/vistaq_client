@@ -75,6 +75,7 @@ export interface Event {
   title: string;
   description: string;
   venue: string;
+  link?: string; // URL for online meetings
   date: string; // ISO String
   createdBy: string; // User ID
   createdByName: string; // User Name

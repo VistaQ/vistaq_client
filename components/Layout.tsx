@@ -86,9 +86,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
         <nav className="flex-1 overflow-y-auto py-6 space-y-1">
           <NavItem id="dashboard" label="Dashboard" icon={LayoutDashboard} />
           
-          {/* Phase 1: Prospecting Only */}
           <NavItem id="prospects" label="Prospects" icon={Users} />
           
+          <NavItem id="events" label="Events & Meetups" icon={CalendarDays} />
+
           {/* Management Views for Admin, Trainer & Leaders */}
           {isManagement && (
             <>
@@ -166,8 +167,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                <nav className="py-4 overflow-y-auto max-h-[calc(100vh-180px)]">
                  <NavItem id="dashboard" label="Dashboard" icon={LayoutDashboard} />
                  
-                 {/* Prospecting */}
                  <NavItem id="prospects" label="Prospects" icon={Users} />
+                 
+                 <NavItem id="events" label="Events & Meetups" icon={CalendarDays} />
 
                  {/* Management */}
                  {isManagement && (
