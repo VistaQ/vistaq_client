@@ -66,16 +66,6 @@ const AdminUsers: React.FC = () => {
     }
   };
 
-  const toggleManagedGroup = (groupId: string) => {
-    if (!editingUser) return;
-    const current = editingUser.managedGroupIds || [];
-    if (current.includes(groupId)) {
-        setEditingUser({ ...editingUser, managedGroupIds: current.filter(id => id !== groupId) });
-    } else {
-        setEditingUser({ ...editingUser, managedGroupIds: [...current, groupId] });
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -237,42 +227,9 @@ const AdminUsers: React.FC = () => {
                      </select>
                   </div>
 
-                  {/* Dynamic Group Assignment Fields */}
-                  {editingUser.role === UserRole.TRAINER && (
-                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Assign Managed Groups</label>
-                        <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-300 bg-gray-50 p-2 rounded">
-                           {groups.map(g => (
-                              <label key={g.id} className="flex items-center space-x-2 p-1 hover:bg-gray-100 cursor-pointer">
-                                 <input 
-                                    type="checkbox"
-                                    checked={editingUser.managedGroupIds?.includes(g.id) || false}
-                                    onChange={() => toggleManagedGroup(g.id)}
-                                    className="rounded text-blue-600 bg-gray-50 border-gray-300"
-                                 />
-                                 <span className="text-sm text-gray-900">{g.name}</span>
-                              </label>
-                           ))}
-                        </div>
-                        <p className="text-xs text-gray-400 mt-1">Trainers can manage multiple groups.</p>
-                     </div>
-                  )}
-
-                  {(editingUser.role === UserRole.AGENT || editingUser.role === UserRole.GROUP_LEADER) && (
-                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Assign to Group</label>
-                        <select 
-                           className="w-full bg-gray-50 border border-gray-300 text-gray-900 p-2 rounded"
-                           value={editingUser.groupId || ''}
-                           onChange={e => setEditingUser({...editingUser, groupId: e.target.value})}
-                        >
-                           <option value="">Select Group...</option>
-                           {groups.map(g => (
-                              <option key={g.id} value={g.id}>{g.name}</option>
-                           ))}
-                        </select>
-                     </div>
-                  )}
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-xs text-blue-700">
+                      <strong>Note:</strong> Group assignment, Trainer assignment, and Member management are now handled centrally in the <strong>Group Management</strong> page.
+                  </div>
 
                   <div className="flex justify-end pt-4">
                      <button 

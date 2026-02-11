@@ -34,8 +34,8 @@ interface AuthContextType {
   deleteUser: (id: string) => Promise<void>;
   
   // Group Management
-  addGroup: (name: string, leaderId: string, trainerId: string | null, agentIds: string[]) => Promise<void>;
-  updateGroup: (groupId: string, name: string, leaderId: string, trainerId: string | null, agentIds: string[]) => Promise<void>;
+  addGroup: (name: string, leaderId: string, trainerIds: string[], agentIds: string[]) => Promise<void>;
+  updateGroup: (groupId: string, name: string, leaderId: string, trainerIds: string[], agentIds: string[]) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
 }
 
@@ -209,7 +209,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // --- GROUP MANAGEMENT ---
-  const addGroup = async (name: string, leaderId: string, trainerId: string | null, agentIds: string[]) => {
+  const addGroup = async (name: string, leaderId: string, trainerIds: string[], agentIds: string[]) => {
     const groupRef = doc(collection(db, "groups"));
     const groupId = groupRef.id;
 
@@ -221,14 +221,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await updateDoc(doc(db, "users", leaderId), { groupId, role: UserRole.GROUP_LEADER });
     }
 
-    // 3. Update Trainer
-    if (trainerId) {
-       const trainer = users.find(u => u.id === trainerId);
-       if (trainer) {
-         const currentManaged = trainer.managedGroupIds || [];
-         await updateDoc(doc(db, "users", trainerId), { managedGroupIds: [...currentManaged, groupId] });
-       }
-    }
+    // 3. Update Trainers (Handle multiple)
+    // Loop all trainers in the system to ensure correct state (though for new group, mostly adding)
+    const allTrainers = users.filter(u => u.role === UserRole.TRAINER);
+    const trainerPromises = allTrainers.map(trainer => {
+        const shouldHaveAccess = trainerIds.includes(trainer.id);
+        const currentManaged = trainer.managedGroupIds || [];
+        
+        if (shouldHaveAccess && !currentManaged.includes(groupId)) {
+            return updateDoc(doc(db, "users", trainer.id), { managedGroupIds: [...currentManaged, groupId] });
+        }
+        return Promise.resolve();
+    });
+    await Promise.all(trainerPromises);
 
     // 4. Update Agents
     const batchPromises = agentIds.map(agentId => 
@@ -237,7 +242,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await Promise.all(batchPromises);
   };
 
-  const updateGroup = async (groupId: string, name: string, leaderId: string, trainerId: string | null, agentIds: string[]) => {
+  const updateGroup = async (groupId: string, name: string, leaderId: string, trainerIds: string[], agentIds: string[]) => {
     // 1. Update Group Meta
     await updateDoc(doc(db, "groups", groupId), { name, leaderId });
 
@@ -246,26 +251,47 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await updateDoc(doc(db, "users", leaderId), { groupId, role: UserRole.GROUP_LEADER });
     }
 
-    // 3. Update Trainer
-    if (trainerId) {
-        const trainer = users.find(u => u.id === trainerId);
-        if (trainer) {
-          const currentManaged = trainer.managedGroupIds || [];
-          if (!currentManaged.includes(groupId)) {
-            await updateDoc(doc(db, "users", trainerId), { managedGroupIds: [...currentManaged, groupId] });
-          }
-        }
-    }
+    // 3. Update Trainers (Handle Multiple: Add to selected, Remove from unselected)
+    const allTrainers = users.filter(u => u.role === UserRole.TRAINER);
+    const trainerPromises = allTrainers.map(trainer => {
+        const shouldHaveAccess = trainerIds.includes(trainer.id);
+        const currentManaged = trainer.managedGroupIds || [];
+        const hasAccess = currentManaged.includes(groupId);
 
-    // 4. Update Agents
-    const batchPromises = agentIds.map(agentId => 
-        updateDoc(doc(db, "users", agentId), { groupId, role: UserRole.AGENT })
-    );
-    await Promise.all(batchPromises);
+        if (shouldHaveAccess && !hasAccess) {
+            // Add group
+            return updateDoc(doc(db, "users", trainer.id), { managedGroupIds: [...currentManaged, groupId] });
+        } else if (!shouldHaveAccess && hasAccess) {
+            // Remove group
+            return updateDoc(doc(db, "users", trainer.id), { managedGroupIds: currentManaged.filter(id => id !== groupId) });
+        }
+        return Promise.resolve();
+    });
+    await Promise.all(trainerPromises);
+
+    // 4. Update Agents (Handle Add, Move, Remove)
+    const agentPromises: Promise<void>[] = [];
+
+    // 4a. Remove agents who are currently in this group but NOT in the new agentIds list
+    const currentGroupMembers = users.filter(u => u.groupId === groupId && u.role === UserRole.AGENT);
+    currentGroupMembers.forEach(user => {
+        if (!agentIds.includes(user.id)) {
+            // Unassign group
+            agentPromises.push(updateDoc(doc(db, "users", user.id), { groupId: '' }));
+        }
+    });
+
+    // 4b. Assign the selected agents to this group
+    agentIds.forEach(agentId => {
+        agentPromises.push(updateDoc(doc(db, "users", agentId), { groupId, role: UserRole.AGENT }));
+    });
+
+    await Promise.all(agentPromises);
   };
 
   const deleteGroup = async (groupId: string) => {
      await deleteDoc(doc(db, "groups", groupId));
+     // Optional: Cleanup users' groupIds, but strict cleanup handled by manual updates for now
   };
 
   return (
