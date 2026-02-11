@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Mail, AlertCircle, Loader2, ChevronRight, User, IdCard, X } from 'lucide-react';
+import { Lock, Mail, AlertCircle, Loader2, ChevronRight, User, X } from 'lucide-react';
 
 interface LoginProps {
   onSwitchToSignup: () => void;
@@ -29,7 +29,7 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
     try {
       const success = await login(identifier, password);
       if (!success) {
-        setError('Invalid credentials. Please check your Agent Code and Password.');
+        setError('Invalid credentials. Please check your Email and Password.');
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
@@ -82,16 +82,16 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
             )}
 
             <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Agent Code</label>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Email Address</label>
               <div className="relative">
-                <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
-                  type="text"
+                  type="email"
                   required
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="block w-full pl-10 pr-3 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="e.g. AGT-12345"
+                  placeholder="you@company.com"
                 />
               </div>
             </div>
@@ -145,11 +145,11 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
              </p>
              <div className="space-y-2">
                  {[
-                    { label: 'System Admin', id: 'ADM-001', role: 'System Config' },
-                    { label: 'Master Trainer', id: 'TRN-MST', role: 'Full Access' },
-                    { label: 'Group Trainer (MDRT STAR)', id: 'TRN-STAR', role: 'Single Group Coach' },
-                    { label: 'Group Leader (MDRT STAR)', id: 'LDR-STAR-01', role: 'Group Leader' },
-                    { label: 'Agent (MDRT STAR)', id: 'AGT-STAR-02', role: 'Agent' },
+                    { label: 'System Admin', id: 'admin@sys.com', role: 'System Config' },
+                    { label: 'Master Trainer', id: 'master@sys.com', role: 'Full Access' },
+                    { label: 'Group Trainer (MDRT STAR)', id: 'coach@star.com', role: 'Single Group Coach' },
+                    { label: 'Group Leader (MDRT STAR)', id: 'agent01@star.com', role: 'Group Leader' },
+                    { label: 'Agent (MDRT STAR)', id: 'agent02@star.com', role: 'Agent' },
                  ].map((cred, idx) => (
                      <button
                         key={idx}

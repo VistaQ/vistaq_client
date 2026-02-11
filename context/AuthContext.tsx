@@ -124,19 +124,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       if (!password) return false;
       
-      let email = identifier;
+      const email = identifier;
       
-      // Check if identifier looks like an email, if not, try to find user by Agent Code
-      if (!identifier.includes('@')) {
-          const userByCode = users.find(u => u.agentCode === identifier);
-          if (userByCode) {
-              email = userByCode.email;
-          } else {
-              // If agent code not found, let firebase handle it (likely fail) or return false
-              console.warn("Agent Code not found locally, attempting login with input as-is...");
-          }
-      }
-
       await signInWithEmailAndPassword(auth, email, password);
       return true;
     } catch (error) {
@@ -168,7 +157,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
        setTimeout(() => {
            showNotification(
                "Registration Successful", 
-               `Welcome to VistaQ, ${name}! Your account has been successfully created. Please login with your Agent Code (${agentCode}) or Email.`, 
+               `Welcome to VistaQ, ${name}! Your account has been successfully created. Please login with your Email Address (${email}).`, 
                'success'
            );
        }, 500);
@@ -228,7 +217,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     // Notification
-    const loginId = userData.role === UserRole.AGENT ? `Agent Code: ${userData.agentCode}` : `Email: ${userData.email}`;
+    const loginId = `Email: ${userData.email}`;
     showNotification(
         "User Created Successfully",
         `Account has been created for ${userData.name}.\n\nLogin ID: ${loginId}\nPassword: ${userData.password}`,
