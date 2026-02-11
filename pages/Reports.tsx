@@ -97,6 +97,11 @@ const Reports: React.FC = () => {
     ? groups.filter(g => currentUser.managedGroupIds!.includes(g.id))
     : groups;
 
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return !isNaN(d.getTime()) ? d.toLocaleDateString() : 'N/A';
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -215,7 +220,7 @@ const Reports: React.FC = () => {
                  {closedSales.map((sale) => (
                     <tr key={sale.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 text-sm text-gray-600">
-                            {new Date(sale.updatedAt).toLocaleDateString()}
+                            {formatDate(sale.updatedAt)}
                         </td>
                         <td className="px-6 py-4 font-medium text-gray-900">
                             {sale.name}

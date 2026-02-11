@@ -41,7 +41,7 @@ let writeBatch: any;
 console.warn("⚠️ Firebase imports removed: Running in DEMO MODE (LocalStorage Backend) ⚠️");
 
 // UPDATED KEY TO FORCE RE-SEED
-const MOCK_STORAGE_KEY = 'vistaq_mock_data_v3';
+const MOCK_STORAGE_KEY = 'vistaq_mock_data_v4';
 
 const getStore = () => {
 try {
@@ -55,7 +55,7 @@ const setStore = (data: any) => localStorage.setItem(MOCK_STORAGE_KEY, JSON.stri
 
 // --- SEED DATA GENERATION ---
 if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
-    console.log("🌱 Seeding Dummy Data (v3)...");
+    console.log("🌱 Seeding Dummy Data (v4)...");
     
     const users: Record<string, any> = {};
     const groups: Record<string, any> = {};
@@ -78,6 +78,7 @@ if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
         name: 'System Admin',
         email: 'admin@sys.com',
         role: 'ADMIN',
+        agentCode: 'ADM-001',
         avatarUrl: 'https://ui-avatars.com/api/?name=System+Admin&background=ef4444&color=fff'
     };
 
@@ -86,6 +87,7 @@ if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
         name: 'Master Trainer',
         email: 'master@sys.com',
         role: 'TRAINER', // Can access all because we will give them all group IDs
+        agentCode: 'TRN-MST',
         managedGroupIds: groupDefs.map(g => g.id),
         avatarUrl: 'https://ui-avatars.com/api/?name=Master+Trainer'
     };
@@ -95,6 +97,7 @@ if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
         name: 'Group Coach (Star)',
         email: 'coach@star.com',
         role: 'TRAINER',
+        agentCode: 'TRN-STAR',
         managedGroupIds: ['g_star'], // Only accesses MDRT STAR
         avatarUrl: 'https://ui-avatars.com/api/?name=Group+Coach'
     };
@@ -212,13 +215,15 @@ if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
         const isStarGroup = g.id === 'g_star';
         const leaderName = isStarGroup ? 'Agent 01 (Leader)' : `${g.name} Leader`;
         const leaderEmail = isStarGroup ? 'agent01@star.com' : `leader@${g.id}.com`;
+        const leaderCode = isStarGroup ? 'LDR-STAR-01' : `LDR-${g.id.toUpperCase()}`;
 
         users[leaderId] = {
             id: leaderId,
             name: leaderName,
             email: leaderEmail,
             role: 'GROUP_LEADER',
-            groupId: g.id
+            groupId: g.id,
+            agentCode: leaderCode
         };
         // Leaders get TOP stats
         generateProspects(leaderId, 'TOP');
@@ -231,11 +236,13 @@ if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
             
             let agentName = `${g.name} Agent ${agentNum}`;
             let agentEmail = `agent${agentNum}@${g.id}.com`;
+            let agentCode = `AGT-${g.id.toUpperCase()}-${agentNum.toString().padStart(2, '0')}`;
             
             // Specific override for Agent 02 in MDRT STAR for demo Login
             if (isStarGroup && i === 0) { // First agent in loop is Agent 02
                 agentName = 'Agent 02';
                 agentEmail = 'agent02@star.com';
+                agentCode = 'AGT-STAR-02';
             }
 
             // Determine Performance Tier based on index i (0 to 9)
@@ -253,7 +260,8 @@ if (!localStorage.getItem(MOCK_STORAGE_KEY)) {
                 name: agentName,
                 email: agentEmail,
                 role: 'AGENT',
-                groupId: g.id
+                groupId: g.id,
+                agentCode: agentCode
             };
             
             generateProspects(agentId, tier);

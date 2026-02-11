@@ -15,7 +15,7 @@ export interface User {
   managedGroupIds?: string[]; // For Trainers handling multiple groups
   avatarUrl?: string;
   password?: string; // For mock auth only
-  agentCode?: string; // "Agent ID" from business perspective
+  agentCode?: string; // "Agent Code"
 }
 
 export interface BadgeTier {
@@ -33,6 +33,12 @@ export enum ProspectStage {
   SALES = 4,
   POINTS = 5,
   CLOSED = 6
+}
+
+export interface ProspectProduct {
+  id: string;
+  name: string;
+  amount: number;
 }
 
 export interface Prospect {
@@ -57,8 +63,10 @@ export interface Prospect {
   };
 
   // Card 4 Data (Sales)
-  productType?: string;
-  policyAmountMYR?: number;
+  productType?: string; // Summary string for backward compatibility
+  policyAmountMYR?: number; // Total sum
+  products?: ProspectProduct[]; // Multiple products support
+  
   saleStatus?: 'SUCCESSFUL' | 'UNSUCCESSFUL' | 'KIV'; // Added KIV
   saleReason?: string; // Mandatory if unsuccessful
   paymentReceived?: boolean;

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Prospect, ProspectStage, UserRole } from '../types';
-import { CheckCircle, Clock, XCircle, ChevronRight, Lock, MessageCircle, DollarSign, Save, Trash2, ShieldCheck, Undo2, Eye, MapPin, AlertTriangle, Calendar, Check, PauseCircle } from 'lucide-react';
+import { Prospect, ProspectStage, UserRole, ProspectProduct } from '../types';
+import { CheckCircle, Clock, XCircle, ChevronRight, Lock, MessageCircle, DollarSign, Save, Trash2, ShieldCheck, Undo2, Eye, MapPin, AlertTriangle, Calendar, Check, PauseCircle, Plus, MinusCircle } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -38,6 +38,9 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   const [customFailReason, setCustomFailReason] = useState('');
   const [failReasonSelectValue, setFailReasonSelectValue] = useState('');
 
+  // Multiple Products State
+  const [productRows, setProductRows] = useState<ProspectProduct[]>([]);
+
   // Delete Modal State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -45,6 +48,13 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   const [errors, setErrors] = useState<{name?: string, phone?: string, email?: string}>({});
 
   const STANDARD_REASONS = ['Unable to afford', 'Unable to decide', 'Due to Health / Occupation', 'Needs more time'];
+
+  const PRODUCT_OPTIONS = [
+    { label: 'Guaranteed Acceptance Plan', options: ['Takaful Al-Shams', 'Takaful Mumtaz', 'Takaful SureCover'] },
+    { label: 'Investment-Linked Plan', options: ['Takaful Single Invest', 'Takaful ProInvest'] },
+    { label: 'Ordinary Family Takaful Plan', options: ['Takaful Term80', 'Takaful ProEssential', 'Takaful Family Hero', 'Takaful ProSecure', 'Executive20', 'Takaful ProAspire'] },
+    { label: 'Personal Accident & Critical Illness Plan', options: ['PATINA2016', 'CancerCare'] }
+  ];
 
   // Initialize local inputs from prospect data if available
   useEffect(() => {
@@ -82,6 +92,21 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
     } else {
         setFailReasonSelectValue('');
     }
+
+    // Initialize Products
+    if (prospect.products && prospect.products.length > 0) {
+        setProductRows(prospect.products);
+    } else if (prospect.productType) {
+        // Migration/Fallback for single product data
+        setProductRows([{
+            id: 'legacy_1',
+            name: prospect.productType,
+            amount: prospect.policyAmountMYR || 0
+        }]);
+    } else {
+        // Default empty row
+        setProductRows([{ id: Date.now().toString(), name: '', amount: 0 }]);
+    }
   }, [prospect]);
 
   // --- AUTO SAVE EFFECT FOR DATES ---
@@ -101,6 +126,23 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
           setFormData(prev => ({...prev, appointmentDate: combinedDate, appointmentEndTime: endTimeInput}));
       }
   }, [dateInput, startTimeInput, endTimeInput]);
+
+  // --- AUTO SAVE EFFECT FOR PRODUCTS ---
+  useEffect(() => {
+      if (!formData.id) return; // Only sync if prospect created
+      
+      const totalAmount = productRows.reduce((sum, p) => sum + (p.amount || 0), 0);
+      const productSummary = productRows.map(p => p.name).filter(Boolean).join(', ');
+
+      // Check if changes exist to avoid infinite loops or unnecessary writes
+      if (totalAmount !== formData.policyAmountMYR || productSummary !== formData.productType) {
+          handleSave({
+              products: productRows,
+              policyAmountMYR: totalAmount,
+              productType: productSummary
+          });
+      }
+  }, [productRows]);
 
 
   // --- PERMISSION LOGIC ---
@@ -135,7 +177,11 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
       const newProspect = await addProspect({
         ...formData,
         phone: fullPhone,
-        currentStage: ProspectStage.APPOINTMENT
+        currentStage: ProspectStage.APPOINTMENT,
+        // Ensure default product structure
+        products: productRows,
+        policyAmountMYR: 0,
+        productType: ''
       });
       setFormData(newProspect);
     }
@@ -154,19 +200,26 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
           onClose();
           return;
       }
+      // Trigger final product sync to be sure
+      const totalAmount = productRows.reduce((sum, p) => sum + (p.amount || 0), 0);
+      const productSummary = productRows.map(p => p.name).filter(Boolean).join(', ');
+
+      const updates: Partial<Prospect> = {
+          products: productRows,
+          policyAmountMYR: totalAmount,
+          productType: productSummary,
+          phone: `+60${phoneSuffix}`
+      };
+
       if (dateInput && startTimeInput) {
           const d = new Date(`${dateInput}T${startTimeInput}`);
           if (!isNaN(d.getTime())) {
-              const combined = d.toISOString();
-              handleSave({ 
-                  appointmentDate: combined,
-                  appointmentEndTime: endTimeInput,
-                  phone: `+60${phoneSuffix}`
-              });
+              updates.appointmentDate = d.toISOString();
+              updates.appointmentEndTime = endTimeInput;
           }
-      } else {
-           handleSave({ phone: `+60${phoneSuffix}` });
       }
+      
+      handleSave(updates);
       onClose();
   };
 
@@ -235,12 +288,26 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   const handleOutcomeChange = (outcome: 'SUCCESSFUL' | 'UNSUCCESSFUL' | 'KIV') => {
       if (!isStep4Unlocked) return; 
 
+      const totalAmount = productRows.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      // Validation for Successful
+      if (outcome === 'SUCCESSFUL') {
+          if (totalAmount <= 0) {
+              alert("Total ACE Amount must be greater than 0 to mark as Successful.");
+              return;
+          }
+          if (productRows.some(p => !p.name)) {
+              alert("Please select a product for all entries.");
+              return;
+          }
+      }
+
       let updates: Partial<Prospect> = { saleStatus: outcome };
       
       if (outcome === 'SUCCESSFUL') {
           updates.currentStage = ProspectStage.POINTS;
-          updates.pointsAwarded = (formData.policyAmountMYR || 0) * 0.1;
-          updates.paymentReceived = true;
+          updates.pointsAwarded = totalAmount * 0.1;
+          updates.paymentReceived = true; // Button click implies success/payment
       } else if (outcome === 'UNSUCCESSFUL') {
           updates.currentStage = ProspectStage.CLOSED;
           updates.paymentReceived = false;
@@ -249,21 +316,6 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
       }
       
       handleSave(updates);
-  };
-
-  const handlePaymentCheck = (checked: boolean) => {
-      if (checked) {
-          if (formData.policyAmountMYR && formData.policyAmountMYR > 0 && formData.productType) {
-              handleOutcomeChange('SUCCESSFUL');
-          } else {
-              alert("Please select a Product and enter Amount before confirming payment.");
-          }
-      } else {
-          handleSave({ paymentReceived: false });
-          if (formData.saleStatus === 'SUCCESSFUL') {
-               handleSave({ saleStatus: undefined, currentStage: ProspectStage.SALES });
-          }
-      }
   };
 
   const handleUndo = () => {
@@ -275,6 +327,27 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
       });
       setFailReasonSelectValue('');
       setCustomFailReason('');
+  };
+
+  // --- PRODUCT HANDLERS ---
+  const handleAddProduct = () => {
+      setProductRows(prev => [...prev, { id: Date.now().toString(), name: '', amount: 0 }]);
+  };
+
+  const handleRemoveProduct = (id: string) => {
+      if (productRows.length === 1) {
+          // Reset if last one
+          setProductRows([{ id: Date.now().toString(), name: '', amount: 0 }]);
+      } else {
+          setProductRows(prev => prev.filter(p => p.id !== id));
+      }
+  };
+
+  const handleProductChange = (id: string, field: 'name' | 'amount', value: any) => {
+      setProductRows(prev => prev.map(p => {
+          if (p.id === id) return { ...p, [field]: value };
+          return p;
+      }));
   };
 
   // --- RENDERERS ---
@@ -550,8 +623,8 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                       <p className="text-xs text-gray-500 mb-2">Check all steps to proceed to Sales Outcome.</p>
                       
                       {[
-                          { key: 'rapport', label: 'Social / Rapport' },
-                          { key: 'factFinding', label: 'Fact Find / Needs' },
+                          { key: 'rapport', label: 'Social' },
+                          { key: 'factFinding', label: 'Fact Find' },
                           { key: 'presentation', label: 'Presentation' }
                       ].map((item) => (
                           <CustomCheckbox 
@@ -575,74 +648,92 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                 isDone={isOutcomeDecided} 
               />
               <div className="p-6 space-y-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Product</label>
-                          <select 
-                            value={formData.productType || ''}
-                            onChange={e => handleSave({ productType: e.target.value })}
-                            className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500"
-                            disabled={isReadOnly || isOutcomeDecided}
+                  
+                  {/* Product List Header */}
+                  <div className="flex justify-between items-end">
+                      <label className="block text-xs font-bold text-gray-500 uppercase">Products Proposed</label>
+                      {!isReadOnly && !isOutcomeDecided && (
+                          <button 
+                            onClick={handleAddProduct}
+                            className="flex items-center text-xs font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
                           >
-                            <option value="">Select Product...</option>
-                            <optgroup label="Guaranteed Acceptance Plan">
-                                <option value="Takaful Al-Shams">Takaful Al-Shams</option>
-                                <option value="Takaful Mumtaz">Takaful Mumtaz</option>
-                                <option value="Takaful SureCover">Takaful SureCover</option>
-                            </optgroup>
-                            <optgroup label="Investment-Linked Plan">
-                                <option value="Takaful Single Invest">Takaful Single Invest</option>
-                                <option value="Takaful ProInvest">Takaful ProInvest</option>
-                            </optgroup>
-                            <optgroup label="Ordinary Family Takaful Plan">
-                                <option value="Takaful Term80">Takaful Term80</option>
-                                <option value="Takaful ProEssential">Takaful ProEssential</option>
-                                <option value="Takaful Family Hero">Takaful Family Hero</option>
-                                <option value="Takaful ProSecure">Takaful ProSecure</option>
-                                <option value="Executive20">Executive20</option>
-                                <option value="Takaful ProAspire">Takaful ProAspire</option>
-                            </optgroup>
-                            <optgroup label="Personal Accident & Critical Illness Plan">
-                                <option value="PATINA2016">PATINA2016</option>
-                                <option value="CancerCare">CancerCare</option>
-                            </optgroup>
-                          </select>
-                      </div>
-                      <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Amount (MYR)</label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">RM</span>
-                            <input 
-                              type="number"
-                              value={formData.policyAmountMYR || ''}
-                              onChange={e => handleSave({ policyAmountMYR: Number(e.target.value) })}
-                              className="block w-full pl-10 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500"
-                              placeholder="5000"
-                              disabled={isReadOnly || isOutcomeDecided}
-                            />
-                          </div>
-                      </div>
+                              <Plus className="w-3 h-3 mr-1" /> ADD PRODUCT
+                          </button>
+                      )}
                   </div>
 
-                  {/* Payment Checkbox - Hides when outcome is KIV or UNSUCCESSFUL */}
-                  {formData.saleStatus !== 'KIV' && formData.saleStatus !== 'UNSUCCESSFUL' && (
-                      <div className="p-1">
-                          <CustomCheckbox 
-                              checked={formData.paymentReceived || false}
-                              onChange={() => handlePaymentCheck(!formData.paymentReceived)}
-                              label="First Payment Completed (Marks as Successful)"
-                              disabled={isReadOnly || isOutcomeDecided}
-                          />
-                      </div>
-                  )}
+                  {/* Multiple Products Rows */}
+                  <div className="space-y-3">
+                      {productRows.map((row, index) => (
+                          <div key={row.id} className="grid grid-cols-12 gap-3 items-end p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              <div className="col-span-7">
+                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Product {index + 1}</label>
+                                  <select 
+                                    value={row.name || ''}
+                                    onChange={e => handleProductChange(row.id, 'name', e.target.value)}
+                                    className="block w-full bg-white border border-gray-300 text-gray-900 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                    disabled={isReadOnly || isOutcomeDecided}
+                                  >
+                                    <option value="">Select Product...</option>
+                                    {PRODUCT_OPTIONS.map(grp => (
+                                        <optgroup key={grp.label} label={grp.label}>
+                                            {grp.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                        </optgroup>
+                                    ))}
+                                  </select>
+                              </div>
+                              <div className="col-span-4">
+                                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">ACE Amount (MYR)</label>
+                                  <div className="relative">
+                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">RM</span>
+                                    <input 
+                                      type="number"
+                                      value={row.amount || ''}
+                                      onChange={e => handleProductChange(row.id, 'amount', Number(e.target.value))}
+                                      className="block w-full pl-8 bg-white border border-gray-300 text-gray-900 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                      placeholder="0"
+                                      disabled={isReadOnly || isOutcomeDecided}
+                                    />
+                                  </div>
+                              </div>
+                              <div className="col-span-1 flex justify-center pb-2">
+                                  {!isReadOnly && !isOutcomeDecided && productRows.length > 1 && (
+                                      <button 
+                                        onClick={() => handleRemoveProduct(row.id)}
+                                        className="text-red-400 hover:text-red-600 transition-colors"
+                                      >
+                                          <MinusCircle className="w-5 h-5" />
+                                      </button>
+                                  )}
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+
+                  {/* Total Summary */}
+                  <div className="flex justify-end items-center pt-2 border-t border-gray-100">
+                      <span className="text-sm text-gray-500 mr-4 font-medium">Total ACE Amount:</span>
+                      <span className="text-xl font-bold text-gray-900">RM {productRows.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()}</span>
+                  </div>
 
                   {/* Outcome Logic */}
                   {!isOutcomeDecided && (
                     <div className="space-y-3 pt-4 border-t">
-                        <label className="block text-xs font-bold text-gray-500 uppercase">Manual Outcome Selection</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase">Outcome Selection</label>
                         <div className="flex gap-3">
-                             <button onClick={() => handleOutcomeChange('KIV')} disabled={isReadOnly} className="flex-1 py-2 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded hover:bg-yellow-100 font-medium text-sm">KIV</button>
-                             <button onClick={() => handleOutcomeChange('UNSUCCESSFUL')} disabled={isReadOnly} className="flex-1 py-2 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 font-medium text-sm">Non-Successful</button>
+                             <button onClick={() => handleOutcomeChange('KIV')} disabled={isReadOnly} className="flex-1 py-3 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-lg hover:bg-yellow-100 font-bold text-sm shadow-sm transition-transform active:scale-95">
+                                 KIV
+                             </button>
+                             <button 
+                                onClick={() => handleOutcomeChange('SUCCESSFUL')} 
+                                disabled={isReadOnly} 
+                                className="flex-1 py-3 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-600 hover:text-white hover:border-green-600 font-bold text-sm shadow-sm transition-all active:scale-95 flex items-center justify-center"
+                            >
+                                 <CheckCircle className="w-4 h-4 mr-2" /> Successful
+                             </button>
+                             <button onClick={() => handleOutcomeChange('UNSUCCESSFUL')} disabled={isReadOnly} className="flex-1 py-3 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 font-bold text-sm shadow-sm transition-transform active:scale-95">
+                                 Non-Successful
+                             </button>
                         </div>
                     </div>
                   )}
@@ -733,7 +824,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                           <h2 className="text-3xl font-extrabold text-green-800 mb-2">Congratulations!</h2>
                           <p className="text-green-700 mb-6 font-medium">You have successfully secured a sale of <br/><span className="text-2xl font-bold">RM {formData.policyAmountMYR?.toLocaleString()}</span></p>
                           <button onClick={onClose} className="bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow-md hover:bg-green-700 transition-transform active:scale-95">
-                              Complete
+                              Complete & Close
                           </button>
                       </div>
                   )}

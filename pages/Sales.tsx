@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -12,9 +13,18 @@ const Sales: React.FC = () => {
   // Filter only Successful Sales for the current user
   const mySales = getProspectsByScope(currentUser)
     .filter(p => p.saleStatus === 'SUCCESSFUL')
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    .sort((a, b) => {
+        const dateA = new Date(a.updatedAt).getTime();
+        const dateB = new Date(b.updatedAt).getTime();
+        return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
+    });
 
   const totalFYC = mySales.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
+
+  const formatDate = (dateStr: string) => {
+      const d = new Date(dateStr);
+      return !isNaN(d.getTime()) ? d.toLocaleDateString() : 'N/A';
+  };
 
   return (
     <div className="space-y-6">
@@ -63,7 +73,7 @@ const Sales: React.FC = () => {
                     <td className="px-6 py-4 text-sm text-gray-600">
                       <div className="flex items-center">
                         <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                        {new Date(sale.updatedAt).toLocaleDateString()}
+                        {formatDate(sale.updatedAt)}
                       </div>
                     </td>
                     <td className="px-6 py-4">

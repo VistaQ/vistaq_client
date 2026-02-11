@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -17,7 +18,11 @@ const PointsHistory: React.FC = () => {
   // Filter for items that gave points and sort by most recent
   const history = prospects
     .filter(p => (p.pointsAwarded || 0) > 0)
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    .sort((a, b) => {
+        const dateA = new Date(a.updatedAt).getTime();
+        const dateB = new Date(b.updatedAt).getTime();
+        return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
+    });
 
   const totalPoints = history.reduce((sum, p) => sum + (p.pointsAwarded || 0), 0);
 
@@ -33,6 +38,11 @@ const PointsHistory: React.FC = () => {
   const progressToNext = nextBadge 
     ? Math.min(100, Math.max(0, ((totalPoints - currentBadge.threshold) / (nextBadge.threshold - currentBadge.threshold)) * 100))
     : 100;
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return !isNaN(d.getTime()) ? d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+  };
 
   return (
     <div className="space-y-8">
@@ -142,7 +152,7 @@ const PointsHistory: React.FC = () => {
               {history.map((item) => (
                 <tr key={item.id} className="hover:bg-blue-50 transition-colors">
                   <td className="px-6 py-4 text-sm text-gray-600">
-                    {new Date(item.updatedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                    {formatDate(item.updatedAt)}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center">

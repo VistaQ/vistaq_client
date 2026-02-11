@@ -90,7 +90,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Agent ID</label>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Agent Code</label>
               <div className="relative">
                 <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input

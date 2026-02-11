@@ -24,22 +24,29 @@ const Events: React.FC = () => {
 
   if (!currentUser) return null;
 
-  // Permissions: Admin, Trainer, Group Trainer can CREATE/EDIT.
-  // Agents and Group Leaders can only VIEW.
-  const canManage = currentUser.role === UserRole.TRAINER || currentUser.role === UserRole.ADMIN;
+  // Permissions: Admin, Trainer, Group Leader can CREATE/EDIT.
+  const canManage = currentUser.role === UserRole.TRAINER || 
+                    currentUser.role === UserRole.ADMIN || 
+                    currentUser.role === UserRole.GROUP_LEADER;
 
   const myEvents = getEventsForUser(currentUser);
   
   // Sort by date (Upcoming first)
   const sortedEvents = [...myEvents].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // Group Options for Creator
-  const targetableGroups = currentUser.role === UserRole.TRAINER 
-     ? groups.filter(g => currentUser.managedGroupIds?.includes(g.id))
-     : (currentUser.role === UserRole.ADMIN ? groups : []);
+  // Determine Targetable Groups based on Role
+  let targetableGroups = groups; 
   
-  // Also Admin sees all
-  const availableGroups = currentUser.role === UserRole.ADMIN ? groups : targetableGroups;
+  if (currentUser.role === UserRole.TRAINER) {
+      targetableGroups = groups.filter(g => currentUser.managedGroupIds?.includes(g.id));
+  } else if (currentUser.role === UserRole.GROUP_LEADER) {
+      targetableGroups = groups.filter(g => g.id === currentUser.groupId);
+  } else if (currentUser.role !== UserRole.ADMIN) {
+      // Agents cannot target groups (and shouldn't see create button anyway due to canManage)
+      targetableGroups = [];
+  }
+  
+  const availableGroups = targetableGroups;
 
   const handleOpenModal = (event?: Event) => {
       if (event) {
@@ -71,7 +78,20 @@ const Events: React.FC = () => {
       } else {
           // Create Mode
           setEditingEventId(null);
-          setFormData({ title: '', description: '', date: '', time: '', venue: '', link: '', targetGroupIds: [] });
+          // If Group Leader, auto-select their group for convenience
+          const initialGroups = (currentUser.role === UserRole.GROUP_LEADER && currentUser.groupId) 
+              ? [currentUser.groupId] 
+              : [];
+              
+          setFormData({ 
+              title: '', 
+              description: '', 
+              date: '', 
+              time: '', 
+              venue: '', 
+              link: '', 
+              targetGroupIds: initialGroups 
+          });
       }
       setIsModalOpen(true);
   };
@@ -153,8 +173,7 @@ const Events: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {sortedEvents.length > 0 ? sortedEvents.map(evt => {
               // Permission Logic:
-              // Admin/Trainer can edit/delete ONLY events they created.
-              // They can view others but cannot change them.
+              // Admin/Trainer/Leader can edit/delete ONLY events they created.
               const isCreator = evt.createdBy === currentUser.id;
               const evtDate = new Date(evt.date);
               
@@ -333,6 +352,9 @@ const Events: React.FC = () => {
                                   <p className="text-xs text-gray-400">No groups available to select.</p>
                               )}
                           </div>
+                          {currentUser.role === UserRole.GROUP_LEADER && (
+                              <p className="text-xs text-gray-400 mt-1">You can only create events for your own group.</p>
+                          )}
                       </div>
 
                       <div className="pt-4 flex justify-end">

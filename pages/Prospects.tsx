@@ -139,6 +139,11 @@ const Prospects: React.FC = () => {
   const canAddProspect = currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER || currentUser?.role === UserRole.ADMIN;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return !isNaN(d.getTime()) ? d.toLocaleDateString() : 'N/A';
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -233,7 +238,7 @@ const Prospects: React.FC = () => {
                             {getStageBadge(prospect)}
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-500">
-                            {new Date(prospect.updatedAt).toLocaleDateString()}
+                            {formatDate(prospect.updatedAt)}
                             </td>
                             <td className="px-6 py-4 text-right">
                             <button 
@@ -295,7 +300,7 @@ const Prospects: React.FC = () => {
                         <div className="border-t border-gray-50 pt-3 flex items-center justify-between mt-auto">
                             <div className="text-xs text-gray-400 flex items-center" title="Last Updated">
                                 <Calendar className="w-3 h-3 mr-1" />
-                                {new Date(prospect.updatedAt).toLocaleDateString()}
+                                {formatDate(prospect.updatedAt)}
                             </div>
                             <button 
                                 onClick={() => handleViewProspect(prospect)}

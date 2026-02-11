@@ -124,7 +124,7 @@ const AdminUsers: React.FC = () => {
               <tr>
                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Name</th>
                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Role</th>
-                 <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Agent ID</th>
+                 <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Agent Code</th>
                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Group Assignment</th>
                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Actions</th>
               </tr>
@@ -210,7 +210,7 @@ const AdminUsers: React.FC = () => {
                   </div>
                   
                   <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Agent ID</label>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Agent Code</label>
                       <div className="relative">
                           <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                           <input 

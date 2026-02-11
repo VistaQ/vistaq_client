@@ -26,7 +26,7 @@ const MDRT_TARGET_FYC = 100000;
 const MDRT_TARGET_PROSPECTS = 100;
 
 // Zurich Palette for Charts
-const COLORS = ['#23366F', '#3D6DB5', '#00C9B1']; 
+const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC']; 
 
 const Dashboard: React.FC = () => {
   const { currentUser, groups, users } = useAuth();
@@ -76,10 +76,19 @@ const Dashboard: React.FC = () => {
     }).sort((a, b) => b.fyc - a.fyc);
 
     // --- 5. CHART DATA ---
+    const totalAppointmentsSet = scopeProspects.filter(p => 
+        p.appointmentStatus === 'Scheduled' || 
+        p.appointmentStatus === 'Rescheduled' || 
+        p.appointmentStatus === 'Completed'
+    ).length;
+
+    const totalSalesMeetings = scopeProspects.filter(p => p.appointmentStatus === 'Completed').length;
+
     const funnelData = [
        { name: 'Prospects', value: scopeProspects.length },
-       { name: 'Appointments', value: scopeProspects.filter(p => p.appointmentStatus === 'Completed').length },
-       { name: 'Sales Closed', value: totalSales },
+       { name: 'Appointments', value: totalAppointmentsSet },
+       { name: 'Sales Meeting', value: totalSalesMeetings },
+       { name: 'Sales', value: totalSales },
     ];
 
     return (
@@ -267,6 +276,14 @@ const Dashboard: React.FC = () => {
 
   // KPI Calculations
   const totalProspects = myProspects.length;
+  
+  // "Appointments" = Scheduled or Rescheduled or Completed (Any appointment activity)
+  const appointmentsSet = myProspects.filter(p => 
+      p.appointmentStatus === 'Scheduled' || 
+      p.appointmentStatus === 'Rescheduled' || 
+      p.appointmentStatus === 'Completed'
+  ).length;
+
   const completedAppointments = myProspects.filter(p => p.appointmentStatus === 'Completed').length;
   const closedSales = myProspects.filter(p => p.saleStatus === 'SUCCESSFUL').length;
   const totalPersonalFYC = myProspects.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
@@ -275,11 +292,6 @@ const Dashboard: React.FC = () => {
   const fycProgress = Math.min(100, (totalPersonalFYC / MDRT_TARGET_FYC) * 100);
   const prospectsProgress = Math.min(100, (totalProspects / MDRT_TARGET_PROSPECTS) * 100);
   
-  // Highest Sale
-  const highestSaleProspect = myProspects
-    .filter(p => p.saleStatus === 'SUCCESSFUL')
-    .sort((a, b) => (b.policyAmountMYR || 0) - (a.policyAmountMYR || 0))[0];
-
   // --- UPCOMING SCHEDULE LOGIC (Combined Events & Meetings) ---
   const now = new Date();
   const next7Days = new Date();
@@ -327,7 +339,8 @@ const Dashboard: React.FC = () => {
   // Chart Data (Personal Funnel)
   const chartData = [
     { name: 'Prospects', value: totalProspects },
-    { name: 'Appointments', value: completedAppointments },
+    { name: 'Appointments', value: appointmentsSet },
+    { name: 'Sales Meeting', value: completedAppointments },
     { name: 'Sales', value: closedSales },
   ];
 
@@ -340,7 +353,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* KPI Cards */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
           <div className="flex justify-between items-start mb-2">
@@ -369,25 +382,6 @@ const Dashboard: React.FC = () => {
                </div>
             </div>
           </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-           <div className="flex justify-between items-start mb-4">
-             <div>
-                <h3 className="text-sm font-medium text-gray-500">Highest Sale</h3>
-                {highestSaleProspect ? (
-                  <div className="mt-1">
-                     <p className="text-2xl font-bold text-gray-900">RM {highestSaleProspect.policyAmountMYR?.toLocaleString()}</p>
-                     <p className="text-sm text-gray-600 truncate">{highestSaleProspect.name} - {highestSaleProspect.productType}</p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400 mt-2">No sales yet</p>
-                )}
-             </div>
-             <div className="p-2 bg-green-50 text-green-600 rounded-lg">
-                <Trophy className="w-6 h-6" />
-             </div>
-           </div>
         </div>
       </div>
 

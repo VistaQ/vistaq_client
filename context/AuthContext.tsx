@@ -107,14 +107,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       let email = identifier;
       
-      // Check if identifier looks like an email, if not, try to find user by Agent ID (code)
+      // Check if identifier looks like an email, if not, try to find user by Agent Code
       if (!identifier.includes('@')) {
           const userByCode = users.find(u => u.agentCode === identifier);
           if (userByCode) {
               email = userByCode.email;
           } else {
               // If agent code not found, let firebase handle it (likely fail) or return false
-              console.warn("Agent ID not found locally, attempting email login with input...");
+              console.warn("Agent Code not found locally, attempting login with input as-is...");
           }
       }
 
@@ -138,7 +138,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
          email,
          role: UserRole.AGENT, // Default role
          groupId,
-         agentCode, // Agent ID
+         agentCode, // Agent Code
          avatarUrl: '',
          password: password // Storing password only for mock demo purposes (reset functionality)
        };
@@ -147,7 +147,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
        
        // 3. Send Welcome Email (Simulated)
        setTimeout(() => {
-           alert(`Welcome Email Sent to ${email}:\n\n"Welcome to VistaQ, ${name}! Your account has been successfully created. Please login with your Agent ID (${agentCode}) or Email."`);
+           alert(`Welcome Email Sent to ${email}:\n\n"Welcome to VistaQ, ${name}! Your account has been successfully created. Please login with your Agent Code (${agentCode}) or Email."`);
        }, 500);
 
        return true;

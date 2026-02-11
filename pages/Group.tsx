@@ -21,13 +21,13 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // Zurich Palette
-const COLORS = ['#23366F', '#3D6DB5', '#00C9B1'];
+const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC'];
 
 const Group: React.FC = () => {
   const { currentUser, getGroupMembers, groups, getUserById } = useAuth();
   const { getGroupProspects } = useData();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'prospects'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales'>('overview');
   
   // Trainer/Admin Logic: Allow selecting a group
   const [trainerSelectedGroupId, setTrainerSelectedGroupId] = useState<string | null>(null);
@@ -36,6 +36,11 @@ const Group: React.FC = () => {
   const isTrainer = currentUser?.role === UserRole.TRAINER;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   const isMultiGroupUser = isTrainer || isAdmin;
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return !isNaN(d.getTime()) ? d.toLocaleDateString() : 'N/A';
+  };
   
   // TRAINER / ADMIN VIEW: GROUP SELECTION GRID
   if (isMultiGroupUser && !trainerSelectedGroupId) {
@@ -157,15 +162,29 @@ const Group: React.FC = () => {
 
     const agentProspects = groupProspects.filter(p => p.agentId === selectedAgentId);
     const successfulSales = agentProspects.filter(p => p.saleStatus === 'SUCCESSFUL');
+    
+    // Updated Logic for Funnel
+    const appointmentsSet = agentProspects.filter(p => 
+        p.appointmentStatus === 'Scheduled' || 
+        p.appointmentStatus === 'Rescheduled' || 
+        p.appointmentStatus === 'Completed'
+    ).length;
+    const completedAppointments = agentProspects.filter(p => p.appointmentStatus === 'Completed').length;
+
     const chartData = [
        { name: 'Prospects', value: agentProspects.length },
-       { name: 'Appointments', value: agentProspects.filter(p => p.appointmentStatus === 'Completed').length },
+       { name: 'Appointments', value: appointmentsSet },
+       { name: 'Sales Meeting', value: completedAppointments },
        { name: 'Sales', value: successfulSales.length },
     ];
 
     const upcomingAppointments = agentProspects
         .filter(p => p.appointmentStatus === 'Not done' && p.appointmentDate && new Date(p.appointmentDate) > new Date())
-        .sort((a, b) => new Date(a.appointmentDate!).getTime() - new Date(b.appointmentDate!).getTime())
+        .sort((a, b) => {
+            const dateA = new Date(a.appointmentDate!).getTime();
+            const dateB = new Date(b.appointmentDate!).getTime();
+            return (isNaN(dateA) ? Infinity : dateA) - (isNaN(dateB) ? Infinity : dateB);
+        })
         .slice(0, 5);
 
     return (
@@ -182,7 +201,7 @@ const Group: React.FC = () => {
              <p className="text-sm text-gray-500">Individual Performance Dashboard</p>
            </div>
            <div className="ml-auto flex space-x-2 bg-white p-1 rounded-lg border">
-             {['overview', 'sales', 'prospects'].map((tab) => (
+             {['overview', 'sales'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as any)}
@@ -240,7 +259,12 @@ const Group: React.FC = () => {
                                     <Clock className="w-4 h-4 text-gray-400 mr-3" />
                                     <div>
                                         <p className="text-sm font-semibold text-gray-900">{p.name}</p>
-                                        <p className="text-xs text-gray-500">{new Date(p.appointmentDate!).toLocaleString()}</p>
+                                        <p className="text-xs text-gray-500">
+                                            {(() => {
+                                                const d = new Date(p.appointmentDate!);
+                                                return !isNaN(d.getTime()) ? d.toLocaleString() : 'Date Pending';
+                                            })()}
+                                        </p>
                                     </div>
                                 </div>
                             ))
@@ -267,7 +291,7 @@ const Group: React.FC = () => {
                     <tbody className="divide-y divide-gray-100">
                         {successfulSales.map(sale => (
                             <tr key={sale.id}>
-                                <td className="px-6 py-4 text-sm text-gray-600">{new Date(sale.updatedAt).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{formatDate(sale.updatedAt)}</td>
                                 <td className="px-6 py-4 font-medium">{sale.name}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600">{sale.productType}</td>
                                 <td className="px-6 py-4 text-right font-mono font-bold">RM {sale.policyAmountMYR?.toLocaleString()}</td>
@@ -276,36 +300,6 @@ const Group: React.FC = () => {
                         {successfulSales.length === 0 && (
                             <tr><td colSpan={4} className="p-8 text-center text-gray-500">No successful sales yet.</td></tr>
                         )}
-                    </tbody>
-                </table>
-             </div>
-        )}
-
-        {activeTab === 'prospects' && (
-             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <table className="w-full text-left">
-                    <thead className="bg-gray-50 border-b">
-                        <tr>
-                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Name</th>
-                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Stage</th>
-                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Last Contact</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {agentProspects.map(p => (
-                            <tr key={p.id}>
-                                <td className="px-6 py-4 font-medium text-gray-900">{p.name}</td>
-                                <td className="px-6 py-4">
-                                    <span className={`px-2 py-1 rounded-full text-xs ${
-                                        p.currentStage === 5 ? 'bg-red-100 text-red-700' :
-                                        p.currentStage === 4 ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                                    }`}>
-                                        {p.currentStage === 5 ? 'Lost' : p.currentStage === 4 ? 'Won' : `Stage ${p.currentStage}`}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{new Date(p.updatedAt).toLocaleDateString()}</td>
-                            </tr>
-                        ))}
                     </tbody>
                 </table>
              </div>
