@@ -291,10 +291,9 @@ const Agents: React.FC = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center">
-                       <Target className="w-3 h-3 text-gray-400 mr-1" />
-                       <span className="font-bold">{agent.sales}</span>
-                    </div>
+                    <span className="inline-block px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">
+                       {agent.sales}
+                    </span>
                 </td>
                 <td className="px-6 py-4 text-right">
                     <span className="font-mono font-medium text-gray-900">

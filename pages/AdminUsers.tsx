@@ -12,7 +12,9 @@ import {
   GraduationCap, 
   UserCheck, 
   X,
-  IdCard
+  IdCard,
+  Key,
+  Globe
 } from 'lucide-react';
 
 const AdminUsers: React.FC = () => {
@@ -23,6 +25,9 @@ const AdminUsers: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
+  
+  // Local state for temporary password
+  const [tempPassword, setTempPassword] = useState('');
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -34,12 +39,16 @@ const AdminUsers: React.FC = () => {
   const handleOpenModal = (user?: User) => {
     if (user) {
       setEditingUser({ ...user });
+      setTempPassword(''); // Don't show password on edit usually
     } else {
+      // New User Default
+      const randomPass = Math.random().toString(36).slice(-8);
+      setTempPassword(randomPass);
       setEditingUser({
         name: '',
         email: '',
         role: UserRole.AGENT,
-        password: 'password', // Default
+        password: '', 
         groupId: '',
         agentCode: '',
         managedGroupIds: []
@@ -54,7 +63,11 @@ const AdminUsers: React.FC = () => {
     if (editingUser.id) {
       updateUser(editingUser.id, editingUser);
     } else {
-      addUser(editingUser);
+      // Add New User with password
+      addUser({
+          ...editingUser,
+          password: tempPassword
+      });
     }
     setIsModalOpen(false);
     setEditingUser(null);
@@ -101,6 +114,7 @@ const AdminUsers: React.FC = () => {
         >
             <option value="all">All Roles</option>
             <option value={UserRole.ADMIN}>Admin</option>
+            <option value={UserRole.MASTER_TRAINER}>Master Trainer</option>
             <option value={UserRole.TRAINER}>Trainer</option>
             <option value={UserRole.GROUP_LEADER}>Group Leader</option>
             <option value={UserRole.AGENT}>Agent</option>
@@ -126,6 +140,7 @@ const AdminUsers: React.FC = () => {
                        <div className="flex items-center">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 font-bold text-xs text-white
                              ${user.role === UserRole.ADMIN ? 'bg-red-500' : 
+                               user.role === UserRole.MASTER_TRAINER ? 'bg-slate-800' :
                                user.role === UserRole.TRAINER ? 'bg-purple-500' : 'bg-blue-500'}`}>
                              {user.name.charAt(0)}
                           </div>
@@ -136,10 +151,12 @@ const AdminUsers: React.FC = () => {
                        </div>
                     </td>
                     <td className="px-6 py-4">
-                       <span className={`px-2 py-1 rounded-full text-xs font-bold
+                       <span className={`px-2 py-1 rounded-full text-xs font-bold flex items-center w-fit
                           ${user.role === UserRole.ADMIN ? 'bg-red-100 text-red-700' :
+                            user.role === UserRole.MASTER_TRAINER ? 'bg-slate-100 text-slate-700' :
                             user.role === UserRole.TRAINER ? 'bg-purple-100 text-purple-700' : 
                             'bg-blue-100 text-blue-700'}`}>
+                          {user.role === UserRole.MASTER_TRAINER && <Globe className="w-3 h-3 mr-1" />}
                           {user.role}
                        </span>
                     </td>
@@ -199,19 +216,22 @@ const AdminUsers: React.FC = () => {
                      </div>
                   </div>
                   
-                  <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Agent Code</label>
-                      <div className="relative">
-                          <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                          <input 
-                             type="text" 
-                             className="w-full pl-9 bg-gray-50 border border-gray-300 text-gray-900 p-2 rounded" 
-                             value={editingUser.agentCode || ''}
-                             onChange={e => setEditingUser({...editingUser, agentCode: e.target.value})}
-                             placeholder="e.g. AGT-12345"
-                          />
+                  {/* Password Field (Only relevant for New Users usually, or resetting) */}
+                  {!editingUser.id && (
+                      <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Temporary Password</label>
+                          <div className="relative">
+                              <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                              <input 
+                                 type="text" 
+                                 className="w-full pl-9 bg-gray-50 border border-gray-300 text-gray-900 p-2 rounded font-mono" 
+                                 value={tempPassword}
+                                 onChange={e => setTempPassword(e.target.value)}
+                              />
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">Credentials will be emailed to the user upon creation.</p>
                       </div>
-                  </div>
+                  )}
 
                   <div>
                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role</label>
@@ -221,11 +241,29 @@ const AdminUsers: React.FC = () => {
                         onChange={e => setEditingUser({...editingUser, role: e.target.value as UserRole})}
                      >
                         <option value={UserRole.AGENT}>Agent</option>
-                        <option value={UserRole.GROUP_LEADER}>Group Leader</option>
+                        {/* Group Leader Removed as requested */}
                         <option value={UserRole.TRAINER}>Trainer</option>
+                        <option value={UserRole.MASTER_TRAINER}>Master Trainer</option>
                         <option value={UserRole.ADMIN}>Admin</option>
                      </select>
                   </div>
+
+                  {/* Agent Code - ONLY IF AGENT */}
+                  {editingUser.role === UserRole.AGENT && (
+                      <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Agent Code</label>
+                          <div className="relative">
+                              <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                              <input 
+                                 type="text" 
+                                 className="w-full pl-9 bg-gray-50 border border-gray-300 text-gray-900 p-2 rounded" 
+                                 value={editingUser.agentCode || ''}
+                                 onChange={e => setEditingUser({...editingUser, agentCode: e.target.value})}
+                                 placeholder="e.g. AGT-12345"
+                              />
+                          </div>
+                      </div>
+                  )}
 
                   <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-xs text-blue-700">
                       <strong>Note:</strong> Group assignment, Trainer assignment, and Member management are now handled centrally in the <strong>Group Management</strong> page.

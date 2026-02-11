@@ -1,8 +1,9 @@
 
 export enum UserRole {
   ADMIN = 'ADMIN',
+  MASTER_TRAINER = 'MASTER_TRAINER', // New Role
   TRAINER = 'TRAINER',
-  GROUP_LEADER = 'GROUP_LEADER',
+  GROUP_LEADER = 'GROUP_LEADER', // Kept for data compatibility, but hidden from Add User UI
   AGENT = 'AGENT'
 }
 
@@ -15,7 +16,7 @@ export interface User {
   managedGroupIds?: string[]; // For Trainers handling multiple groups
   avatarUrl?: string;
   password?: string; // For mock auth only
-  agentCode?: string; // "Agent Code"
+  agentCode?: string; // "Agent Code" - Required for AGENT only
 }
 
 export interface BadgeTier {

@@ -192,11 +192,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const newId = userData.id || `user_${Date.now()}`;
     const newRef = doc(db, "users", newId); 
     
+    // In a real app, this would also create a firebase auth user with the password
     await setDoc(newRef, {
       ...userData,
       id: newId,
-      role: userData.role || UserRole.AGENT
+      role: userData.role || UserRole.AGENT,
+      password: userData.password // Saving password to mock DB for reference/login simulation
     });
+
+    // Simulate Welcome Email with Credentials
+    setTimeout(() => {
+        const loginId = userData.role === UserRole.AGENT ? `Agent Code: ${userData.agentCode}` : `Email: ${userData.email}`;
+        alert(`Account Created & Email Sent to ${userData.email}!\n\nSubject: Welcome to VistaQ\n\nHello ${userData.name},\nYour account has been created.\n\nLogin ID: ${loginId}\nPassword: ${userData.password}\n\nPlease login and change your password.`);
+    }, 500);
   };
 
   const updateUser = async (id: string, updates: Partial<User>) => {

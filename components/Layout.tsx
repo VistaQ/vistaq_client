@@ -22,7 +22,8 @@ import {
   Upload,
   CalendarDays,
   UserCircle,
-  TrendingUp
+  TrendingUp,
+  Globe
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -38,6 +39,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
   const getRoleIcon = (role: UserRole) => {
     switch(role) {
       case UserRole.ADMIN: return <Shield className="w-4 h-4" />;
+      case UserRole.MASTER_TRAINER: return <Globe className="w-4 h-4" />;
       case UserRole.TRAINER: return <GraduationCap className="w-4 h-4" />;
       case UserRole.GROUP_LEADER: return <Users className="w-4 h-4" />;
       default: return <Briefcase className="w-4 h-4" />;
@@ -64,8 +66,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
   );
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
-  const isManagement = currentUser?.role === UserRole.TRAINER || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.GROUP_LEADER;
-  const isTrainerOrAdmin = currentUser?.role === UserRole.TRAINER || currentUser?.role === UserRole.ADMIN;
+  // Management includes Master Trainer, Trainer, Admin, Group Leader
+  const isManagement = currentUser?.role === UserRole.TRAINER || 
+                       currentUser?.role === UserRole.ADMIN || 
+                       currentUser?.role === UserRole.GROUP_LEADER ||
+                       currentUser?.role === UserRole.MASTER_TRAINER;
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -90,7 +95,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
           
           <NavItem id="events" label="Events & Meetups" icon={CalendarDays} />
 
-          {/* Management Views for Admin, Trainer & Leaders */}
+          {/* Management Views for Admin, Master Trainer, Trainer & Leaders */}
           {isManagement && (
             <>
               <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Performance</div>
@@ -103,7 +108,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
             </>
           )}
 
-          {/* ADMIN MANAGEMENT */}
+          {/* ADMIN MANAGEMENT ONLY */}
           {isAdmin && (
             <>
               <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">System</div>

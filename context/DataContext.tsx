@@ -160,8 +160,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- MAIN SCOPE FUNCTION ---
   const getProspectsByScope = (user: User): Prospect[] => {
-    // 1. Admin & Master Trainer (No specific groups assigned = All)
-    if (user.role === UserRole.ADMIN) {
+    // 1. Admin & Master Trainer (View All)
+    if (user.role === UserRole.ADMIN || user.role === UserRole.MASTER_TRAINER) {
         return prospects;
     }
 
@@ -179,17 +179,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           });
         });
       }
-      // If trainer has no groups assigned, technically sees none or all depending on policy.
-      // Assuming Master Trainer if no specific groups -> All
+      // If trainer has no groups assigned, view all by default or none. 
+      // Assuming behavior same as Master Trainer if unassigned, but safer to return prospects for demo.
       return prospects;
     }
 
-    // 3. Group Leader (Own + Group Members)
-    if (user.role === UserRole.GROUP_LEADER && user.groupId) {
-        return getGroupProspects(user.groupId);
-    }
-
-    // 4. Agent (Own Only)
+    // 3. Group Leader & Agent (Own Only)
+    // Group Leaders are restricted to seeing ONLY their own prospects in lists.
+    // Team performance is viewed via the Group Dashboard aggregates using getGroupProspects directly in those pages.
     return prospects.filter(p => p.agentId === user.id);
   };
 
@@ -218,8 +215,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const getEventsForUser = (user: User): Event[] => {
       if (!user) return [];
       
-      // Admin sees all
-      if (user.role === UserRole.ADMIN) return events;
+      // Admin & Master Trainer sees all
+      if (user.role === UserRole.ADMIN || user.role === UserRole.MASTER_TRAINER) return events;
 
       return events.filter(e => {
           const targetGroups = e.targetGroupIds || [];
