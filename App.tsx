@@ -20,6 +20,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import PdpaNotice from './pages/PdpaNotice';
+import GlobalNotification from './components/GlobalNotification';
 
 const AuthenticatedApp: React.FC = () => {
   // Default to dashboard
@@ -89,6 +90,7 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <DataProvider>
+         <GlobalNotification />
          <AuthFlow />
       </DataProvider>
     </AuthProvider>

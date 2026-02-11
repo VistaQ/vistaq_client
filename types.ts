@@ -19,6 +19,12 @@ export interface User {
   agentCode?: string; // "Agent Code" - Required for AGENT only
 }
 
+export interface Notification {
+  title: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
 export interface BadgeTier {
   id: string;
   name: string;

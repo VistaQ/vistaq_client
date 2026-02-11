@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, UserRole, Group } from '../types';
+import { User, UserRole, Group, Notification } from '../types';
 import { 
   auth, 
   db,
@@ -37,6 +37,11 @@ interface AuthContextType {
   addGroup: (name: string, leaderId: string, trainerIds: string[], agentIds: string[]) => Promise<void>;
   updateGroup: (groupId: string, name: string, leaderId: string, trainerIds: string[], agentIds: string[]) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
+
+  // Notification
+  notification: Notification | null;
+  showNotification: (title: string, message: string, type?: 'success' | 'error' | 'info') => void;
+  closeNotification: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,6 +51,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [users, setUsers] = useState<User[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Global Notification State
+  const [notification, setNotification] = useState<Notification | null>(null);
+
+  const showNotification = (title: string, message: string, type: 'success' | 'error' | 'info' = 'success') => {
+      setNotification({ title, message, type });
+  };
+  const closeNotification = () => setNotification(null);
 
   // 1. Listen to Auth State Changes
   useEffect(() => {
@@ -80,9 +93,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUsers(loadedUsers);
       
       // Update current user state if their profile changes in background
+      // Use JSON.stringify for deep comparison to prevent unnecessary re-renders (Fixes UI Jumping)
       if (auth.currentUser) {
         const me = loadedUsers.find(u => u.id === auth.currentUser?.uid);
-        if (me) setCurrentUser(me);
+        if (me) {
+            setCurrentUser(prev => {
+                if (JSON.stringify(prev) !== JSON.stringify(me)) return me;
+                return prev;
+            });
+        }
       }
     });
 
@@ -145,9 +164,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
        await setDoc(doc(db, "users", res.user.uid), newUser);
        
-       // 3. Send Welcome Email (Simulated)
+       // 3. Send Welcome Notification
        setTimeout(() => {
-           alert(`Welcome Email Sent to ${email}:\n\n"Welcome to VistaQ, ${name}! Your account has been successfully created. Please login with your Agent Code (${agentCode}) or Email."`);
+           showNotification(
+               "Registration Successful", 
+               `Welcome to VistaQ, ${name}! Your account has been successfully created. Please login with your Agent Code (${agentCode}) or Email.`, 
+               'success'
+           );
        }, 500);
 
        return true;
@@ -162,7 +185,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return new Promise((resolve) => {
           setTimeout(() => {
               // In a real app, sendPasswordResetEmail(auth, email);
-              alert(`Password Recovery Email Sent to ${email}:\n\n"Click the link below to reset your password..."`);
+              showNotification(
+                  "Recovery Email Sent",
+                  `We have sent a password recovery link to ${email}. Check your inbox to reset your password.`,
+                  'success'
+              );
               resolve(true);
           }, 1000);
       });
@@ -200,20 +227,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       password: userData.password // Saving password to mock DB for reference/login simulation
     });
 
-    // Simulate Welcome Email with Credentials
-    setTimeout(() => {
-        const loginId = userData.role === UserRole.AGENT ? `Agent Code: ${userData.agentCode}` : `Email: ${userData.email}`;
-        alert(`Account Created & Email Sent to ${userData.email}!\n\nSubject: Welcome to VistaQ\n\nHello ${userData.name},\nYour account has been created.\n\nLogin ID: ${loginId}\nPassword: ${userData.password}\n\nPlease login and change your password.`);
-    }, 500);
+    // Notification
+    const loginId = userData.role === UserRole.AGENT ? `Agent Code: ${userData.agentCode}` : `Email: ${userData.email}`;
+    showNotification(
+        "User Created Successfully",
+        `Account has been created for ${userData.name}.\n\nLogin ID: ${loginId}\nPassword: ${userData.password}`,
+        'success'
+    );
   };
 
   const updateUser = async (id: string, updates: Partial<User>) => {
     const userRef = doc(db, "users", id);
     await updateDoc(userRef, updates);
+    showNotification("User Updated", "User profile has been updated successfully.", "success");
   };
 
   const deleteUser = async (id: string) => {
     await deleteDoc(doc(db, "users", id));
+    showNotification("User Deleted", "The user has been removed from the system.", "info");
   };
 
   // --- GROUP MANAGEMENT ---
@@ -229,8 +260,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await updateDoc(doc(db, "users", leaderId), { groupId, role: UserRole.GROUP_LEADER });
     }
 
-    // 3. Update Trainers (Handle multiple)
-    // Loop all trainers in the system to ensure correct state (though for new group, mostly adding)
+    // 3. Update Trainers
     const allTrainers = users.filter(u => u.role === UserRole.TRAINER);
     const trainerPromises = allTrainers.map(trainer => {
         const shouldHaveAccess = trainerIds.includes(trainer.id);
@@ -248,6 +278,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       updateDoc(doc(db, "users", agentId), { groupId, role: UserRole.AGENT })
     );
     await Promise.all(batchPromises);
+
+    showNotification("Group Created", `Group "${name}" has been created with assigned members.`, "success");
   };
 
   const updateGroup = async (groupId: string, name: string, leaderId: string, trainerIds: string[], agentIds: string[]) => {
@@ -259,7 +291,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await updateDoc(doc(db, "users", leaderId), { groupId, role: UserRole.GROUP_LEADER });
     }
 
-    // 3. Update Trainers (Handle Multiple: Add to selected, Remove from unselected)
+    // 3. Update Trainers
     const allTrainers = users.filter(u => u.role === UserRole.TRAINER);
     const trainerPromises = allTrainers.map(trainer => {
         const shouldHaveAccess = trainerIds.includes(trainer.id);
@@ -277,29 +309,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
     await Promise.all(trainerPromises);
 
-    // 4. Update Agents (Handle Add, Move, Remove)
+    // 4. Update Agents
     const agentPromises: Promise<void>[] = [];
-
-    // 4a. Remove agents who are currently in this group but NOT in the new agentIds list
     const currentGroupMembers = users.filter(u => u.groupId === groupId && u.role === UserRole.AGENT);
     currentGroupMembers.forEach(user => {
         if (!agentIds.includes(user.id)) {
-            // Unassign group
             agentPromises.push(updateDoc(doc(db, "users", user.id), { groupId: '' }));
         }
     });
-
-    // 4b. Assign the selected agents to this group
     agentIds.forEach(agentId => {
         agentPromises.push(updateDoc(doc(db, "users", agentId), { groupId, role: UserRole.AGENT }));
     });
-
     await Promise.all(agentPromises);
+
+    showNotification("Group Updated", `Group configuration for "${name}" has been saved.`, "success");
   };
 
   const deleteGroup = async (groupId: string) => {
      await deleteDoc(doc(db, "groups", groupId));
-     // Optional: Cleanup users' groupIds, but strict cleanup handled by manual updates for now
+     showNotification("Group Deleted", "The group has been disbanded.", "info");
   };
 
   return (
@@ -308,7 +336,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       getGroupMembers, groups, getUserById, users,
       addUser, updateUser, deleteUser,
       addGroup, updateGroup, deleteGroup,
-      resetPassword
+      resetPassword,
+      notification, showNotification, closeNotification
     }}>
       {!loading && children}
     </AuthContext.Provider>
