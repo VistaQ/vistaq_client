@@ -185,7 +185,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
-    await signOut(auth);
+    // Corrected: signOut() takes 0 arguments in the provided firebase.ts service definition
+    await signOut();
     setCurrentUser(null);
   };
 

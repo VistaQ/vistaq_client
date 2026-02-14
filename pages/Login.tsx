@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Mail, AlertCircle, Loader2, ChevronRight, User, X } from 'lucide-react';
+import { Lock, Mail, AlertCircle, Loader2, X } from 'lucide-react';
 
 interface LoginProps {
   onSwitchToSignup: () => void;
@@ -27,12 +27,10 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
     setLoading(true);
 
     try {
-      const success = await login(identifier, password);
-      if (!success) {
-        setError('Invalid credentials. Please check your Email and Password.');
-      }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
+      await login(identifier, password);
+      // AuthContext handles redirect
+    } catch (err: any) {
+      setError(err.message || 'Invalid credentials. Please check your Email and Password.');
     } finally {
       setLoading(false);
     }
@@ -56,11 +54,6 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
       }
   };
 
-  const fillCredentials = (id: string, p: string) => {
-      setIdentifier(id);
-      setPassword(p);
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 relative z-10">
@@ -75,9 +68,9 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
         <div className="p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded-lg flex items-center text-sm border border-red-100">
-                <AlertCircle className="w-4 h-4 mr-2" />
-                {error}
+              <div className="bg-red-50 text-red-600 p-3 rounded-lg flex items-start text-sm border border-red-100 animate-in fade-in slide-in-from-top-1">
+                <AlertCircle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                <span className="flex-1">{error}</span>
               </div>
             )}
 
@@ -137,39 +130,6 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
             >
               Register as a new Agent
             </button>
-          </div>
-          
-          <div className="mt-8 pt-6 border-t border-gray-100">
-             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-3 text-center">
-                Quick Access (Mock Data)
-             </p>
-             <div className="space-y-2">
-                 {[
-                    { label: 'System Admin', id: 'admin@sys.com', role: 'System Config' },
-                    { label: 'Master Trainer', id: 'master@sys.com', role: 'Full Access' },
-                    { label: 'Group Trainer (MDRT STAR)', id: 'coach@star.com', role: 'Single Group Coach' },
-                    { label: 'Group Leader (MDRT STAR)', id: 'agent01@star.com', role: 'Group Leader' },
-                    { label: 'Agent (MDRT STAR)', id: 'agent02@star.com', role: 'Agent' },
-                 ].map((cred, idx) => (
-                     <button
-                        key={idx}
-                        type="button"
-                        onClick={() => fillCredentials(cred.id, 'password')}
-                        className="w-full flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all text-left group"
-                     >
-                        <div className="flex items-center">
-                           <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 mr-3 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                              <User className="w-4 h-4" />
-                           </div>
-                           <div>
-                              <p className="text-xs font-bold text-gray-700">{cred.label}</p>
-                              <p className="text-[10px] text-gray-400">{cred.id}</p>
-                           </div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500" />
-                     </button>
-                 ))}
-             </div>
           </div>
         </div>
       </div>

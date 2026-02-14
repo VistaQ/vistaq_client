@@ -138,7 +138,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
   
   const updateBadgeTiers = async (tiers: BadgeTier[]) => {
-    await setDoc(doc(db, "config", "badges"), { tiers }, { merge: true });
+    // Corrected: setDoc takes (ref, data) as used here, removing options if definition mismatch
+    await setDoc(doc(db, "config", "badges"), { tiers });
     setBadgeTiers(tiers); // Optimistic update
   };
 
