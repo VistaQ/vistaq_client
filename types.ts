@@ -1,11 +1,21 @@
 
 export enum UserRole {
-  ADMIN = 'ADMIN',
-  MASTER_TRAINER = 'MASTER_TRAINER', // New Role
-  TRAINER = 'TRAINER',
-  GROUP_LEADER = 'GROUP_LEADER', // Kept for data compatibility, but hidden from Add User UI
-  AGENT = 'AGENT'
+  ADMIN = 'admin',
+  MASTER_TRAINER = 'master_trainer',
+  TRAINER = 'trainer',
+  GROUP_LEADER = 'group_leader',
+  AGENT = 'agent'
 }
+
+export const ROLE_LABELS: Record<string, string> = {
+  admin: 'Admin',
+  master_trainer: 'Master Trainer',
+  trainer: 'Trainer',
+  group_leader: 'Group Leader',
+  agent: 'Agent',
+};
+
+export const getRoleLabel = (role: string): string => ROLE_LABELS[role] ?? role;
 
 export interface User {
   id: string;
@@ -34,73 +44,107 @@ export interface BadgeTier {
 }
 
 export enum ProspectStage {
-  INFO = 1,
-  APPOINTMENT = 2,
-  MEETING = 3, // New Stage
-  SALES = 4,
-  POINTS = 5,
-  CLOSED = 6
+  PROSPECT = 'prospect',
+  APPOINTMENT = 'appointment',
+  SALES_OUTCOME = 'sales_outcome'
 }
 
 export interface ProspectProduct {
   id: string;
-  name: string;
-  amount: number;
+  productName: string;
+  aceAmount: number;
 }
 
 export interface Prospect {
   id: string;
-  agentId: string;
-  name: string;
-  phone: string;
-  email?: string;
-  currentStage: ProspectStage;
-  
-  // Card 2 Data (Appointment)
-  appointmentDate?: string; // ISO string (Date + Start Time) for sorting/dashboard compatibility
-  appointmentEndTime?: string; // HH:mm string
-  location?: string; // New field
-  appointmentStatus?: 'Completed' | 'KIV' | 'Declined' | 'Not done' | 'Scheduled' | 'Rescheduled'; // Updated statuses
-  
-  // Card 3 Data (Meeting Checklist - New)
-  meetingChecklist?: {
-    rapport: boolean;
-    factFinding: boolean;
-    presentation: boolean;
-  };
 
-  // Card 4 Data (Sales)
-  productType?: string; // Summary string for backward compatibility
-  policyAmountMYR?: number; // Total sum
-  products?: ProspectProduct[]; // Multiple products support
-  
-  saleStatus?: 'SUCCESSFUL' | 'UNSUCCESSFUL' | 'KIV'; // Added KIV
-  saleReason?: string; // Mandatory if unsuccessful
-  paymentReceived?: boolean;
-  
-  // Card 5 Data (Points)
-  pointsAwarded?: number;
-  
+  // Agent info (auto-filled from auth token on create)
+  uid: string;
+  agentCode?: string;
+  agentName?: string;
+  agentEmail?: string;
+  groupId?: string;
+  groupName?: string;
+
+  // Prospect info
+  prospectName: string;
+  prospectPhone?: string;
+  prospectEmail?: string;
+  prospectEnteredAt?: string;
+
+  currentStage: ProspectStage;
+
+  // Appointment stage
+  appointmentDate?: string;
+  appointmentStartTime?: string;
+  appointmentEndTime?: string;
+  appointmentLocation?: string;
+  appointmentStatus?: 'not_done' | 'scheduled' | 'rescheduled' | 'completed' | 'declined' | 'kiv';
+  appointmentCompletedAt?: string;
+  salesPartsCompleted?: string[];
+
+  // Sales outcome stage
+  salesOutcome?: 'successful' | 'unsuccessful' | 'kiv';
+  productsSold?: ProspectProduct[];
+  totalACE?: number;
+  unsuccessfulReason?: string;
+  salesCompletedAt?: string;
+
+  stageHistory?: { stage: string; enteredAt: string }[];
+
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Event {
   id: string;
-  title: string;
-  description: string;
-  venue: string;
-  link?: string; // URL for online meetings
+  eventTitle: string;
   date: string; // ISO String
-  createdBy: string; // User ID
-  createdByName: string; // User Name
-  targetGroupIds: string[]; // ['g_star', 'g_legend'] etc.
+  venue: string;
+  description: string;
+  meetingLink?: string;
+
+  // Groups
+  groupIds: string[];
+  groupNames?: string[];
+
+  // Creator info (auto-filled from auth token on create)
+  createdBy: string;
+  createdByName: string;
+  createdByRole?: string;
+
+  status?: 'upcoming' | 'completed' | 'cancelled';
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Group {
   id: string;
   name: string;
-  leaderId: string;
+
+  // Leadership
+  leaderId?: string;
+  leaderName?: string;
+  leaderEmail?: string;
+
+  // Trainers
+  trainerIds?: string[];
+  trainerNames?: string[];
+
+  // Members
+  memberIds?: string[];
+  memberCount?: number;
+
+  // Performance stats (from API)
+  totalProspects?: number;
+  totalAppointments?: number;
+  totalSales?: number;
+  totalACE?: number;
+  totalPoints?: number;
+
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // AI Service Types
