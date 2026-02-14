@@ -84,13 +84,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // 2. Real-time Listeners for Users and Groups (Sync State)
   useEffect(() => {
-    // GUARD: Only fetch data if user is authenticated to prevent CORS/Auth errors on Login
-    if (!currentUser) {
-        setUsers([]);
-        setGroups([]);
-        return;
-    }
-
     // Listen to Users
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot: any) => {
       const loadedUsers = snapshot.docs.map((doc: any) => ({
@@ -125,7 +118,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       unsubUsers();
       unsubGroups();
     };
-  }, [currentUser]); // Add currentUser dependency to re-subscribe on login
+  }, []);
 
   const login = async (identifier: string, password?: string): Promise<boolean> => {
     try {
@@ -192,7 +185,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
-    await signOut();
+    await signOut(auth);
     setCurrentUser(null);
   };
 
