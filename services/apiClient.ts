@@ -1,6 +1,6 @@
 
 // Base URL for the Staging Environment
-export const API_BASE_URL = "https://stg-api.vistaq.co";
+export const API_BASE_URL = "https://stg-api.vistaq.co/api";
 
 // Helper to get token
 const getToken = () => localStorage.getItem('vistaq_token');
