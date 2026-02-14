@@ -13,20 +13,23 @@ const Events: React.FC = () => {
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-      title: '',
+      eventTitle: '',
       description: '',
       date: '',
       time: '',
       venue: '',
-      link: '',
-      targetGroupIds: [] as string[]
+      meetingLink: '',
+      groupIds: [] as string[],
+      status: 'upcoming' as 'upcoming' | 'completed' | 'cancelled'
   });
 
   if (!currentUser) return null;
 
   // Permissions: Admin, Trainer, Group Leader can CREATE/EDIT.
-  const canManage = currentUser.role === UserRole.TRAINER || 
-                    currentUser.role === UserRole.ADMIN || 
+  const isAdmin = currentUser.role === UserRole.ADMIN;
+  const canManage = isAdmin ||
+                    currentUser.role === UserRole.MASTER_TRAINER ||
+                    currentUser.role === UserRole.TRAINER ||
                     currentUser.role === UserRole.GROUP_LEADER;
 
   const myEvents = getEventsForUser(currentUser);
@@ -67,13 +70,14 @@ const Events: React.FC = () => {
 
           setEditingEventId(event.id);
           setFormData({
-              title: event.title,
+              eventTitle: event.eventTitle,
               description: event.description,
               date: dateStr,
               time: timeStr,
               venue: event.venue,
-              link: event.link || '',
-              targetGroupIds: event.targetGroupIds
+              meetingLink: event.meetingLink || '',
+              groupIds: event.groupIds,
+              status: event.status || 'upcoming'
           });
       } else {
           // Create Mode
@@ -83,22 +87,23 @@ const Events: React.FC = () => {
               ? [currentUser.groupId] 
               : [];
               
-          setFormData({ 
-              title: '', 
-              description: '', 
-              date: '', 
-              time: '', 
-              venue: '', 
-              link: '', 
-              targetGroupIds: initialGroups 
+          setFormData({
+              eventTitle: '',
+              description: '',
+              date: '',
+              time: '',
+              venue: '',
+              meetingLink: '',
+              groupIds: initialGroups,
+              status: 'upcoming'
           });
       }
       setIsModalOpen(true);
   };
 
   const handleSave = async () => {
-     if (!formData.title || !formData.date || !formData.time || formData.targetGroupIds.length === 0) {
-         alert("Please fill in required fields (Title, Date, Time, Groups).");
+     if (!formData.eventTitle || !formData.date || !formData.time || !formData.venue || !formData.description || formData.groupIds.length === 0) {
+         alert("Please fill in all required fields (Title, Date, Time, Venue, Description, Groups).");
          return;
      }
 
@@ -108,14 +113,15 @@ const Events: React.FC = () => {
          alert("Invalid date or time selected.");
          return;
      }
-     
+
      const eventData: Partial<Event> = {
-         title: formData.title,
+         eventTitle: formData.eventTitle,
          description: formData.description,
          venue: formData.venue,
-         link: formData.link,
+         meetingLink: formData.meetingLink || undefined,
          date: dateTime.toISOString(),
-         targetGroupIds: formData.targetGroupIds
+         groupIds: formData.groupIds,
+         status: formData.status
      };
 
      if (editingEventId) {
@@ -130,15 +136,15 @@ const Events: React.FC = () => {
 
      setIsModalOpen(false);
      setEditingEventId(null);
-     setFormData({ title: '', description: '', date: '', time: '', venue: '', link: '', targetGroupIds: [] });
+     setFormData({ eventTitle: '', description: '', date: '', time: '', venue: '', meetingLink: '', groupIds: [], status: 'upcoming' });
   };
 
   const toggleGroup = (id: string) => {
       setFormData(prev => {
-          if (prev.targetGroupIds.includes(id)) {
-              return { ...prev, targetGroupIds: prev.targetGroupIds.filter(g => g !== id) };
+          if (prev.groupIds.includes(id)) {
+              return { ...prev, groupIds: prev.groupIds.filter(g => g !== id) };
           }
-          return { ...prev, targetGroupIds: [...prev.targetGroupIds, id] };
+          return { ...prev, groupIds: [...prev.groupIds, id] };
       });
   };
 
@@ -175,6 +181,7 @@ const Events: React.FC = () => {
               // Permission Logic:
               // Admin/Trainer/Leader can edit/delete ONLY events they created.
               const isCreator = evt.createdBy === currentUser.id;
+              const canEditEvent = isAdmin || isCreator;
               const evtDate = new Date(evt.date);
               
               return (
@@ -190,16 +197,16 @@ const Events: React.FC = () => {
                                   </span>
                               </div>
                               <div>
-                                  <h3 className="text-lg font-bold text-gray-900">{evt.title}</h3>
+                                  <h3 className="text-lg font-bold text-gray-900">{evt.eventTitle}</h3>
                                   <div className="flex items-center text-sm text-gray-500 mt-1">
                                       <Clock className="w-3 h-3 mr-1" />
                                       {!isNaN(evtDate.getTime()) 
-                                        ? evtDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                                        ? evtDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
                                         : 'Time not set'}
                                   </div>
                               </div>
                           </div>
-                          {isCreator && canManage && (
+                          {canEditEvent && (
                               <div className="flex space-x-1">
                                   <button onClick={() => handleOpenModal(evt)} className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 rounded-lg">
                                       <Edit2 className="w-4 h-4" />
@@ -224,10 +231,10 @@ const Events: React.FC = () => {
                           </div>
                           
                           {/* JOIN BUTTON */}
-                          {evt.link && (
+                          {evt.meetingLink && (
                               <div className="pt-2">
-                                  <a 
-                                    href={evt.link} 
+                                  <a
+                                    href={evt.meetingLink}
                                     target="_blank" 
                                     rel="noreferrer"
                                     className="inline-flex items-center justify-center w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-bold text-sm shadow-md transition-colors"
@@ -238,10 +245,18 @@ const Events: React.FC = () => {
                               </div>
                           )}
 
-                          {isCreator && (
-                              <div className="text-xs text-gray-400 font-medium mt-1">
-                                  Shared with: {evt.targetGroupIds.map(id => groups.find(g => g.id === id)?.name).join(', ')}
-                              </div>
+                          <div className="text-xs text-gray-400 font-medium mt-1">
+                              Shared with: {(evt.groupNames && evt.groupNames.length > 0)
+                                  ? evt.groupNames.join(', ')
+                                  : evt.groupIds.map(id => groups.find(g => g.id === id)?.name).filter(Boolean).join(', ')
+                              }
+                          </div>
+                          {evt.status && evt.status !== 'upcoming' && (
+                              <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${
+                                  evt.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                              }`}>
+                                  {evt.status.charAt(0).toUpperCase() + evt.status.slice(1)}
+                              </span>
                           )}
                       </div>
                   </div>
@@ -268,8 +283,8 @@ const Events: React.FC = () => {
                           <input 
                              type="text" 
                              className={inputClass}
-                             value={formData.title}
-                             onChange={e => setFormData({...formData, title: e.target.value})}
+                             value={formData.eventTitle}
+                             onChange={e => setFormData({...formData, eventTitle: e.target.value})}
                              placeholder="e.g. Weekly Huddle"
                           />
                       </div>
@@ -316,8 +331,8 @@ const Events: React.FC = () => {
                              <input 
                                 type="url" 
                                 className={`${inputClass} pl-9`}
-                                value={formData.link}
-                                onChange={e => setFormData({...formData, link: e.target.value})}
+                                value={formData.meetingLink}
+                                onChange={e => setFormData({...formData, meetingLink: e.target.value})}
                                 placeholder="https://zoom.us/j/..."
                              />
                           </div>
@@ -335,6 +350,21 @@ const Events: React.FC = () => {
                           />
                       </div>
 
+                      {editingEventId && (
+                          <div>
+                              <label className={labelClass}>Status</label>
+                              <select
+                                  className={inputClass}
+                                  value={formData.status}
+                                  onChange={e => setFormData({...formData, status: e.target.value as 'upcoming' | 'completed' | 'cancelled'})}
+                              >
+                                  <option value="upcoming">Upcoming</option>
+                                  <option value="completed">Completed</option>
+                                  <option value="cancelled">Cancelled</option>
+                              </select>
+                          </div>
+                      )}
+
                       <div>
                           <label className={labelClass}>Share with Group(s) <span className="text-red-500">*</span></label>
                           <div className="bg-gray-50 border border-gray-300 rounded-lg p-3 max-h-32 overflow-y-auto shadow-inner">
@@ -342,7 +372,7 @@ const Events: React.FC = () => {
                                   <label key={g.id} className="flex items-center space-x-2 mb-2 last:mb-0 cursor-pointer">
                                       <input 
                                           type="checkbox"
-                                          checked={formData.targetGroupIds.includes(g.id)}
+                                          checked={formData.groupIds.includes(g.id)}
                                           onChange={() => toggleGroup(g.id)}
                                           className="text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                                       />

@@ -26,11 +26,11 @@ const AdminGroups: React.FC = () => {
   const [formName, setFormName] = useState('');
   const [formLeaderId, setFormLeaderId] = useState('');
   const [formTrainerIds, setFormTrainerIds] = useState<string[]>([]);
-  const [formAgentIds, setFormAgentIds] = useState<string[]>([]);
+  const [formMemberIds, setFormMemberIds] = useState<string[]>([]);
 
   // Search states within Modal
   const [trainerSearch, setTrainerSearch] = useState('');
-  const [agentSearch, setAgentSearch] = useState('');
+  const [memberSearch, setMemberSearch] = useState('');
 
   const filteredGroups = groups.filter(g => g.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -51,18 +51,20 @@ const AdminGroups: React.FC = () => {
       const assignedTrainers = users.filter(u => u.role === UserRole.TRAINER && u.managedGroupIds?.includes(group.id)).map(u => u.id);
       setFormTrainerIds(assignedTrainers);
 
-      // Get current agents
-      const members = getGroupMembers(group.id);
-      setFormAgentIds(members.map(m => m.id));
+      // Use memberIds from group object if available, otherwise fall back to getGroupMembers
+      const existingMemberIds = group.memberIds && group.memberIds.length > 0
+          ? group.memberIds
+          : getGroupMembers(group.id).map(m => m.id);
+      setFormMemberIds(existingMemberIds);
     } else {
       setEditingGroup(null); // New Group
       setFormName('');
       setFormLeaderId('');
       setFormTrainerIds([]);
-      setFormAgentIds([]);
+      setFormMemberIds([]);
     }
     setTrainerSearch('');
-    setAgentSearch('');
+    setMemberSearch('');
     setIsModalOpen(true);
   };
 
@@ -72,12 +74,17 @@ const AdminGroups: React.FC = () => {
         return;
     }
 
+    // Ensure leader is always included in memberIds (API requirement)
+    const finalMemberIds = formLeaderId && !formMemberIds.includes(formLeaderId)
+        ? [...formMemberIds, formLeaderId]
+        : formMemberIds;
+
     if (editingGroup && editingGroup.id) {
         // Update
-        updateGroup(editingGroup.id, formName, formLeaderId, formTrainerIds, formAgentIds);
+        updateGroup(editingGroup.id, formName, formLeaderId, formTrainerIds, finalMemberIds);
     } else {
         // Create
-        addGroup(formName, formLeaderId, formTrainerIds, formAgentIds);
+        addGroup(formName, formLeaderId, formTrainerIds, finalMemberIds);
     }
     setIsModalOpen(false);
   };
@@ -88,14 +95,14 @@ const AdminGroups: React.FC = () => {
       }
   };
 
-  const toggleAgentSelection = (agentId: string) => {
-      // Prevent selecting the leader as an agent simultaneously in the list
-      if (agentId === formLeaderId) return;
+  const toggleMemberSelection = (memberId: string) => {
+      // The leader cannot be removed from memberIds — they must always be included
+      if (memberId === formLeaderId) return;
 
-      if (formAgentIds.includes(agentId)) {
-          setFormAgentIds(prev => prev.filter(id => id !== agentId));
+      if (formMemberIds.includes(memberId)) {
+          setFormMemberIds(prev => prev.filter(id => id !== memberId));
       } else {
-          setFormAgentIds(prev => [...prev, agentId]);
+          setFormMemberIds(prev => [...prev, memberId]);
       }
   };
 
@@ -115,8 +122,8 @@ const AdminGroups: React.FC = () => {
 
   const filteredAgentsList = potentialAgents.filter(a => 
       a.id !== formLeaderId && // Exclude currently selected leader from agent list
-      (a.name.toLowerCase().includes(agentSearch.toLowerCase()) || 
-       a.email.toLowerCase().includes(agentSearch.toLowerCase()))
+      (a.name.toLowerCase().includes(memberSearch.toLowerCase()) || 
+       a.email.toLowerCase().includes(memberSearch.toLowerCase()))
   );
 
   return (
@@ -236,10 +243,11 @@ const AdminGroups: React.FC = () => {
                                       className="w-full pl-10 bg-gray-50 border border-gray-300 text-gray-900 p-2.5 rounded-lg appearance-none"
                                       value={formLeaderId}
                                       onChange={e => {
-                                          setFormLeaderId(e.target.value);
-                                          // If user was selected as agent, unselect them automatically
-                                          if (formAgentIds.includes(e.target.value)) {
-                                              setFormAgentIds(prev => prev.filter(id => id !== e.target.value));
+                                          const newLeaderId = e.target.value;
+                                          setFormLeaderId(newLeaderId);
+                                          // Auto-add the new leader to memberIds (API requirement)
+                                          if (newLeaderId && !formMemberIds.includes(newLeaderId)) {
+                                              setFormMemberIds(prev => [...prev, newLeaderId]);
                                           }
                                       }}
                                   >
@@ -303,19 +311,19 @@ const AdminGroups: React.FC = () => {
                                       type="text" 
                                       placeholder="Search agents..."
                                       className="w-full text-sm bg-gray-50 border border-gray-200 rounded-md px-3 py-2"
-                                      value={agentSearch}
-                                      onChange={e => setAgentSearch(e.target.value)}
+                                      value={memberSearch}
+                                      onChange={e => setMemberSearch(e.target.value)}
                                   />
                               </div>
                               <div className="flex-1 overflow-y-auto p-2 bg-gray-50/50 space-y-1">
                                   {filteredAgentsList.map(agent => {
-                                      const isSelected = formAgentIds.includes(agent.id);
+                                      const isSelected = formMemberIds.includes(agent.id);
                                       const isAssignedElsewhere = agent.groupId && agent.groupId !== editingGroup?.id;
                                       
                                       return (
                                           <div 
                                             key={agent.id} 
-                                            onClick={() => toggleAgentSelection(agent.id)}
+                                            onClick={() => toggleMemberSelection(agent.id)}
                                             className={`flex items-center p-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-blue-100 border border-blue-200' : 'hover:bg-gray-100 border border-transparent'}`}
                                           >
                                               <div className={`w-4 h-4 rounded border flex items-center justify-center mr-3 ${isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'}`}>

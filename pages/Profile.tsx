@@ -5,13 +5,18 @@ import { User, UserRole } from '../types';
 import { UserCircle, Mail, IdCard, Users, Lock, Save, AlertCircle, CheckCircle } from 'lucide-react';
 
 const Profile: React.FC = () => {
-  const { currentUser, groups, updateUser, changePassword } = useAuth();
+  const { currentUser, groups, updateProfile, refreshCurrentUser, changePassword } = useAuth();
   
   const [formData, setFormData] = useState<Partial<User>>({});
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
   const [status, setStatus] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
+
+  useEffect(() => {
+      // Fetch fresh user data from API on load
+      refreshCurrentUser();
+  }, []);
 
   useEffect(() => {
       if (currentUser) {
@@ -32,14 +37,14 @@ const Profile: React.FC = () => {
       setStatus(null);
       
       try {
-          await updateUser(currentUser.id, {
+          await updateProfile({
               name: formData.name,
               email: formData.email,
               agentCode: formData.agentCode
           });
           setStatus({ msg: 'Profile updated successfully!', type: 'success' });
-      } catch (err) {
-          setStatus({ msg: 'Failed to update profile.', type: 'error' });
+      } catch (err: any) {
+          setStatus({ msg: err?.message || 'Failed to update profile.', type: 'error' });
       }
   };
 
@@ -62,8 +67,8 @@ const Profile: React.FC = () => {
           setStatus({ msg: 'Password changed successfully!', type: 'success' });
           setNewPassword('');
           setConfirmPassword('');
-      } catch (err) {
-          setStatus({ msg: 'Failed to change password.', type: 'error' });
+      } catch (err: any) {
+          setStatus({ msg: err?.message || 'Failed to change password.', type: 'error' });
       }
   };
 

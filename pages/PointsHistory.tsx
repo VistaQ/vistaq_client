@@ -15,16 +15,18 @@ const PointsHistory: React.FC = () => {
 
   const prospects = getProspectsByScope(currentUser);
   
-  // Filter for items that gave points and sort by most recent
+  // Filter for successful sales and sort by most recent
+  const getAce = (p: any) => (p.productsSold || []).reduce((s: number, prod: any) => s + (prod.aceAmount || 0), 0);
+
   const history = prospects
-    .filter(p => (p.pointsAwarded || 0) > 0)
+    .filter(p => p.salesOutcome === 'successful' && getAce(p) > 0)
     .sort((a, b) => {
         const dateA = new Date(a.updatedAt).getTime();
         const dateB = new Date(b.updatedAt).getTime();
         return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
     });
 
-  const totalPoints = history.reduce((sum, p) => sum + (p.pointsAwarded || 0), 0);
+  const totalPoints = history.reduce((sum, p) => sum + Math.floor(getAce(p) * 0.1), 0);
 
   // Determine current badge and next milestone
   // Find the highest threshold met
@@ -157,20 +159,20 @@ const PointsHistory: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center">
                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold mr-2">
-                          {item.name.charAt(0)}
+                          {item.prospectName.charAt(0)}
                        </div>
-                       <span className="font-medium text-gray-900">{item.name}</span>
+                       <span className="font-medium text-gray-900">{item.prospectName}</span>
                     </div>
                     <div className="text-xs text-gray-400 mt-1 pl-8">Closed Sale</div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">
                     <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                      {item.productType}
+                      {(item.productsSold || []).map((p: any) => p.productName).filter(Boolean).join(', ') || '-'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">
-                      +{Math.floor(item.pointsAwarded || 0)} pts
+                      +{Math.floor(getAce(item) * 0.1)} pts
                     </span>
                   </td>
                 </tr>

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { User, UserRole } from '../types';
+import { User, UserRole, getRoleLabel } from '../types';
 import { 
   Users, 
   Search, 
@@ -113,11 +113,11 @@ const AdminUsers: React.FC = () => {
            onChange={(e) => setFilterRole(e.target.value)}
         >
             <option value="all">All Roles</option>
-            <option value={UserRole.ADMIN}>Admin</option>
-            <option value={UserRole.MASTER_TRAINER}>Master Trainer</option>
-            <option value={UserRole.TRAINER}>Trainer</option>
-            <option value={UserRole.GROUP_LEADER}>Group Leader</option>
-            <option value={UserRole.AGENT}>Agent</option>
+            <option value={UserRole.ADMIN}>{getRoleLabel(UserRole.ADMIN)}</option>
+            <option value={UserRole.MASTER_TRAINER}>{getRoleLabel(UserRole.MASTER_TRAINER)}</option>
+            <option value={UserRole.TRAINER}>{getRoleLabel(UserRole.TRAINER)}</option>
+            <option value={UserRole.GROUP_LEADER}>{getRoleLabel(UserRole.GROUP_LEADER)}</option>
+            <option value={UserRole.AGENT}>{getRoleLabel(UserRole.AGENT)}</option>
         </select>
       </div>
 
@@ -157,7 +157,7 @@ const AdminUsers: React.FC = () => {
                             user.role === UserRole.TRAINER ? 'bg-purple-100 text-purple-700' : 
                             'bg-blue-100 text-blue-700'}`}>
                           {user.role === UserRole.MASTER_TRAINER && <Globe className="w-3 h-3 mr-1" />}
-                          {user.role}
+                          {getRoleLabel(user.role)}
                        </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
@@ -240,11 +240,10 @@ const AdminUsers: React.FC = () => {
                         value={editingUser.role}
                         onChange={e => setEditingUser({...editingUser, role: e.target.value as UserRole})}
                      >
-                        <option value={UserRole.AGENT}>Agent</option>
-                        {/* Group Leader Removed as requested */}
-                        <option value={UserRole.TRAINER}>Trainer</option>
-                        <option value={UserRole.MASTER_TRAINER}>Master Trainer</option>
-                        <option value={UserRole.ADMIN}>Admin</option>
+                        <option value={UserRole.AGENT}>{getRoleLabel(UserRole.AGENT)}</option>
+                        <option value={UserRole.TRAINER}>{getRoleLabel(UserRole.TRAINER)}</option>
+                        <option value={UserRole.MASTER_TRAINER}>{getRoleLabel(UserRole.MASTER_TRAINER)}</option>
+                        <option value={UserRole.ADMIN}>{getRoleLabel(UserRole.ADMIN)}</option>
                      </select>
                   </div>
 

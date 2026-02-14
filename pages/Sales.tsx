@@ -12,14 +12,14 @@ const Sales: React.FC = () => {
 
   // Filter only Successful Sales for the current user
   const mySales = getProspectsByScope(currentUser)
-    .filter(p => p.saleStatus === 'SUCCESSFUL')
+    .filter(p => p.salesOutcome === 'successful')
     .sort((a, b) => {
         const dateA = new Date(a.updatedAt).getTime();
         const dateB = new Date(b.updatedAt).getTime();
         return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
     });
 
-  const totalFYC = mySales.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
+  const totalFYC = mySales.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
 
   const formatDate = (dateStr: string) => {
       const d = new Date(dateStr);
@@ -77,18 +77,18 @@ const Sales: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                       <span className="font-bold text-gray-900">{sale.name}</span>
-                       <div className="text-xs text-gray-500 mt-0.5">{sale.email || 'No email'}</div>
+                       <span className="font-bold text-gray-900">{sale.prospectName}</span>
+                       <div className="text-xs text-gray-500 mt-0.5">{sale.prospectEmail || 'No email'}</div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                        <div className="flex items-center">
                           <Shield className="w-4 h-4 mr-2 text-blue-500" />
-                          {sale.productType}
+                          {(sale.productsSold || []).map(p => p.productName).filter(Boolean).join(', ') || '-'}
                        </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                        <span className="font-mono font-bold text-gray-900">
-                          {sale.policyAmountMYR?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          {(sale.productsSold || []).reduce((s, p) => s + (p.aceAmount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                        </span>
                     </td>
                     <td className="px-6 py-4 text-center">

@@ -62,16 +62,16 @@ const Dashboard: React.FC = () => {
     const totalAgents = relevantAgents.length;
     
     // --- 3. PERFORMANCE METRICS (AGGREGATE) ---
-    const totalFYC = scopeProspects.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
-    const totalSales = scopeProspects.filter(p => p.saleStatus === 'SUCCESSFUL').length;
-    const totalClosed = scopeProspects.filter(p => p.saleStatus === 'SUCCESSFUL' || p.saleStatus === 'UNSUCCESSFUL').length;
+    const totalFYC = scopeProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+    const totalSales = scopeProspects.filter(p => p.salesOutcome === 'successful').length;
+    const totalClosed = scopeProspects.filter(p => p.salesOutcome === 'successful' || p.salesOutcome === 'unsuccessful').length;
     const conversionRate = totalClosed > 0 ? (totalSales / totalClosed) * 100 : 0;
     
     // --- 4. GROUP RANKINGS (Only relevant if > 1 group) ---
     const groupRankings = relevantGroups.map(group => {
        const gProspects = getGroupProspects(group.id);
-       const gFYC = gProspects.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
-       const gSales = gProspects.filter(p => p.saleStatus === 'SUCCESSFUL').length;
+       const gFYC = gProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+       const gSales = gProspects.filter(p => p.salesOutcome === 'successful').length;
        return { id: group.id, name: group.name, fyc: gFYC, sales: gSales };
     }).sort((a, b) => b.fyc - a.fyc);
 
@@ -271,7 +271,7 @@ const Dashboard: React.FC = () => {
   // --- AGENT & GROUP LEADER PERSONAL DASHBOARD ---
 
   // --- STRICTLY PERSONAL DATA ---
-  const myProspects = prospects.filter(p => p.agentId === currentUser?.id);
+  const myProspects = prospects.filter(p => p.uid === currentUser?.id);
   const myEvents = currentUser ? getEventsForUser(currentUser) : [];
 
   // KPI Calculations
@@ -285,8 +285,8 @@ const Dashboard: React.FC = () => {
   ).length;
 
   const completedAppointments = myProspects.filter(p => p.appointmentStatus === 'Completed').length;
-  const closedSales = myProspects.filter(p => p.saleStatus === 'SUCCESSFUL').length;
-  const totalPersonalFYC = myProspects.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
+  const closedSales = myProspects.filter(p => p.salesOutcome === 'successful').length;
+  const totalPersonalFYC = myProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
   
   // MDRT Progress
   const fycProgress = Math.min(100, (totalPersonalFYC / MDRT_TARGET_FYC) * 100);
@@ -304,15 +304,15 @@ const Dashboard: React.FC = () => {
         const apptDate = new Date(p.appointmentDate);
         if (isNaN(apptDate.getTime())) return false; // Safety check
         const isFuture = apptDate >= now && apptDate <= next7Days;
-        const isActive = p.appointmentStatus === 'Not done' || (p.currentStage === ProspectStage.APPOINTMENT && p.appointmentStatus !== 'Completed');
+        const isActive = p.appointmentStatus === 'not_done' || (p.currentStage === ProspectStage.APPOINTMENT && p.appointmentStatus !== 'completed');
         return isFuture && isActive;
     })
     .map(p => ({
         id: p.id,
-        title: `Mtg: ${p.name}`,
+        title: `Mtg: ${p.prospectName}`,
         date: p.appointmentDate!,
         type: 'meeting',
-        meta: p.name,
+        meta: p.prospectName,
         link: undefined
     }));
 
@@ -325,11 +325,11 @@ const Dashboard: React.FC = () => {
     })
     .map(e => ({
         id: e.id,
-        title: e.title,
+        title: e.eventTitle,
         date: e.date,
         type: 'event',
         meta: e.venue,
-        link: e.link
+        link: e.meetingLink
     }));
 
   // 3. Combine & Sort

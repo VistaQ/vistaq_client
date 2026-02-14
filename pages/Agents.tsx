@@ -60,9 +60,9 @@ const Agents: React.FC = () => {
 
   // 3. Compute Aggregates
   const agentPerformance = uniqueAgents.map(agent => {
-    const agentProspects = prospects.filter(p => p.agentId === agent.id);
-    const fyc = agentProspects.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
-    const sales = agentProspects.filter(p => p.saleStatus === 'SUCCESSFUL').length;
+    const agentProspects = prospects.filter(p => p.uid === agent.id);
+    const fyc = agentProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+    const sales = agentProspects.filter(p => p.salesOutcome === 'successful').length;
     const group = groups.find(g => g.id === agent.groupId);
 
     return {
@@ -84,8 +84,8 @@ const Agents: React.FC = () => {
     const agent = agentPerformance.find(u => u.id === selectedAgentId);
     if (!agent) return <div>Agent not found</div>;
 
-    const agentProspects = prospects.filter(p => p.agentId === selectedAgentId);
-    const successfulSales = agentProspects.filter(p => p.saleStatus === 'SUCCESSFUL');
+    const agentProspects = prospects.filter(p => p.uid === selectedAgentId);
+    const successfulSales = agentProspects.filter(p => p.salesOutcome === 'successful');
     
     // Updated Logic for Funnel
     const appointmentsSet = agentProspects.filter(p => 
@@ -185,7 +185,7 @@ const Agents: React.FC = () => {
                                 <div key={p.id} className="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
                                     <Clock className="w-4 h-4 text-gray-400 mr-3" />
                                     <div>
-                                        <p className="text-sm font-semibold text-gray-900">{p.name}</p>
+                                        <p className="text-sm font-semibold text-gray-900">{p.prospectName}</p>
                                         <p className="text-xs text-gray-500">
                                             {(() => {
                                                 const d = new Date(p.appointmentDate!);
@@ -219,9 +219,9 @@ const Agents: React.FC = () => {
                         {successfulSales.map(sale => (
                             <tr key={sale.id}>
                                 <td className="px-6 py-4 text-sm text-gray-600">{formatDate(sale.updatedAt)}</td>
-                                <td className="px-6 py-4 font-medium">{sale.name}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{sale.productType}</td>
-                                <td className="px-6 py-4 text-right font-mono font-bold">RM {sale.policyAmountMYR?.toLocaleString()}</td>
+                                <td className="px-6 py-4 font-medium">{sale.prospectName}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{(sale.productsSold || []).map(p => p.productName).filter(Boolean).join(', ') || '-'}</td>
+                                <td className="px-6 py-4 text-right font-mono font-bold">RM {(sale.productsSold || []).reduce((s, p) => s + (p.aceAmount || 0), 0).toLocaleString()}</td>
                             </tr>
                         ))}
                         {successfulSales.length === 0 && (

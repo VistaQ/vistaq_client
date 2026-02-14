@@ -15,11 +15,13 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [rateLimited, setRateLimited] = useState(false);
 
   // Forgot Password State
   const [showForgot, setShowForgot] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetStatus, setResetStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [resetError, setResetError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +32,10 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
       await login(identifier, password);
       // AuthContext handles redirect
     } catch (err: any) {
+      if (err.status === 429) {
+        setRateLimited(true);
+        setTimeout(() => setRateLimited(false), 5000);
+      }
       setError(err.message || 'Invalid credentials. Please check your Email and Password.');
     } finally {
       setLoading(false);
@@ -41,6 +47,7 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
       if (!resetEmail) return;
       
       setResetStatus('sending');
+      setResetError('');
       try {
           await resetPassword(resetEmail);
           setResetStatus('sent');
@@ -48,9 +55,11 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
               setShowForgot(false);
               setResetStatus('idle');
               setResetEmail('');
+              setResetError('');
           }, 3000);
-      } catch (err) {
+      } catch (err: any) {
           setResetStatus('error');
+          setResetError(err?.message || 'Failed to send email. Please try again.');
       }
   };
 
@@ -115,7 +124,7 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || rateLimited}
               className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-md shadow-blue-200 disabled:opacity-70 flex items-center justify-center"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign In'}
@@ -167,7 +176,7 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
                                 placeholder="you@company.com"
                             />
                           </div>
-                          {resetStatus === 'error' && <p className="text-xs text-red-500">Failed to send email. Please try again.</p>}
+                          {resetStatus === 'error' && <p className="text-xs text-red-500">{resetError}</p>}
                           <button
                             type="submit"
                             disabled={resetStatus === 'sending'}

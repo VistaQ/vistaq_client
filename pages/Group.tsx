@@ -63,8 +63,8 @@ const Group: React.FC = () => {
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {visibleGroups.map(group => {
                    const gProspects = getGroupProspects(group.id);
-                   const gFYC = gProspects.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
-                   const gSales = gProspects.filter(p => p.saleStatus === 'SUCCESSFUL').length;
+                   const gFYC = gProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+                   const gSales = gProspects.filter(p => p.salesOutcome === 'successful').length;
                    const members = getGroupMembers(group.id);
 
                    return (
@@ -130,8 +130,8 @@ const Group: React.FC = () => {
   const groupMembers = getGroupMembers(currentGroupId);
 
   // Group Aggregates
-  const totalGroupFYC = groupProspects.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
-  const totalGroupSales = groupProspects.filter(p => p.saleStatus === 'SUCCESSFUL').length;
+  const totalGroupFYC = groupProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+  const totalGroupSales = groupProspects.filter(p => p.salesOutcome === 'successful').length;
   const activeMembersCount = groupMembers.length + 1; // +1 for the leader
   const avgFYCPerAgent = activeMembersCount > 0 ? totalGroupFYC / activeMembersCount : 0;
 
@@ -144,9 +144,9 @@ const Group: React.FC = () => {
 
   // Sorting by FYC instead of Points
   const agentList = allGroupUsers.map(member => {
-    const memberProspects = groupProspects.filter(p => p.agentId === member.id);
-    const memberFYC = memberProspects.reduce((sum, p) => sum + (p.policyAmountMYR || 0), 0);
-    const memberSales = memberProspects.filter(p => p.saleStatus === 'SUCCESSFUL').length;
+    const memberProspects = groupProspects.filter(p => p.uid === member.id);
+    const memberFYC = memberProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+    const memberSales = memberProspects.filter(p => p.salesOutcome === 'successful').length;
     return {
       ...member,
       fyc: memberFYC,
@@ -160,8 +160,8 @@ const Group: React.FC = () => {
     const agent = agentList.find(u => u.id === selectedAgentId);
     if (!agent) return <div>Agent not found</div>;
 
-    const agentProspects = groupProspects.filter(p => p.agentId === selectedAgentId);
-    const successfulSales = agentProspects.filter(p => p.saleStatus === 'SUCCESSFUL');
+    const agentProspects = groupProspects.filter(p => p.uid === selectedAgentId);
+    const successfulSales = agentProspects.filter(p => p.salesOutcome === 'successful');
     
     // Updated Logic for Funnel
     const appointmentsSet = agentProspects.filter(p => 
@@ -258,7 +258,7 @@ const Group: React.FC = () => {
                                 <div key={p.id} className="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
                                     <Clock className="w-4 h-4 text-gray-400 mr-3" />
                                     <div>
-                                        <p className="text-sm font-semibold text-gray-900">{p.name}</p>
+                                        <p className="text-sm font-semibold text-gray-900">{p.prospectName}</p>
                                         <p className="text-xs text-gray-500">
                                             {(() => {
                                                 const d = new Date(p.appointmentDate!);
@@ -292,9 +292,9 @@ const Group: React.FC = () => {
                         {successfulSales.map(sale => (
                             <tr key={sale.id}>
                                 <td className="px-6 py-4 text-sm text-gray-600">{formatDate(sale.updatedAt)}</td>
-                                <td className="px-6 py-4 font-medium">{sale.name}</td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{sale.productType}</td>
-                                <td className="px-6 py-4 text-right font-mono font-bold">RM {sale.policyAmountMYR?.toLocaleString()}</td>
+                                <td className="px-6 py-4 font-medium">{sale.prospectName}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{(sale.productsSold || []).map(p => p.productName).filter(Boolean).join(', ') || '-'}</td>
+                                <td className="px-6 py-4 text-right font-mono font-bold">RM {(sale.productsSold || []).reduce((s, p) => s + (p.aceAmount || 0), 0).toLocaleString()}</td>
                             </tr>
                         ))}
                         {successfulSales.length === 0 && (

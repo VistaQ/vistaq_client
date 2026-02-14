@@ -61,32 +61,36 @@ const Import: React.FC = () => {
                 const id = cols[0]?.trim();
                 const name = cols[1]?.trim();
                 const phone = cols[2]?.trim();
-                const agentId = cols[3]?.trim();
+                const uid = cols[3]?.trim();
                 const outcome = cols[4]?.trim(); // SUCCESSFUL / UNSUCCESSFUL
                 const reason = cols[5]?.trim();
                 const product = cols[6]?.trim();
                 const amount = parseFloat(cols[7]?.trim()) || 0;
                 
                 // Infer Stage based on outcome for logic consistency
-                let stage = ProspectStage.INFO;
-                if (outcome === 'SUCCESSFUL') stage = ProspectStage.POINTS;
-                else if (outcome === 'UNSUCCESSFUL') stage = ProspectStage.CLOSED;
-                else if (outcome) stage = ProspectStage.SALES; 
+                let stage = ProspectStage.PROSPECT;
+                if (outcome === 'SUCCESSFUL' || outcome === 'UNSUCCESSFUL' || outcome === 'KIV') {
+                    stage = ProspectStage.SALES_OUTCOME;
+                } else if (outcome) {
+                    stage = ProspectStage.APPOINTMENT;
+                }
 
-                if (id && agentId && name) {
+                const normalizedOutcome = outcome === 'SUCCESSFUL' ? 'successful'
+                    : outcome === 'UNSUCCESSFUL' ? 'unsuccessful'
+                    : outcome === 'KIV' ? 'kiv'
+                    : undefined;
+
+                if (id && uid && name) {
                     parsedData.push({
                         id,
-                        agentId,
-                        name,
-                        phone,
+                        uid,
+                        prospectName: name,
+                        prospectPhone: phone,
                         currentStage: stage,
-                        saleStatus: (outcome === 'SUCCESSFUL' || outcome === 'UNSUCCESSFUL') ? outcome as any : undefined,
-                        saleReason: reason,
-                        productType: product,
-                        policyAmountMYR: amount,
-                        pointsAwarded: outcome === 'SUCCESSFUL' ? amount * 0.1 : 0,
-                        appointmentStatus: 'Completed', // Assume imported records have completed appointments
-                        paymentReceived: outcome === 'SUCCESSFUL',
+                        salesOutcome: normalizedOutcome as any,
+                        unsuccessfulReason: reason,
+                        productsSold: product ? [{ id: '1', productName: product, aceAmount: amount }] : [],
+                        appointmentStatus: 'completed',
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
                     } as Prospect);
