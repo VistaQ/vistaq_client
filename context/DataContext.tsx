@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Prospect, ProspectStage, User, UserRole, BadgeTier, Event } from '../types';
+import { useAuth } from './AuthContext';
 import { 
   db,
   collection, 
@@ -45,12 +46,19 @@ const DEFAULT_MILESTONES: BadgeTier[] = [
 ];
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { currentUser } = useAuth();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [badgeTiers, setBadgeTiers] = useState<BadgeTier[]>(DEFAULT_MILESTONES);
   const [events, setEvents] = useState<Event[]>([]);
 
   // 1. Sync Prospects from Firestore
   useEffect(() => {
+    // GUARD: Only fetch if authenticated
+    if (!currentUser) {
+        setProspects([]);
+        return;
+    }
+
     const unsubscribe = onSnapshot(collection(db, "prospects"), (snapshot: any) => {
       const loadedData = snapshot.docs.map((doc: any) => ({
         id: doc.id,
@@ -59,10 +67,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setProspects(loadedData);
     });
     return unsubscribe;
-  }, []);
+  }, [currentUser]);
 
   // 2. Sync Badge Tiers from Firestore (Optional collection)
   useEffect(() => {
+    if (!currentUser) return;
+
     const unsubscribe = onSnapshot(collection(db, "config"), (snapshot: any) => {
         // Assume we store badges in a single doc config/badges
         const badgesDoc = snapshot.docs.find((d: any) => d.id === 'badges');
@@ -71,10 +81,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     });
     return unsubscribe;
-  }, []);
+  }, [currentUser]);
 
   // 3. Sync Events from Firestore
   useEffect(() => {
+    if (!currentUser) return;
+
     const unsubscribe = onSnapshot(collection(db, "events"), (snapshot: any) => {
       const loadedEvents = snapshot.docs.map((doc: any) => ({
         id: doc.id,
@@ -83,7 +95,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setEvents(loadedEvents);
     });
     return unsubscribe;
-  }, []);
+  }, [currentUser]);
 
   const addProspect = async (data: Partial<Prospect>) => {
     // Generate a new reference
@@ -127,7 +139,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Ensure timestamp exists if not provided
         updatedAt: new Date().toISOString(),
         createdAt: p.createdAt || new Date().toISOString()
-      }, { merge: true }); // Upsert logic
+      }); // Upsert logic implied by batch set without merge option in our mock unless handled
     });
 
     await batch.commit();
@@ -138,7 +150,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
   
   const updateBadgeTiers = async (tiers: BadgeTier[]) => {
-    await setDoc(doc(db, "config", "badges"), { tiers }, { merge: true });
+    // Mock setDoc does not need options and ignores them, fixing TS error by removing them.
+    await setDoc(doc(db, "config", "badges"), { tiers });
     setBadgeTiers(tiers); // Optimistic update
   };
 
