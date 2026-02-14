@@ -1,17 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Prospect, ProspectStage, User, UserRole, BadgeTier, Event } from '../types';
-import { 
-  db,
-  collection, 
-  doc, 
-  addDoc, 
-  setDoc,
-  updateDoc, 
-  deleteDoc, 
-  onSnapshot, 
-  writeBatch 
-} from '../services/firebase';
+import { apiCall } from '../services/apiClient';
 
 interface DataContextType {
   prospects: Prospect[];
@@ -49,114 +39,126 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [badgeTiers, setBadgeTiers] = useState<BadgeTier[]>(DEFAULT_MILESTONES);
   const [events, setEvents] = useState<Event[]>([]);
 
-  // 1. Sync Prospects from Firestore
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "prospects"), (snapshot: any) => {
-      const loadedData = snapshot.docs.map((doc: any) => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Prospect[];
-      setProspects(loadedData);
-    });
-    return unsubscribe;
-  }, []);
-
-  // 2. Sync Badge Tiers from Firestore (Optional collection)
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "config"), (snapshot: any) => {
-        // Assume we store badges in a single doc config/badges
-        const badgesDoc = snapshot.docs.find((d: any) => d.id === 'badges');
-        if (badgesDoc) {
-            setBadgeTiers(badgesDoc.data().tiers as BadgeTier[]);
+  const getProspectsEndpoint = () => {
+    try {
+      const stored = localStorage.getItem('authUser');
+      if (stored) {
+        const user = JSON.parse(stored);
+        if (user.role === 'admin' || user.role === 'master_trainer') {
+          return '/admin/all-prospects';
         }
-    });
-    return unsubscribe;
+      }
+    } catch (_e) {}
+    return '/prospects/my-prospects';
+  };
+
+  const toISO = (ts: any): string | undefined => {
+    if (!ts) return undefined;
+    if (ts._seconds) return new Date(ts._seconds * 1000).toISOString();
+    if (typeof ts === 'string' || typeof ts === 'number') return new Date(ts).toISOString();
+    return undefined;
+  };
+
+  const normalizeProspect = (p: any): Prospect => ({
+    ...p,
+    id: p.id || p.prospectId,
+    prospectName: p.prospectName || '',
+    appointmentDate: toISO(p.appointmentDate),
+    productsSold: (p.productsSold || []).map((prod: any, i: number) => ({
+      ...prod,
+      id: prod.id || `prod_${i}`,
+    })),
+  });
+
+  const fetchProspects = async () => {
+    if (!localStorage.getItem('authToken')) return;
+    try {
+      const data = await apiCall(getProspectsEndpoint());
+      const raw: any[] = Array.isArray(data) ? data : (data.prospects || []);
+      setProspects(raw.map(normalizeProspect));
+    } catch (_e) {}
+  };
+
+  const fetchEvents = async () => {
+    if (!localStorage.getItem('authToken')) return;
+    try {
+      const data = await apiCall('/events/my-events');
+      const raw: any[] = Array.isArray(data) ? data : (data.events || []);
+      const items: Event[] = raw.map(e => ({
+        ...e,
+        date: toISO(e.date) || e.date,
+        createdAt: toISO(e.createdAt) || e.createdAt,
+        updatedAt: toISO(e.updatedAt) || e.updatedAt,
+      }));
+      setEvents(items);
+    } catch (_e) {}
+  };
+
+  // 1. Sync Prospects
+  useEffect(() => {
+    fetchProspects();
   }, []);
 
-  // 3. Sync Events from Firestore
+  // 2. Sync Events
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "events"), (snapshot: any) => {
-      const loadedEvents = snapshot.docs.map((doc: any) => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Event[];
-      setEvents(loadedEvents);
-    });
-    return unsubscribe;
+    fetchEvents();
   }, []);
 
   const addProspect = async (data: Partial<Prospect>) => {
-    // Generate a new reference
-    const newRef = doc(collection(db, "prospects"));
-    const newProspect: Prospect = {
-      id: newRef.id, // Use Firestore generated ID
-      agentId: data.agentId || 'unknown',
-      name: data.name || '',
-      phone: data.phone || '',
-      email: data.email || '',
-      currentStage: ProspectStage.INFO,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      ...data
-    } as Prospect;
-    
-    await setDoc(newRef, newProspect);
-    return newProspect;
+    const payload: Record<string, any> = {
+      prospectName: data.prospectName || '',
+    };
+    if (data.prospectEmail) payload.prospectEmail = data.prospectEmail;
+    if (data.prospectPhone) payload.prospectPhone = data.prospectPhone;
+
+    const response = await apiCall('/prospects', { method: 'POST', data: payload });
+    const prospectId = response.prospectId || response.id;
+
+    // Fetch the full created prospect from the API
+    const detail = await apiCall(`/prospects/${prospectId}`);
+    const created: Prospect = normalizeProspect(detail.prospect || detail);
+
+    await fetchProspects();
+    return created;
   };
 
   const updateProspect = async (id: string, updates: Partial<Prospect>) => {
-    const prospectRef = doc(db, "prospects", id);
-    await updateDoc(prospectRef, {
-      ...updates,
-      updatedAt: new Date().toISOString()
+    await apiCall(`/prospects/${id}`, {
+      method: 'PUT',
+      data: { ...updates, updatedAt: new Date().toISOString() }
     });
+    await fetchProspects();
   };
 
-  // Sync / Import function using Batch Writes
   const importProspects = async (importedData: Prospect[]) => {
-    const batch = writeBatch(db);
-    
-    importedData.forEach((p) => {
-      // Use the provided ID from CSV or generate one if missing
-      const docId = p.id || doc(collection(db, "prospects")).id;
-      const docRef = doc(db, "prospects", docId);
-      
-      batch.set(docRef, {
+    for (const p of importedData) {
+      const payload = {
         ...p,
-        id: docId,
-        // Ensure timestamp exists if not provided
         updatedAt: new Date().toISOString(),
         createdAt: p.createdAt || new Date().toISOString()
-      }, { merge: true }); // Upsert logic
-    });
-
-    await batch.commit();
+      };
+      if (p.id) {
+        await apiCall(`/prospects/${p.id}`, { method: 'PUT', data: payload });
+      } else {
+        await apiCall('/prospects', { method: 'POST', data: payload });
+      }
+    }
+    await fetchProspects();
   };
 
   const deleteProspect = async (id: string) => {
-    await deleteDoc(doc(db, "prospects", id));
+    await apiCall(`/prospects/${id}`, { method: 'DELETE' });
+    await fetchProspects();
   };
-  
+
   const updateBadgeTiers = async (tiers: BadgeTier[]) => {
-    // Corrected: setDoc takes (ref, data) as used here, removing options if definition mismatch
-    await setDoc(doc(db, "config", "badges"), { tiers });
-    setBadgeTiers(tiers); // Optimistic update
+    await apiCall('/config/badges', { method: 'PUT', data: { tiers } });
+    setBadgeTiers(tiers);
   };
 
   // --- SCOPING HELPER ---
   const getGroupProspects = (groupId: string): Prospect[] => {
-    return prospects.filter(p => {
-        // 1. Standard Convention: ID contains group (e.g. agent_g1_1)
-        const matchesGroup = p.agentId.includes(groupId);
-        
-        // 2. Leader Convention: ID is leader_X where X is group suffix
-        const matchesLeader = p.agentId.includes(`leader_${groupId.replace('g','')}`);
-        
-        // 3. SPECIAL DEMO MAPPING: agent_1 is in g1
-        const matchesDemoAgent = (groupId === 'g1' && p.agentId === 'agent_1');
-
-        return matchesGroup || matchesLeader || matchesDemoAgent;
-    });
+    return prospects.filter(p => p.groupId === groupId);
   };
 
   // --- MAIN SCOPE FUNCTION ---
@@ -169,48 +171,34 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // 2. Trainer (Managed Groups)
     if (user.role === UserRole.TRAINER) {
       if (user.managedGroupIds && user.managedGroupIds.length > 0) {
-        // Filter prospects belonging to any of the managed groups
-        return prospects.filter(p => {
-          return user.managedGroupIds?.some(gid => {
-             // Reuse the logic from getGroupProspects via direct checks for efficiency
-             const matchesGroup = p.agentId.includes(gid);
-             const leaderSuffix = gid.replace('g', ''); 
-             const matchesLeader = p.agentId === `leader_${leaderSuffix}`;
-             return matchesGroup || matchesLeader;
-          });
-        });
+        return prospects.filter(p => user.managedGroupIds!.includes(p.groupId || ''));
       }
-      // If trainer has no groups assigned, view all by default or none. 
-      // Assuming behavior same as Master Trainer if unassigned, but safer to return prospects for demo.
       return prospects;
     }
 
     // 3. Group Leader & Agent (Own Only)
-    // Group Leaders are restricted to seeing ONLY their own prospects in lists.
-    // Team performance is viewed via the Group Dashboard aggregates using getGroupProspects directly in those pages.
-    return prospects.filter(p => p.agentId === user.id);
+    return prospects.filter(p => p.uid === user.id);
   };
 
   // --- EVENTS ---
   const addEvent = async (evt: Partial<Event>) => {
-      const ref = doc(collection(db, "events"));
-      const newEvent = {
+      const payload = {
           ...evt,
-          id: ref.id,
-          // Defaults
-          title: evt.title || 'New Event',
+          eventTitle: evt.eventTitle || 'New Event',
           date: evt.date || new Date().toISOString()
       };
-      await setDoc(ref, newEvent);
+      await apiCall('/events', { method: 'POST', data: payload });
+      await fetchEvents();
   };
 
   const updateEvent = async (id: string, evt: Partial<Event>) => {
-      const ref = doc(db, "events", id);
-      await updateDoc(ref, evt);
+      await apiCall(`/events/${id}`, { method: 'PUT', data: evt });
+      await fetchEvents();
   };
 
   const deleteEvent = async (id: string) => {
-      await deleteDoc(doc(db, "events", id));
+      await apiCall(`/events/${id}`, { method: 'DELETE' });
+      await fetchEvents();
   };
 
   const getEventsForUser = (user: User): Event[] => {
@@ -220,7 +208,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (user.role === UserRole.ADMIN || user.role === UserRole.MASTER_TRAINER) return events;
 
       return events.filter(e => {
-          const targetGroups = e.targetGroupIds || [];
+          const targetGroups = e.groupIds || [];
           
           // 1. Created by me?
           if (e.createdBy === user.id) return true;
