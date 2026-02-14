@@ -1,8 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Initialize Gemini Client
-// Guidelines: API key must be obtained exclusively from process.env.API_KEY.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy-initialize Gemini client so missing API key doesn't crash the app on load.
+let _ai: GoogleGenAI | null = null;
+const getAI = (): GoogleGenAI | null => {
+  if (!process.env.API_KEY) return null;
+  if (!_ai) _ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  return _ai;
+};
 
 // Fallback messages for when API Quota is exceeded
 const FALLBACK_CHAT_MSG = "I apologize, but I am currently experiencing high traffic (Quota Exceeded). Here is a general tip: Focus on building rapport during your first appointment to increase conversion rates.";
@@ -15,10 +19,11 @@ const FALLBACK_ANALYSIS_MSG = "AI Analysis Unavailable (Quota Limit Reached).\n\
  */
 export const getChatResponse = async (history: {role: string, parts: string[]}[], message: string): Promise<string> => {
   try {
-    if (!process.env.API_KEY) return "AI Configuration Error: API Key missing.";
+    const ai = getAI();
+    if (!ai) return "AI Configuration Error: API Key missing.";
 
     const model = 'gemini-2.5-flash-lite-latest';
-    
+
     const chat = ai.chats.create({
       model: model,
       config: {
@@ -44,7 +49,8 @@ export const getChatResponse = async (history: {role: string, parts: string[]}[]
  */
 export const getMarketInsights = async (query: string): Promise<string> => {
   try {
-    if (!process.env.API_KEY) return "AI Configuration Error: API Key missing.";
+    const ai = getAI();
+    if (!ai) return "AI Configuration Error: API Key missing.";
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -81,7 +87,8 @@ export const getMarketInsights = async (query: string): Promise<string> => {
  */
 export const analyzePerformance = async (dataContext: string): Promise<string> => {
   try {
-    if (!process.env.API_KEY) return "AI Configuration Error: API Key missing.";
+    const ai = getAI();
+    if (!ai) return "AI Configuration Error: API Key missing.";
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
