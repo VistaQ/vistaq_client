@@ -25,26 +25,69 @@ const Agents: React.FC = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'sales'>('overview');
   const [groupUsers, setGroupUsers] = useState<any[]>([]);
+  const [groupProspects, setGroupProspects] = useState<any[]>([]);
 
-  // Fetch group users with metrics for group leaders
+  // Fetch group users and prospects for group leaders
   useEffect(() => {
-    const fetchGroupUsers = async () => {
+    const fetchGroupData = async () => {
       if (currentUser?.role === UserRole.GROUP_LEADER && currentUser.groupId) {
         try {
-          const response = await apiCall(`/users/group/${currentUser.groupId}`);
-          setGroupUsers(response.users || []);
+          // Fetch users
+          const usersResponse = await apiCall(`/users/group/${currentUser.groupId}`);
+          setGroupUsers(usersResponse.users || []);
+
+          // Fetch prospects
+          const prospectsResponse = await apiCall(`/prospects/group/${currentUser.groupId}`);
+          const raw = prospectsResponse.prospects || [];
+          // Normalize prospects
+          const normalized = raw.map((p: any) => ({
+            ...p,
+            id: p.id || p.prospectId,
+            prospectName: p.prospectName || '',
+            appointmentDate: p.appointmentDate?._seconds
+              ? new Date(p.appointmentDate._seconds * 1000).toISOString()
+              : p.appointmentDate,
+            appointmentCompletedAt: p.appointmentCompletedAt?._seconds
+              ? new Date(p.appointmentCompletedAt._seconds * 1000).toISOString()
+              : p.appointmentCompletedAt,
+            salesCompletedAt: p.salesCompletedAt?._seconds
+              ? new Date(p.salesCompletedAt._seconds * 1000).toISOString()
+              : p.salesCompletedAt,
+            createdAt: p.createdAt?._seconds
+              ? new Date(p.createdAt._seconds * 1000).toISOString()
+              : p.createdAt,
+            updatedAt: p.updatedAt?._seconds
+              ? new Date(p.updatedAt._seconds * 1000).toISOString()
+              : p.updatedAt,
+            productsSold: (p.productsSold || []).map((prod: any, i: number) => ({
+              ...prod,
+              id: prod.id || `prod_${i}`,
+            })),
+          }));
+          setGroupProspects(normalized);
         } catch (error) {
-          console.error('Failed to fetch group users:', error);
+          console.error('Failed to fetch group data:', error);
           setGroupUsers([]);
+          setGroupProspects([]);
         }
       }
     };
-    fetchGroupUsers();
+    fetchGroupData();
   }, [currentUser?.groupId, currentUser?.role]);
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     return !isNaN(d.getTime()) ? d.toLocaleDateString() : 'N/A';
+  };
+
+  // Helper to handle redacted prospect names for group leaders viewing other agents
+  const getProspectDisplayName = (prospect: any) => {
+    // Show actual name only if it's the current user's prospect
+    if (prospect.uid === currentUser?.id) {
+      return prospect.prospectName || 'N/A';
+    }
+    // For other agents' prospects, show nothing
+    return '';
   };
 
   // 1. Determine Visible Groups for current user
@@ -74,22 +117,30 @@ const Agents: React.FC = () => {
     (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
   );
 
-  // 3. Compute Aggregates
-  // For group leaders, use pre-calculated metrics from API; for others, calculate from prospects
-  const agentPerformance = currentUser?.role === UserRole.GROUP_LEADER && groupUsers.length > 0
+  // 3. Compute Aggregates - calculate from prospects for all roles
+  const agentPerformance = currentUser?.role === UserRole.GROUP_LEADER
     ? groupUsers.map(user => {
+        const userId = user.uid || user.id;
+        const userProspects = groupProspects.filter(p => p.uid === userId);
+        const fyc = userProspects
+          .filter(p => p.salesOutcome === 'successful')
+          .reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+        const sales = userProspects.filter(p => p.salesOutcome === 'successful').length;
         const group = groups.find(g => g.id === user.groupId);
+
         return {
           ...user,
-          id: user.uid || user.id,
+          id: userId,
           groupName: user.groupName || group?.name || 'N/A',
-          fyc: user.totalACE || 0,
-          sales: user.totalSales || 0
+          fyc,
+          sales
         };
       })
     : uniqueAgents.map(agent => {
         const agentProspects = prospects.filter(p => p.uid === agent.id);
-        const fyc = agentProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+        const fyc = agentProspects
+          .filter(p => p.salesOutcome === 'successful')
+          .reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
         const sales = agentProspects.filter(p => p.salesOutcome === 'successful').length;
         const group = groups.find(g => g.id === agent.groupId);
 
@@ -112,7 +163,9 @@ const Agents: React.FC = () => {
     const agent = agentPerformance.find(u => u.id === selectedAgentId);
     if (!agent) return <div>Agent not found</div>;
 
-    const agentProspects = prospects.filter(p => p.uid === selectedAgentId);
+    // Use appropriate data source based on role
+    const prospectsSource = currentUser?.role === UserRole.GROUP_LEADER ? groupProspects : prospects;
+    const agentProspects = prospectsSource.filter(p => p.uid === selectedAgentId);
     const successfulSales = agentProspects.filter(p => p.salesOutcome === 'successful');
     
     // Updated Logic for Funnel
@@ -212,7 +265,7 @@ const Agents: React.FC = () => {
                                 <div key={p.id} className="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
                                     <Clock className="w-4 h-4 text-gray-400 mr-3" />
                                     <div>
-                                        <p className="text-sm font-semibold text-gray-900">{p.prospectName}</p>
+                                        <p className="text-sm font-semibold text-gray-900">{getProspectDisplayName(p)}</p>
                                         <p className="text-xs text-gray-500">
                                             {(() => {
                                                 const d = new Date(p.appointmentDate!);
@@ -245,8 +298,8 @@ const Agents: React.FC = () => {
                     <tbody className="divide-y divide-gray-100">
                         {successfulSales.map(sale => (
                             <tr key={sale.id}>
-                                <td className="px-6 py-4 text-sm text-gray-600">{formatDate(sale.updatedAt)}</td>
-                                <td className="px-6 py-4 font-medium">{sale.prospectName}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{formatDate(sale.salesCompletedAt || sale.updatedAt)}</td>
+                                <td className="px-6 py-4 font-medium">{getProspectDisplayName(sale)}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600">{(sale.productsSold || []).map(p => p.productName).filter(Boolean).join(', ') || '-'}</td>
                                 <td className="px-6 py-4 text-right font-mono font-bold">RM {(sale.productsSold || []).reduce((s, p) => s + (p.aceAmount || 0), 0).toLocaleString()}</td>
                             </tr>

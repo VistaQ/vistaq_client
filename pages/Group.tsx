@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { User, ProspectStage, UserRole } from '../types';
+import { User, ProspectStage, UserRole, Prospect } from '../types';
+import { apiCall } from '../services/apiClient';
 import { 
   Users, 
   Crown,
@@ -32,17 +33,107 @@ const Group: React.FC = () => {
   // Trainer/Admin Logic: Allow selecting a group
   const [trainerSelectedGroupId, setTrainerSelectedGroupId] = useState<string | null>(null);
 
+  // Store group prospects fetched from API (for group leaders)
+  const [groupProspectsFromAPI, setGroupProspectsFromAPI] = useState<Prospect[]>([]);
+
+  // Store group users fetched from API (for group leaders)
+  const [groupUsersFromAPI, setGroupUsersFromAPI] = useState<User[]>([]);
+
   // User Roles Logic
   const isTrainer = currentUser?.role === UserRole.TRAINER;
   const isMasterTrainer = currentUser?.role === UserRole.MASTER_TRAINER;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   const isMultiGroupUser = isTrainer || isMasterTrainer || isAdmin;
 
+  // Determine current group ID (needed for useEffect dependency)
+  const currentGroupId = isMultiGroupUser ? trainerSelectedGroupId : currentUser?.groupId;
+
+  // Fetch group prospects and users from API for group leaders
+  // IMPORTANT: This must be before any early returns to comply with Rules of Hooks
+  useEffect(() => {
+    const fetchGroupData = async () => {
+      if (currentUser?.role === UserRole.GROUP_LEADER && currentGroupId) {
+        try {
+          // Fetch prospects
+          const prospectsResponse = await apiCall(`/prospects/group/${currentGroupId}`);
+          const raw: any[] = prospectsResponse.prospects || [];
+          // Normalize prospects
+          const normalized = raw.map((p: any) => ({
+            ...p,
+            id: p.id || p.prospectId,
+            prospectName: p.prospectName || '',
+            appointmentDate: p.appointmentDate?._seconds
+              ? new Date(p.appointmentDate._seconds * 1000).toISOString()
+              : p.appointmentDate,
+            appointmentCompletedAt: p.appointmentCompletedAt?._seconds
+              ? new Date(p.appointmentCompletedAt._seconds * 1000).toISOString()
+              : p.appointmentCompletedAt,
+            salesCompletedAt: p.salesCompletedAt?._seconds
+              ? new Date(p.salesCompletedAt._seconds * 1000).toISOString()
+              : p.salesCompletedAt,
+            createdAt: p.createdAt?._seconds
+              ? new Date(p.createdAt._seconds * 1000).toISOString()
+              : p.createdAt,
+            updatedAt: p.updatedAt?._seconds
+              ? new Date(p.updatedAt._seconds * 1000).toISOString()
+              : p.updatedAt,
+            productsSold: (p.productsSold || []).map((prod: any, i: number) => ({
+              ...prod,
+              id: prod.id || `prod_${i}`,
+            })),
+          }));
+          setGroupProspectsFromAPI(normalized);
+
+          // Fetch users
+          const usersResponse = await apiCall(`/users/group/${currentGroupId}`);
+          const groupUsers = usersResponse.users || [];
+          setGroupUsersFromAPI(groupUsers);
+        } catch (error) {
+          console.error('Failed to fetch group data:', error);
+          setGroupProspectsFromAPI([]);
+          setGroupUsersFromAPI([]);
+        }
+      }
+    };
+    fetchGroupData();
+  }, [currentGroupId, currentUser?.role]);
+
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     return !isNaN(d.getTime()) ? d.toLocaleDateString() : 'N/A';
   };
-  
+
+  // Normalize timestamp fields from Firestore format to ISO strings
+  const toISO = (ts: any): string | undefined => {
+    if (!ts) return undefined;
+    if (ts._seconds) return new Date(ts._seconds * 1000).toISOString();
+    if (typeof ts === 'string' || typeof ts === 'number') return new Date(ts).toISOString();
+    return undefined;
+  };
+
+  const normalizeProspect = (p: any): Prospect => ({
+    ...p,
+    id: p.id || p.prospectId,
+    prospectName: p.prospectName || '',
+    appointmentDate: toISO(p.appointmentDate),
+    createdAt: toISO(p.createdAt),
+    updatedAt: toISO(p.updatedAt),
+    productsSold: (p.productsSold || []).map((prod: any, i: number) => ({
+      ...prod,
+      id: prod.id || `prod_${i}`,
+    })),
+  });
+
+  // Helper to handle redacted prospect names for group leaders viewing other agents
+  const getProspectDisplayName = (prospect: Prospect) => {
+    // Show actual name only if it's the current user's prospect
+    if (prospect.uid === currentUser?.id) {
+      return prospect.prospectName || 'N/A';
+    }
+    // For other agents' prospects, show nothing
+    return '';
+  };
+
   // TRAINER / ADMIN VIEW: GROUP SELECTION GRID
   if (isMultiGroupUser && !trainerSelectedGroupId) {
       const visibleGroups = (isTrainer && currentUser.managedGroupIds)
@@ -117,9 +208,6 @@ const Group: React.FC = () => {
       );
   }
 
-  // If not Admin/Trainer, user just has one group. If Admin/Trainer selected a group, use that.
-  const currentGroupId = isMultiGroupUser ? trainerSelectedGroupId : currentUser?.groupId;
-
   if (!currentGroupId) {
      return (
         <div className="flex flex-col items-center justify-center h-full text-gray-500">
@@ -131,34 +219,43 @@ const Group: React.FC = () => {
 
   // --- GROUP DATA PREPARATION ---
   const myGroup = groups.find(g => g.id === currentGroupId);
-  const groupProspects = getGroupProspects(currentGroupId);
+  // Use API data for group leaders, otherwise use DataContext
+  const groupProspects = currentUser?.role === UserRole.GROUP_LEADER
+    ? groupProspectsFromAPI
+    : getGroupProspects(currentGroupId);
   const groupMembers = getGroupMembers(currentGroupId);
 
-  // Group Aggregates
-  const totalGroupFYC = groupProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+  // Group Aggregates - only count successful sales
+  const totalGroupFYC = groupProspects
+    .filter(p => p.salesOutcome === 'successful')
+    .reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
   const totalGroupSales = groupProspects.filter(p => p.salesOutcome === 'successful').length;
 
   // Count all team members (both agents and group leaders)
-  const activeMembersCount = users.filter(u =>
-    u.groupId === currentGroupId &&
-    (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
-  ).length;
+  // Use API data for group leaders, otherwise use AuthContext users
+  const groupUsers = currentUser?.role === UserRole.GROUP_LEADER
+    ? groupUsersFromAPI
+    : users.filter(u =>
+        u.groupId === currentGroupId &&
+        (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
+      );
+  const activeMembersCount = groupUsers.length;
 
   const avgFYCPerAgent = activeMembersCount > 0 ? totalGroupFYC / activeMembersCount : 0;
 
-  // Get all team members (agents + group leaders)
-  const allGroupUsers = users.filter(u =>
-    u.groupId === currentGroupId &&
-    (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
-  );
+  // Get all team members (agents + group leaders) - reuse groupUsers from above
+  const allGroupUsers = groupUsers;
 
-  // Sorting by FYC instead of Points
+  // Build agent list with performance metrics - calculate from prospects for all roles
   const agentList = allGroupUsers.map(member => {
-    const memberProspects = groupProspects.filter(p => p.uid === member.id);
-    const memberFYC = memberProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+    const memberProspects = groupProspects.filter(p => p.uid === (member.uid || member.id));
+    const memberFYC = memberProspects
+      .filter(p => p.salesOutcome === 'successful')
+      .reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
     const memberSales = memberProspects.filter(p => p.salesOutcome === 'successful').length;
     return {
       ...member,
+      id: member.uid || member.id,
       fyc: memberFYC,
       sales: memberSales
     };
@@ -267,7 +364,7 @@ const Group: React.FC = () => {
                                 <div key={p.id} className="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
                                     <Clock className="w-4 h-4 text-gray-400 mr-3" />
                                     <div>
-                                        <p className="text-sm font-semibold text-gray-900">{p.prospectName}</p>
+                                        <p className="text-sm font-semibold text-gray-900">{getProspectDisplayName(p)}</p>
                                         <p className="text-xs text-gray-500">
                                             {(() => {
                                                 const d = new Date(p.appointmentDate!);
@@ -300,8 +397,8 @@ const Group: React.FC = () => {
                     <tbody className="divide-y divide-gray-100">
                         {successfulSales.map(sale => (
                             <tr key={sale.id}>
-                                <td className="px-6 py-4 text-sm text-gray-600">{formatDate(sale.updatedAt)}</td>
-                                <td className="px-6 py-4 font-medium">{sale.prospectName}</td>
+                                <td className="px-6 py-4 text-sm text-gray-600">{formatDate(sale.salesCompletedAt || sale.updatedAt)}</td>
+                                <td className="px-6 py-4 font-medium">{getProspectDisplayName(sale)}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600">{(sale.productsSold || []).map(p => p.productName).filter(Boolean).join(', ') || '-'}</td>
                                 <td className="px-6 py-4 text-right font-mono font-bold">RM {(sale.productsSold || []).reduce((s, p) => s + (p.aceAmount || 0), 0).toLocaleString()}</td>
                             </tr>
