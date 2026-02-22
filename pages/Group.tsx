@@ -24,18 +24,19 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC'];
 
 const Group: React.FC = () => {
-  const { currentUser, getGroupMembers, groups, getUserById } = useAuth();
+  const { currentUser, getGroupMembers, groups, getUserById, users } = useAuth();
   const { getGroupProspects } = useData();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'sales'>('overview');
-  
+
   // Trainer/Admin Logic: Allow selecting a group
   const [trainerSelectedGroupId, setTrainerSelectedGroupId] = useState<string | null>(null);
 
   // User Roles Logic
   const isTrainer = currentUser?.role === UserRole.TRAINER;
+  const isMasterTrainer = currentUser?.role === UserRole.MASTER_TRAINER;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
-  const isMultiGroupUser = isTrainer || isAdmin;
+  const isMultiGroupUser = isTrainer || isMasterTrainer || isAdmin;
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -65,7 +66,11 @@ const Group: React.FC = () => {
                    const gProspects = getGroupProspects(group.id);
                    const gFYC = gProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
                    const gSales = gProspects.filter(p => p.salesOutcome === 'successful').length;
-                   const members = getGroupMembers(group.id);
+                   // Count all team members (agents + group leaders)
+                   const members = users.filter(u =>
+                     u.groupId === group.id &&
+                     (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
+                   );
 
                    return (
                       <button 
@@ -132,15 +137,20 @@ const Group: React.FC = () => {
   // Group Aggregates
   const totalGroupFYC = groupProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
   const totalGroupSales = groupProspects.filter(p => p.salesOutcome === 'successful').length;
-  const activeMembersCount = groupMembers.length + 1; // +1 for the leader
+
+  // Count all team members (both agents and group leaders)
+  const activeMembersCount = users.filter(u =>
+    u.groupId === currentGroupId &&
+    (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
+  ).length;
+
   const avgFYCPerAgent = activeMembersCount > 0 ? totalGroupFYC / activeMembersCount : 0;
 
-  // Add the leader to the list
-  const allGroupUsers = [...groupMembers];
-  const leader = getUserById(myGroup?.leaderId || '');
-  if (leader && !allGroupUsers.find(u => u.id === leader.id)) {
-     allGroupUsers.push(leader);
-  }
+  // Get all team members (agents + group leaders)
+  const allGroupUsers = users.filter(u =>
+    u.groupId === currentGroupId &&
+    (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
+  );
 
   // Sorting by FYC instead of Points
   const agentList = allGroupUsers.map(member => {
@@ -164,12 +174,11 @@ const Group: React.FC = () => {
     const successfulSales = agentProspects.filter(p => p.salesOutcome === 'successful');
     
     // Updated Logic for Funnel
-    const appointmentsSet = agentProspects.filter(p => 
-        p.appointmentStatus === 'Scheduled' || 
-        p.appointmentStatus === 'Rescheduled' || 
-        p.appointmentStatus === 'Completed'
+    const appointmentsSet = agentProspects.filter(p =>
+        p.appointmentStatus === 'scheduled' ||
+        p.appointmentStatus === 'rescheduled'
     ).length;
-    const completedAppointments = agentProspects.filter(p => p.appointmentStatus === 'Completed').length;
+    const completedAppointments = agentProspects.filter(p => p.appointmentStatus === 'completed').length;
 
     const chartData = [
        { name: 'Prospects', value: agentProspects.length },
@@ -179,7 +188,7 @@ const Group: React.FC = () => {
     ];
 
     const upcomingAppointments = agentProspects
-        .filter(p => p.appointmentStatus === 'Not done' && p.appointmentDate && new Date(p.appointmentDate) > new Date())
+        .filter(p => p.appointmentStatus === 'not_done' && p.appointmentDate && new Date(p.appointmentDate) > new Date())
         .sort((a, b) => {
             const dateA = new Date(a.appointmentDate!).getTime();
             const dateB = new Date(b.appointmentDate!).getTime();

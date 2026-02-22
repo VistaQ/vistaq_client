@@ -135,7 +135,7 @@ const Prospects: React.FC = () => {
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-700">Appt Declined</span>;
     }
     if (appointmentStatus === 'completed') {
-      return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-700">Appt Done</span>;
+      return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-700">Sales Meeting</span>;
     }
 
     // 3. Appointment stage

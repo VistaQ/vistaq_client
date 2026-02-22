@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { UserRole, Event } from '../types';
@@ -7,7 +7,12 @@ import { CalendarDays, Plus, MapPin, User, X, Clock, Link as LinkIcon, Edit2, Ex
 
 const Events: React.FC = () => {
   const { currentUser, groups } = useAuth();
-  const { addEvent, deleteEvent, updateEvent, getEventsForUser } = useData();
+  const { addEvent, deleteEvent, updateEvent, getEventsForUser, refetchEvents } = useData();
+
+  // Refetch events when component mounts to ensure fresh data
+  useEffect(() => {
+    refetchEvents();
+  }, []);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -162,7 +167,7 @@ const Events: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-           <h1 className="text-2xl font-bold text-gray-900">Events & Announcements</h1>
+           <h1 className="text-2xl font-bold text-gray-900">Events & Meetups</h1>
            <p className="text-sm text-gray-500">Upcoming training sessions, huddles, and group meetings.</p>
         </div>
         {canManage && (

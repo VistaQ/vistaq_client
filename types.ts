@@ -23,6 +23,7 @@ export interface User {
   email: string;
   role: UserRole;
   groupId?: string; // Primary group for Agents/Leaders
+  groupName?: string; // Group name from API
   managedGroupIds?: string[]; // For Trainers handling multiple groups
   avatarUrl?: string;
   password?: string; // For mock auth only
