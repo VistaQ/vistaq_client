@@ -103,9 +103,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       method: 'POST',
       data: { email: identifier, password }
     });
-    const raw = response.user;
-    const user: User = { ...raw, id: raw.uid || raw.id };
     localStorage.setItem('authToken', response.token);
+
+    // Fetch complete user data from /users/me instead of using login response
+    // This ensures we have all fields including managedGroupIds
+    const meData = await apiCall('/users/me');
+    const raw = meData.user || meData;
+    const user: User = { ...raw, id: raw.uid || raw.id };
     localStorage.setItem('authUser', JSON.stringify(user));
     setCurrentUser(user);
     return true;
