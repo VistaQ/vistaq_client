@@ -20,6 +20,7 @@ interface DataContextType {
   updateEvent: (id: string, evt: Partial<Event>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
   getEventsForUser: (user: User) => Event[];
+  refetchEvents: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -46,6 +47,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const user = JSON.parse(stored);
         if (user.role === 'admin' || user.role === 'master_trainer') {
           return '/admin/all-prospects';
+        }
+        if (user.role === 'trainer') {
+          return '/prospects/managed-groups';
         }
       }
     } catch (_e) {}
@@ -80,7 +84,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const fetchEvents = async () => {
-    if (!localStorage.getItem('authToken')) return;
+    if (!localStorage.getItem('authToken')) {
+      setEvents([]);
+      return;
+    }
     try {
       const data = await apiCall('/events/my-events');
       const raw: any[] = Array.isArray(data) ? data : (data.events || []);
@@ -91,18 +98,70 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updatedAt: toISO(e.updatedAt) || e.updatedAt,
       }));
       setEvents(items);
-    } catch (_e) {}
+    } catch (_e) {
+      setEvents([]);
+    }
   };
 
-  // 1. Sync Prospects
-  useEffect(() => {
-    fetchProspects();
-  }, []);
+  // Track authentication state to trigger refetch on login
+  const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('authToken'));
+  const [userRole, setUserRole] = useState<string | null>(() => {
+    try {
+      const stored = localStorage.getItem('authUser');
+      return stored ? JSON.parse(stored).role : null;
+    } catch {
+      return null;
+    }
+  });
 
-  // 2. Sync Events
+  // Watch for auth token and user changes in localStorage
   useEffect(() => {
-    fetchEvents();
-  }, []);
+    const checkAuth = () => {
+      const token = localStorage.getItem('authToken');
+      if (token !== authToken) {
+        setAuthToken(token);
+      }
+
+      try {
+        const stored = localStorage.getItem('authUser');
+        const role = stored ? JSON.parse(stored).role : null;
+        if (role !== userRole) {
+          setUserRole(role);
+        }
+      } catch {}
+    };
+
+    // Check periodically for auth changes
+    const interval = setInterval(checkAuth, 100);
+
+    // Also listen to storage events (for cross-tab sync)
+    window.addEventListener('storage', checkAuth);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', checkAuth);
+    };
+  }, [authToken, userRole]);
+
+  // 1. Sync Prospects when authenticated or user role changes, clear on logout
+  useEffect(() => {
+    if (authToken) {
+      fetchProspects();
+    } else {
+      // Clear data on logout
+      setProspects([]);
+    }
+  }, [authToken, userRole]);
+
+  // 2. Sync Events when authenticated, clear on logout
+  useEffect(() => {
+    if (authToken) {
+      fetchEvents();
+    } else {
+      // Clear data on logout
+      setEvents([]);
+    }
+  }, [authToken]);
 
   const addProspect = async (data: Partial<Prospect>) => {
     const payload: Record<string, any> = {
@@ -203,13 +262,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const getEventsForUser = (user: User): Event[] => {
       if (!user) return [];
-      
-      // Admin & Master Trainer sees all
-      if (user.role === UserRole.ADMIN || user.role === UserRole.MASTER_TRAINER) return events;
+
+      // Admin, Master Trainer, and Trainer see all events
+      if (user.role === UserRole.ADMIN ||
+          user.role === UserRole.MASTER_TRAINER ||
+          user.role === UserRole.TRAINER) {
+          return events;
+      }
 
       return events.filter(e => {
           const targetGroups = e.groupIds || [];
-          
+
           // 1. Created by me?
           if (e.createdBy === user.id) return true;
 
@@ -223,21 +286,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                return targetGroups.includes(user.groupId);
           }
 
-          // 4. For Trainer: Do managed groups overlap with target groups?
-          if (user.role === UserRole.TRAINER && user.managedGroupIds) {
-               return targetGroups.some(gid => user.managedGroupIds!.includes(gid));
-          }
-
           return false;
       });
   };
 
   return (
-    <DataContext.Provider value={{ 
-      prospects, badgeTiers, events, 
+    <DataContext.Provider value={{
+      prospects, badgeTiers, events,
       addProspect, updateProspect, importProspects, deleteProspect,
       getProspectsByScope, getGroupProspects, updateBadgeTiers,
-      addEvent, updateEvent, deleteEvent, getEventsForUser
+      addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents
     }}>
       {children}
     </DataContext.Provider>
