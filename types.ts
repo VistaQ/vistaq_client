@@ -19,6 +19,7 @@ export const getRoleLabel = (role: string): string => ROLE_LABELS[role] ?? role;
 
 export interface User {
   id: string;
+  uid?: string; // Firebase UID
   name: string;
   email: string;
   role: UserRole;
@@ -28,6 +29,11 @@ export interface User {
   avatarUrl?: string;
   password?: string; // For mock auth only
   agentCode?: string; // "Agent Code" - Required for AGENT only
+  // Performance metrics from API
+  totalProspects?: number;
+  totalAppointments?: number;
+  totalSales?: number;
+  totalACE?: number;
 }
 
 export interface Notification {
