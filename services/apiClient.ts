@@ -1,6 +1,6 @@
 import { clearAllCache } from './cache';
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://stg-api.vistaq.co/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export interface ApiError {
   status: number;
