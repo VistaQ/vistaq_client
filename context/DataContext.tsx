@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Prospect, ProspectStage, User, UserRole, BadgeTier, Event } from '../types';
 import { apiCall } from '../services/apiClient';
+import { getCache, setCache, invalidateCache, buildCacheKey } from '../services/cache';
 
 interface DataContextType {
   prospects: Prospect[];
@@ -40,6 +41,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [badgeTiers, setBadgeTiers] = useState<BadgeTier[]>(DEFAULT_MILESTONES);
   const [events, setEvents] = useState<Event[]>([]);
 
+  const getCurrentUserId = (): string | null => {
+    try {
+      const stored = localStorage.getItem('authUser');
+      if (stored) {
+        const user = JSON.parse(stored);
+        return user.id || user.uid || null;
+      }
+    } catch (_e) {}
+    return null;
+  };
+
   const getProspectsEndpoint = () => {
     try {
       const stored = localStorage.getItem('authUser');
@@ -76,10 +88,27 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const fetchProspects = async () => {
     if (!localStorage.getItem('authToken')) return;
+
+    const userId = getCurrentUserId();
+    if (!userId) return;
+
+    const endpoint = getProspectsEndpoint();
+    const cacheKey = buildCacheKey(userId, `prospects_${endpoint}`);
+
+    // Try to get from cache first
+    const cached = getCache<Prospect[]>(cacheKey, userId);
+    if (cached) {
+      setProspects(cached);
+      return;
+    }
+
+    // Fetch from API if cache miss or stale
     try {
-      const data = await apiCall(getProspectsEndpoint());
+      const data = await apiCall(endpoint);
       const raw: any[] = Array.isArray(data) ? data : (data.prospects || []);
-      setProspects(raw.map(normalizeProspect));
+      const normalized = raw.map(normalizeProspect);
+      setProspects(normalized);
+      setCache(cacheKey, normalized, userId);
     } catch (_e) {}
   };
 
@@ -88,6 +117,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setEvents([]);
       return;
     }
+
+    const userId = getCurrentUserId();
+    if (!userId) {
+      setEvents([]);
+      return;
+    }
+
+    const cacheKey = buildCacheKey(userId, 'events');
+
+    // Try to get from cache first
+    const cached = getCache<Event[]>(cacheKey, userId);
+    if (cached) {
+      setEvents(cached);
+      return;
+    }
+
+    // Fetch from API if cache miss or stale
     try {
       const data = await apiCall('/events/my-events');
       const raw: any[] = Array.isArray(data) ? data : (data.events || []);
@@ -98,6 +144,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updatedAt: toISO(e.updatedAt) || e.updatedAt,
       }));
       setEvents(items);
+      setCache(cacheKey, items, userId);
     } catch (_e) {
       setEvents([]);
     }
@@ -177,6 +224,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const detail = await apiCall(`/prospects/${prospectId}`);
     const created: Prospect = normalizeProspect(detail.prospect || detail);
 
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      const endpoint = getProspectsEndpoint();
+      invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+    }
+
     await fetchProspects();
     return created;
   };
@@ -186,6 +240,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       method: 'PUT',
       data: { ...updates, updatedAt: new Date().toISOString() }
     });
+
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      const endpoint = getProspectsEndpoint();
+      invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+    }
+
     await fetchProspects();
   };
 
@@ -202,11 +264,27 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await apiCall('/prospects', { method: 'POST', data: payload });
       }
     }
+
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      const endpoint = getProspectsEndpoint();
+      invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+    }
+
     await fetchProspects();
   };
 
   const deleteProspect = async (id: string) => {
     await apiCall(`/prospects/${id}`, { method: 'DELETE' });
+
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      const endpoint = getProspectsEndpoint();
+      invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+    }
+
     await fetchProspects();
   };
 
@@ -247,16 +325,37 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           date: evt.date || new Date().toISOString()
       };
       await apiCall('/events', { method: 'POST', data: payload });
+
+      // Invalidate cache before refetching
+      const userId = getCurrentUserId();
+      if (userId) {
+        invalidateCache(buildCacheKey(userId, 'events'));
+      }
+
       await fetchEvents();
   };
 
   const updateEvent = async (id: string, evt: Partial<Event>) => {
       await apiCall(`/events/${id}`, { method: 'PUT', data: evt });
+
+      // Invalidate cache before refetching
+      const userId = getCurrentUserId();
+      if (userId) {
+        invalidateCache(buildCacheKey(userId, 'events'));
+      }
+
       await fetchEvents();
   };
 
   const deleteEvent = async (id: string) => {
       await apiCall(`/events/${id}`, { method: 'DELETE' });
+
+      // Invalidate cache before refetching
+      const userId = getCurrentUserId();
+      if (userId) {
+        invalidateCache(buildCacheKey(userId, 'events'));
+      }
+
       await fetchEvents();
   };
 

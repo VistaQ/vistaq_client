@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, UserRole, Group, Notification } from '../types';
 import { apiCall } from '../services/apiClient';
+import { getCache, setCache, invalidateCache, buildCacheKey, clearAllCache } from '../services/cache';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -82,23 +83,57 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [currentUser?.id]);
 
   const fetchUsers = async () => {
+    if (!currentUser) return;
+
+    const userId = currentUser.id;
+    const cacheKey = buildCacheKey(userId, 'users');
+
+    // Try to get from cache first
+    const cached = getCache<User[]>(cacheKey, userId);
+    if (cached) {
+      setUsers(cached);
+      return;
+    }
+
+    // Fetch from API if cache miss or stale
     try {
       const data = await apiCall('/users');
       const list: any[] = Array.isArray(data.users) ? data.users : (Array.isArray(data) ? data : []);
-      setUsers(list.map(u => ({ ...u, id: u.uid || u.id, name: u.name || u.email || '' })));
+      const normalized = list.map(u => ({ ...u, id: u.uid || u.id, name: u.name || u.email || '' }));
+      setUsers(normalized);
+      setCache(cacheKey, normalized, userId);
     } catch (_e) {}
   };
 
   const fetchGroups = async () => {
+    if (!currentUser) return;
+
+    const userId = currentUser.id;
+    const cacheKey = buildCacheKey(userId, 'groups');
+
+    // Try to get from cache first
+    const cached = getCache<Group[]>(cacheKey, userId);
+    if (cached) {
+      setGroups(cached);
+      return;
+    }
+
+    // Fetch from API if cache miss or stale
     try {
       const data = await apiCall('/groups');
       const list = data.groups || data;
-      setGroups(Array.isArray(list) ? list : []);
+      const normalized = Array.isArray(list) ? list : [];
+      setGroups(normalized);
+      setCache(cacheKey, normalized, userId);
     } catch (_e) {}
   };
 
   const login = async (identifier: string, password?: string): Promise<boolean> => {
     if (!password) return false;
+
+    // Clear all cache before login to ensure clean state for new user
+    clearAllCache();
+
     const response = await apiCall('/auth/login', {
       method: 'POST',
       data: { email: identifier, password }
@@ -138,6 +173,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('authUser');
+
+    // Clear all cache on logout to prevent cross-user contamination
+    clearAllCache();
+
     setCurrentUser(null);
   };
 
@@ -173,6 +212,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateProfile = async (updates: Partial<User>) => {
     if (!currentUser) return;
     await apiCall(`/users/${currentUser.id}`, { method: 'PUT', data: updates });
+
+    // Invalidate users cache since profile was updated
+    invalidateCache(buildCacheKey(currentUser.id, 'users'));
+
     await refreshCurrentUser();
   };
 
@@ -192,18 +235,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       `Account has been created for ${userData.name}.\n\nLogin ID: Email: ${userData.email}\nPassword: ${userData.password}`,
       'success'
     );
+
+    // Invalidate cache before refetching
+    if (currentUser) {
+      invalidateCache(buildCacheKey(currentUser.id, 'users'));
+    }
+
     await fetchUsers();
   };
 
   const updateUser = async (id: string, updates: Partial<User>) => {
     await apiCall(`/admin/users/${id}`, { method: 'PUT', data: updates });
     showNotification("User Updated", "User profile has been updated successfully.", "success");
+
+    // Invalidate cache before refetching
+    if (currentUser) {
+      invalidateCache(buildCacheKey(currentUser.id, 'users'));
+    }
+
     await fetchUsers();
   };
 
   const deleteUser = async (id: string) => {
     await apiCall(`/admin/users/${id}`, { method: 'DELETE' });
     showNotification("User Deleted", "The user has been removed from the system.", "info");
+
+    // Invalidate cache before refetching
+    if (currentUser) {
+      invalidateCache(buildCacheKey(currentUser.id, 'users'));
+    }
+
     await fetchUsers();
   };
 
@@ -214,6 +275,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       data: { name, leaderId, trainerIds, memberIds }
     });
     showNotification("Group Created", `Group "${name}" has been created with assigned members.`, "success");
+
+    // Invalidate cache before refetching
+    if (currentUser) {
+      invalidateCache(buildCacheKey(currentUser.id, 'groups'));
+    }
+
     await fetchGroups();
   };
 
@@ -223,12 +290,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       data: { name, leaderId, trainerIds, memberIds }
     });
     showNotification("Group Updated", `Group configuration for "${name}" has been saved.`, "success");
+
+    // Invalidate cache before refetching
+    if (currentUser) {
+      invalidateCache(buildCacheKey(currentUser.id, 'groups'));
+    }
+
     await fetchGroups();
   };
 
   const deleteGroup = async (groupId: string) => {
     await apiCall(`/admin/groups/${groupId}`, { method: 'DELETE' });
     showNotification("Group Deleted", "The group has been disbanded.", "info");
+
+    // Invalidate cache before refetching
+    if (currentUser) {
+      invalidateCache(buildCacheKey(currentUser.id, 'groups'));
+    }
+
     await fetchGroups();
   };
 
