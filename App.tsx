@@ -64,6 +64,9 @@ const AuthFlow: React.FC = () => {
     const [view, setView] = useState<AuthView>('login');
 
     if (isAuthenticated) {
+        if (window.location.pathname !== '/') {
+            window.history.replaceState(null, '', '/');
+        }
         return <AuthenticatedApp />;
     }
 
