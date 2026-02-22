@@ -1,13 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { User, UserRole } from '../types';
-import { 
-  Search, 
-  UserCheck, 
-  ChevronRight, 
-  ArrowLeft, 
+import { apiCall } from '../services/apiClient';
+import {
+  Search,
+  UserCheck,
+  ChevronRight,
+  ArrowLeft,
   Clock,
   Target
 } from 'lucide-react';
@@ -17,12 +18,29 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC'];
 
 const Agents: React.FC = () => {
-  const { groups, getGroupMembers, getUserById, currentUser } = useAuth();
+  const { groups, getGroupMembers, getUserById, currentUser, users } = useAuth();
   const { prospects } = useData();
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'sales'>('overview');
+  const [groupUsers, setGroupUsers] = useState<any[]>([]);
+
+  // Fetch group users with metrics for group leaders
+  useEffect(() => {
+    const fetchGroupUsers = async () => {
+      if (currentUser?.role === UserRole.GROUP_LEADER && currentUser.groupId) {
+        try {
+          const response = await apiCall(`/users/group/${currentUser.groupId}`);
+          setGroupUsers(response.users || []);
+        } catch (error) {
+          console.error('Failed to fetch group users:', error);
+          setGroupUsers([]);
+        }
+      }
+    };
+    fetchGroupUsers();
+  }, [currentUser?.groupId, currentUser?.role]);
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -30,48 +48,58 @@ const Agents: React.FC = () => {
   };
 
   // 1. Determine Visible Groups for current user
-  let visibleGroups = groups; // Default to all (Admin)
+  let visibleGroups = groups; // Default to all (Admin & Master Trainer)
 
-  if (currentUser?.role === UserRole.TRAINER && currentUser.managedGroupIds) {
-      visibleGroups = groups.filter(g => currentUser.managedGroupIds!.includes(g.id));
+  if (currentUser?.role === UserRole.TRAINER) {
+      // Trainers MUST have managedGroupIds - only show their managed groups
+      if (currentUser.managedGroupIds && currentUser.managedGroupIds.length > 0) {
+          visibleGroups = groups.filter(g => currentUser.managedGroupIds!.includes(g.id));
+      } else {
+          // If trainer has no managedGroupIds, show empty (data issue - needs to be fixed in backend)
+          visibleGroups = [];
+      }
   } else if (currentUser?.role === UserRole.GROUP_LEADER && currentUser.groupId) {
       visibleGroups = groups.filter(g => g.id === currentUser.groupId);
   } else if (currentUser?.role === UserRole.AGENT) {
       // Agents shouldn't really access this page usually, but if they do, show only their group
       visibleGroups = groups.filter(g => g.id === currentUser.groupId);
   }
+  // Note: Admin and Master Trainer see all groups (default)
 
   // 2. Build Master List of All Agents/Leaders from visible groups
-  const allAgents: User[] = [];
-  
-  visibleGroups.forEach(g => {
-    // Add Leader
-    const leader = getUserById(g.leaderId);
-    if (leader) allAgents.push(leader);
-    
-    // Add Members
-    const members = getGroupMembers(g.id);
-    allAgents.push(...members);
-  });
-
-  // Deduplicate agents (in case of weird data states)
-  const uniqueAgents = Array.from(new Set(allAgents.map(a => a.id)))
-    .map(id => allAgents.find(a => a.id === id)!);
+  // Get all users (agents + group leaders) from visible groups
+  const visibleGroupIds = visibleGroups.map(g => g.id);
+  const uniqueAgents = users.filter(u =>
+    visibleGroupIds.includes(u.groupId || '') &&
+    (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
+  );
 
   // 3. Compute Aggregates
-  const agentPerformance = uniqueAgents.map(agent => {
-    const agentProspects = prospects.filter(p => p.uid === agent.id);
-    const fyc = agentProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
-    const sales = agentProspects.filter(p => p.salesOutcome === 'successful').length;
-    const group = groups.find(g => g.id === agent.groupId);
+  // For group leaders, use pre-calculated metrics from API; for others, calculate from prospects
+  const agentPerformance = currentUser?.role === UserRole.GROUP_LEADER && groupUsers.length > 0
+    ? groupUsers.map(user => {
+        const group = groups.find(g => g.id === user.groupId);
+        return {
+          ...user,
+          id: user.uid || user.id,
+          groupName: user.groupName || group?.name || 'N/A',
+          fyc: user.totalACE || 0,
+          sales: user.totalSales || 0
+        };
+      })
+    : uniqueAgents.map(agent => {
+        const agentProspects = prospects.filter(p => p.uid === agent.id);
+        const fyc = agentProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+        const sales = agentProspects.filter(p => p.salesOutcome === 'successful').length;
+        const group = groups.find(g => g.id === agent.groupId);
 
-    return {
-      ...agent,
-      groupName: group ? group.name : 'N/A',
-      fyc,
-      sales
-    };
-  });
+        return {
+          ...agent,
+          groupName: group ? group.name : 'N/A',
+          fyc,
+          sales
+        };
+      });
 
   // 4. Filter
   const filteredAgents = agentPerformance.filter(a => 
@@ -88,12 +116,11 @@ const Agents: React.FC = () => {
     const successfulSales = agentProspects.filter(p => p.salesOutcome === 'successful');
     
     // Updated Logic for Funnel
-    const appointmentsSet = agentProspects.filter(p => 
-        p.appointmentStatus === 'Scheduled' || 
-        p.appointmentStatus === 'Rescheduled' || 
-        p.appointmentStatus === 'Completed'
+    const appointmentsSet = agentProspects.filter(p =>
+        p.appointmentStatus === 'scheduled' ||
+        p.appointmentStatus === 'rescheduled'
     ).length;
-    const completedAppointments = agentProspects.filter(p => p.appointmentStatus === 'Completed').length;
+    const completedAppointments = agentProspects.filter(p => p.appointmentStatus === 'completed').length;
 
     const chartData = [
        { name: 'Prospects', value: agentProspects.length },
@@ -103,7 +130,7 @@ const Agents: React.FC = () => {
     ];
 
     const upcomingAppointments = agentProspects
-        .filter(p => p.appointmentStatus === 'Not done' && p.appointmentDate && new Date(p.appointmentDate) > new Date())
+        .filter(p => p.appointmentStatus === 'not_done' && p.appointmentDate && new Date(p.appointmentDate) > new Date())
         .sort((a, b) => {
             const dateA = new Date(a.appointmentDate!).getTime();
             const dateB = new Date(b.appointmentDate!).getTime();
