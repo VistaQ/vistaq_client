@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { User, ProspectStage, UserRole, Prospect } from '../types';
 import { apiCall } from '../services/apiClient';
+import { getCache, setCache, buildCacheKey } from '../services/cache';
 import { 
   Users, 
   Crown,
@@ -53,41 +54,55 @@ const Group: React.FC = () => {
   useEffect(() => {
     const fetchGroupData = async () => {
       if (currentUser?.role === UserRole.GROUP_LEADER && currentGroupId) {
-        try {
-          // Fetch prospects
-          const prospectsResponse = await apiCall(`/prospects/group/${currentGroupId}`);
-          const raw: any[] = prospectsResponse.prospects || [];
-          // Normalize prospects
-          const normalized = raw.map((p: any) => ({
-            ...p,
-            id: p.id || p.prospectId,
-            prospectName: p.prospectName || '',
-            appointmentDate: p.appointmentDate?._seconds
-              ? new Date(p.appointmentDate._seconds * 1000).toISOString()
-              : p.appointmentDate,
-            appointmentCompletedAt: p.appointmentCompletedAt?._seconds
-              ? new Date(p.appointmentCompletedAt._seconds * 1000).toISOString()
-              : p.appointmentCompletedAt,
-            salesCompletedAt: p.salesCompletedAt?._seconds
-              ? new Date(p.salesCompletedAt._seconds * 1000).toISOString()
-              : p.salesCompletedAt,
-            createdAt: p.createdAt?._seconds
-              ? new Date(p.createdAt._seconds * 1000).toISOString()
-              : p.createdAt,
-            updatedAt: p.updatedAt?._seconds
-              ? new Date(p.updatedAt._seconds * 1000).toISOString()
-              : p.updatedAt,
-            productsSold: (p.productsSold || []).map((prod: any, i: number) => ({
-              ...prod,
-              id: prod.id || `prod_${i}`,
-            })),
-          }));
-          setGroupProspectsFromAPI(normalized);
+        const userId = currentUser.id;
+        const usersCacheKey = buildCacheKey(userId, `group_users_${currentGroupId}`);
+        const prospectsCacheKey = buildCacheKey(userId, `group_prospects_${currentGroupId}`);
 
-          // Fetch users
-          const usersResponse = await apiCall(`/users/group/${currentGroupId}`);
-          const groupUsers = usersResponse.users || [];
-          setGroupUsersFromAPI(groupUsers);
+        const cachedUsers = getCache<any[]>(usersCacheKey, userId);
+        const cachedProspects = getCache<any[]>(prospectsCacheKey, userId);
+
+        if (cachedUsers) setGroupUsersFromAPI(cachedUsers);
+        if (cachedProspects) setGroupProspectsFromAPI(cachedProspects);
+        if (cachedUsers && cachedProspects) return;
+
+        try {
+          if (!cachedProspects) {
+            const prospectsResponse = await apiCall(`/prospects/group/${currentGroupId}`);
+            const raw: any[] = prospectsResponse.prospects || [];
+            const normalized = raw.map((p: any) => ({
+              ...p,
+              id: p.id || p.prospectId,
+              prospectName: p.prospectName || '',
+              appointmentDate: p.appointmentDate?._seconds
+                ? new Date(p.appointmentDate._seconds * 1000).toISOString()
+                : p.appointmentDate,
+              appointmentCompletedAt: p.appointmentCompletedAt?._seconds
+                ? new Date(p.appointmentCompletedAt._seconds * 1000).toISOString()
+                : p.appointmentCompletedAt,
+              salesCompletedAt: p.salesCompletedAt?._seconds
+                ? new Date(p.salesCompletedAt._seconds * 1000).toISOString()
+                : p.salesCompletedAt,
+              createdAt: p.createdAt?._seconds
+                ? new Date(p.createdAt._seconds * 1000).toISOString()
+                : p.createdAt,
+              updatedAt: p.updatedAt?._seconds
+                ? new Date(p.updatedAt._seconds * 1000).toISOString()
+                : p.updatedAt,
+              productsSold: (p.productsSold || []).map((prod: any, i: number) => ({
+                ...prod,
+                id: prod.id || `prod_${i}`,
+              })),
+            }));
+            setGroupProspectsFromAPI(normalized);
+            setCache(prospectsCacheKey, normalized, userId);
+          }
+
+          if (!cachedUsers) {
+            const usersResponse = await apiCall(`/users/group/${currentGroupId}`);
+            const groupUsers = usersResponse.users || [];
+            setGroupUsersFromAPI(groupUsers);
+            setCache(usersCacheKey, groupUsers, userId);
+          }
         } catch (error) {
           console.error('Failed to fetch group data:', error);
           setGroupProspectsFromAPI([]);
