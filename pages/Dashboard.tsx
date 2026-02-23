@@ -133,7 +133,7 @@ const Dashboard: React.FC = () => {
                  </div>
                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between bg-gradient-to-br from-white to-green-50">
                     <div>
-                       <p className="text-sm font-medium text-gray-500">Total Revenue (FYC)</p>
+                       <p className="text-sm font-medium text-gray-500">Total Revenue (ACE)</p>
                        <h3 className="text-2xl font-bold text-green-700 mt-1">RM {totalFYC.toLocaleString()}</h3>
                     </div>
                     <div className="p-3 bg-green-100 text-green-700 rounded-lg"><TrendingUp className="w-6 h-6"/></div>
@@ -196,7 +196,7 @@ const Dashboard: React.FC = () => {
                           </>
                       ) : (
                           <>
-                            <h3 className="text-lg font-bold text-gray-900 truncate">FYC Generated</h3>
+                            <h3 className="text-lg font-bold text-gray-900 truncate">ACE Generated</h3>
                             <p className="text-sm font-mono text-green-600 font-bold">RM {totalFYC.toLocaleString() || '0'}</p>
                           </>
                       )}
@@ -243,7 +243,7 @@ const Dashboard: React.FC = () => {
                              <tr>
                                 <th className="px-4 py-2 text-left">Group</th>
                                 <th className="px-4 py-2 text-right">Sales Count</th>
-                                <th className="px-4 py-2 text-right">Total FYC</th>
+                                <th className="px-4 py-2 text-right">Total ACE</th>
                              </tr>
                           </thead>
                           <tbody>
