@@ -437,7 +437,9 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                         return;
                       }
                       setStartTimeInput(val);
-                      if (val > endTimeInput) setEndTimeInput(val);
+                      const [h, m] = val.split(':').map(Number);
+                      const endH = String((h + 1) % 24).padStart(2, '0');
+                      setEndTimeInput(`${endH}:${String(m).padStart(2, '0')}`);
                     }}
                     className="block w-full bg-gray-50 hover:bg-blue-50 border border-gray-300 hover:border-blue-400 text-black rounded-lg p-2.5 text-sm focus:ring-blue-600 focus:border-blue-600 cursor-pointer transition-colors accent-blue-600"
                     disabled={isReadOnly}
