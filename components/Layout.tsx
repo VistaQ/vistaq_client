@@ -15,7 +15,6 @@ import {
   Award,
   Crown,
   DollarSign,
-  UserCheck,
   Settings,
   Gift,
   Layers,
@@ -100,9 +99,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
             <>
               <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Performance</div>
               
-              {/* Agents View: List of agents with drill-down */}
-              <NavItem id="agents" label="Agents" icon={UserCheck} />
-              
               {/* Group View: Group Dashboard (Aggregated) */}
               <NavItem id="group" label="Group Progress" icon={TrendingUp} />
             </>
@@ -180,7 +176,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                  {isManagement && (
                     <>
                        <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Performance</div>
-                       <NavItem id="agents" label="Agents" icon={UserCheck} />
                        <NavItem id="group" label="Group Progress" icon={TrendingUp} />
                     </>
                  )}

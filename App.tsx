@@ -8,7 +8,6 @@ import Prospects from './pages/Prospects';
 import Reports from './pages/Reports';
 import PointsHistory from './pages/PointsHistory';
 import Group from './pages/Group';
-import Agents from './pages/Agents';
 import Sales from './pages/Sales';
 import AdminUsers from './pages/AdminUsers';
 import AdminGroups from './pages/AdminGroups';
@@ -40,7 +39,6 @@ const AuthenticatedApp: React.FC = () => {
       case 'points': return <PointsHistory />;
       case 'admin-rewards': return <AdminRewards />;
       case 'group': return <Group />; 
-      case 'agents': return <Agents />;
       case 'sales': return <Sales />;
       case 'reports': return <Reports />;
       case 'events': return <Events />;

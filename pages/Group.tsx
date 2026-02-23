@@ -5,8 +5,8 @@ import { useData } from '../context/DataContext';
 import { User, ProspectStage, UserRole, Prospect } from '../types';
 import { apiCall } from '../services/apiClient';
 import { getCache, setCache, buildCacheKey } from '../services/cache';
-import { 
-  Users, 
+import {
+  Users,
   Crown,
   TrendingUp,
   Target,
@@ -18,7 +18,8 @@ import {
   Clock,
   Briefcase,
   Grid,
-  Layers
+  Layers,
+  Search
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -30,6 +31,7 @@ const Group: React.FC = () => {
   const { getGroupProspects } = useData();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'sales'>('overview');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Trainer/Admin Logic: Allow selecting a group
   const [trainerSelectedGroupId, setTrainerSelectedGroupId] = useState<string | null>(null);
@@ -193,7 +195,7 @@ const Group: React.FC = () => {
                          
                          <div className="space-y-3 flex-1">
                             <div className="flex justify-between text-sm">
-                               <span className="text-gray-500">Total FYC</span>
+                               <span className="text-gray-500">Total ACE</span>
                                <span className="font-bold text-gray-900">RM {gFYC.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between text-sm">
@@ -277,6 +279,10 @@ const Group: React.FC = () => {
   })
   .sort((a, b) => b.fyc - a.fyc); // Sort by FYC descending
 
+  const filteredAgentList = agentList.filter(a =>
+    a.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   // --- AGENT DETAIL VIEW RENDERER ---
   if (selectedAgentId) {
     const agent = agentList.find(u => u.id === selectedAgentId);
@@ -340,7 +346,7 @@ const Group: React.FC = () => {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <p className="text-sm text-gray-500">Total FYC</p>
+                    <p className="text-sm text-gray-500">Total ACE</p>
                     <h3 className="text-2xl font-bold text-gray-900">RM {agent.fyc.toLocaleString()}</h3>
                 </div>
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -404,22 +410,20 @@ const Group: React.FC = () => {
                     <thead className="bg-gray-50 border-b">
                         <tr>
                             <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Date</th>
-                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Client</th>
                             <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Product</th>
-                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-right">FYC</th>
+                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-right">ACE</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {successfulSales.map(sale => (
                             <tr key={sale.id}>
                                 <td className="px-6 py-4 text-sm text-gray-600">{formatDate(sale.salesCompletedAt || sale.updatedAt)}</td>
-                                <td className="px-6 py-4 font-medium">{getProspectDisplayName(sale)}</td>
                                 <td className="px-6 py-4 text-sm text-gray-600">{(sale.productsSold || []).map(p => p.productName).filter(Boolean).join(', ') || '-'}</td>
                                 <td className="px-6 py-4 text-right font-mono font-bold">RM {(sale.productsSold || []).reduce((s, p) => s + (p.aceAmount || 0), 0).toLocaleString()}</td>
                             </tr>
                         ))}
                         {successfulSales.length === 0 && (
-                            <tr><td colSpan={4} className="p-8 text-center text-gray-500">No successful sales yet.</td></tr>
+                            <tr><td colSpan={3} className="p-8 text-center text-gray-500">No successful sales yet.</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -449,7 +453,7 @@ const Group: React.FC = () => {
           <p className="text-sm text-gray-500">Team Performance & Sales Overview</p>
         </div>
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg">
-           <span className="text-xs uppercase font-semibold opacity-80">Total Group FYC</span>
+           <span className="text-xs uppercase font-semibold opacity-80">Total Group ACE</span>
            <p className="text-2xl font-bold">RM {totalGroupFYC.toLocaleString()}</p>
         </div>
       </div>
@@ -468,7 +472,7 @@ const Group: React.FC = () => {
 
          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
             <div>
-               <p className="text-sm font-medium text-gray-500">Avg FYC / Agent</p>
+               <p className="text-sm font-medium text-gray-500">Avg ACE / Agent</p>
                <h3 className="text-3xl font-bold text-gray-900 mt-1">RM {Math.round(avgFYCPerAgent).toLocaleString()}</h3>
             </div>
             <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
@@ -487,6 +491,20 @@ const Group: React.FC = () => {
          </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search agent by name..."
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
       {/* Agent Performance Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
          <div className="px-6 py-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
@@ -501,12 +519,12 @@ const Group: React.FC = () => {
              <tr>
                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Agent Name</th>
                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Sales Closed</th>
-               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Total FYC (MYR)</th>
+               <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Total ACE (MYR)</th>
                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Action</th>
              </tr>
            </thead>
            <tbody className="divide-y divide-gray-100">
-             {agentList.map((agent) => (
+             {filteredAgentList.map((agent) => (
                <tr key={agent.id} className={`hover:bg-blue-50 transition-colors ${agent.id === currentUser?.id ? 'bg-blue-50/50' : ''}`}>
                  <td className="px-6 py-4">
                     <div className="flex items-center">
