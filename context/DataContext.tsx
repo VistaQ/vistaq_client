@@ -80,6 +80,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     id: p.id || p.prospectId,
     prospectName: p.prospectName || '',
     appointmentDate: toISO(p.appointmentDate),
+    appointmentCompletedAt: toISO(p.appointmentCompletedAt),
+    salesCompletedAt: toISO(p.salesCompletedAt),
+    createdAt: toISO(p.createdAt),
+    updatedAt: toISO(p.updatedAt),
     productsSold: (p.productsSold || []).map((prod: any, i: number) => ({
       ...prod,
       id: prod.id || `prod_${i}`,
