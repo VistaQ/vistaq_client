@@ -156,7 +156,7 @@ const Prospects: React.FC = () => {
   // Leader -> Add (own)
   // Admin -> Add (any)
   // Trainer -> View Only (Cannot Add)
-  const canAddProspect = currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER || currentUser?.role === UserRole.ADMIN;
+  const canAddProspect = currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
   const formatDate = (val: any) => {
