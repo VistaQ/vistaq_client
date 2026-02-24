@@ -18,7 +18,8 @@ import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import PrivacyPolicy from './pages/PrivacyPolicy';
-import PdpaNotice from './pages/PdpaNotice';
+import Support from './pages/Support';
+import Tutorials from './pages/Tutorials';
 import GlobalNotification from './components/GlobalNotification';
 
 const AuthenticatedApp: React.FC = () => {
@@ -26,24 +27,27 @@ const AuthenticatedApp: React.FC = () => {
   const [activePage, setActivePage] = useState('dashboard');
 
   const renderPage = () => {
-    switch(activePage) {
+    switch (activePage) {
       case 'dashboard': return <Dashboard />;
       case 'prospects': return <Prospects />;
       case 'profile': return <Profile />;
-      
+
       // Admin Routes (Re-enabled for Phase 1 Config)
       case 'users': return <AdminUsers />;
       case 'admin-groups': return <AdminGroups />;
-      
+
       // Hidden / Disabled for Phase 1 but code preserved
       case 'points': return <PointsHistory />;
       case 'admin-rewards': return <AdminRewards />;
-      case 'group': return <Group />; 
+      case 'group': return <Group />;
       case 'sales': return <Sales />;
       case 'reports': return <Reports />;
       case 'events': return <Events />;
       case 'import': return <Import />;
-      
+      case 'support': return <Support />;
+      case 'tutorials': return <Tutorials />;
+      case 'privacy-policy': return <PrivacyPolicy />;
+
       default: return <Dashboard />;
     }
   };
@@ -55,44 +59,42 @@ const AuthenticatedApp: React.FC = () => {
   );
 };
 
-type AuthView = 'login' | 'signup' | 'privacy' | 'pdpa';
+type AuthView = 'login' | 'signup' | 'privacy';
 
 const AuthFlow: React.FC = () => {
-    const { isAuthenticated } = useAuth();
-    const [view, setView] = useState<AuthView>('login');
+  const { isAuthenticated } = useAuth();
+  const [view, setView] = useState<AuthView>('login');
 
-    if (isAuthenticated) {
-        if (window.location.pathname !== '/') {
-            window.history.replaceState(null, '', '/');
-        }
-        return <AuthenticatedApp />;
+  if (isAuthenticated) {
+    if (window.location.pathname !== '/') {
+      window.history.replaceState(null, '', '/');
     }
+    return <AuthenticatedApp />;
+  }
 
-    switch (view) {
-        case 'login':
-            return <Login onSwitchToSignup={() => setView('signup')} />;
-        case 'signup':
-            return (
-              <Signup 
-                onSwitchToLogin={() => setView('login')} 
-                onNavigateToPolicy={(page) => setView(page)} 
-              />
-            );
-        case 'privacy':
-            return <PrivacyPolicy onBack={() => setView('signup')} />;
-        case 'pdpa':
-            return <PdpaNotice onBack={() => setView('signup')} />;
-        default:
-            return <Login onSwitchToSignup={() => setView('signup')} />;
-    }
+  switch (view) {
+    case 'login':
+      return <Login onSwitchToSignup={() => setView('signup')} />;
+    case 'signup':
+      return (
+        <Signup
+          onSwitchToLogin={() => setView('login')}
+          onNavigateToPolicy={(page) => setView(page)}
+        />
+      );
+    case 'privacy':
+      return <PrivacyPolicy onBack={() => setView('signup')} />;
+    default:
+      return <Login onSwitchToSignup={() => setView('signup')} />;
+  }
 }
 
 const App: React.FC = () => {
   return (
     <AuthProvider>
       <DataProvider>
-         <GlobalNotification />
-         <AuthFlow />
+        <GlobalNotification />
+        <AuthFlow />
       </DataProvider>
     </AuthProvider>
   );

@@ -7,7 +7,7 @@ import { Lock, Mail, User, Users, AlertCircle, Loader2, IdCard } from 'lucide-re
 
 interface SignupProps {
   onSwitchToLogin: () => void;
-  onNavigateToPolicy: (page: 'privacy' | 'pdpa') => void;
+  onNavigateToPolicy: (page: 'privacy') => void;
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -38,7 +38,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
     apiCall('/groups/public').then((data: any) => {
       const items: Group[] = Array.isArray(data) ? data : (data.groups || []);
       setPublicGroups(items);
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   useEffect(() => {
@@ -118,8 +118,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
   };
 
   const fieldClass = (hasError: boolean) =>
-    `block w-full pl-10 pr-3 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900 ${
-      hasError ? 'border-red-400' : 'border-gray-300'
+    `block w-full pl-10 pr-3 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900 ${hasError ? 'border-red-400' : 'border-gray-300'
     }`;
 
   return (
@@ -127,7 +126,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
         <div className="bg-blue-600 p-10 text-center">
           <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm shadow-inner">
-             <span className="font-brand text-4xl text-white font-bold italic">V</span>
+            <span className="font-brand text-4xl text-white font-bold italic">V</span>
           </div>
           <h1 className="text-3xl font-brand font-medium text-white mb-1">VistaQ</h1>
           <p className="text-blue-100 text-sm tracking-wide">Join the Sales Team</p>
@@ -223,10 +222,10 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
                   onChange={(e) => { setGroupId(e.target.value); setGroupError(''); }}
                   className={`${fieldClass(!!groupError)} appearance-none`}
                 >
-                    <option value="" disabled>Select your group</option>
-                    {publicGroups.map(g => (
-                        <option key={g.id} value={g.id}>{g.name}</option>
-                    ))}
+                  <option value="" disabled>Select your group</option>
+                  {publicGroups.map(g => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
                 </select>
               </div>
               {groupError
@@ -237,26 +236,24 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
 
             {/* Compliance Checkbox */}
             <div className="pt-2">
-                <div className="flex items-start">
-                    <div className="flex items-center h-5">
-                        <input
-                            id="compliance"
-                            type="checkbox"
-                            checked={isAgreed}
-                            onChange={(e) => setIsAgreed(e.target.checked)}
-                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                    </div>
-                    <div className="ml-3 text-sm">
-                        <label htmlFor="compliance" className="text-gray-600 leading-tight">
-                            I acknowledge that I have read and understood the{' '}
-                            <button type="button" onClick={() => onNavigateToPolicy('privacy')} className="text-blue-600 font-bold hover:underline">Privacy Policy</button>
-                            {' '}and{' '}
-                            <button type="button" onClick={() => onNavigateToPolicy('pdpa')} className="text-blue-600 font-bold hover:underline">PDPA Notice</button>,
-                            {' '}and I consent to the collection and processing of my Personal Data in accordance with the Personal Data Protection Act 2010 (Malaysia).
-                        </label>
-                    </div>
+              <div className="flex items-start">
+                <div className="flex items-center h-5">
+                  <input
+                    id="compliance"
+                    type="checkbox"
+                    checked={isAgreed}
+                    onChange={(e) => setIsAgreed(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                  />
                 </div>
+                <div className="ml-3 text-sm">
+                  <label htmlFor="compliance" className="text-gray-600 leading-tight">
+                    I acknowledge that I have read and understood the{' '}
+                    <button type="button" onClick={() => onNavigateToPolicy('privacy')} className="text-blue-600 font-bold hover:underline">Privacy Policy</button>,
+                    {' '}and I consent to the collection and processing of my Personal Data in accordance with the Personal Data Protection Act 2010 (Malaysia).
+                  </label>
+                </div>
+              </div>
             </div>
 
             <button
