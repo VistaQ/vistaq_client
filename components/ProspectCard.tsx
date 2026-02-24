@@ -45,6 +45,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [errors, setErrors] = useState<{prospectName?: string, prospectPhone?: string, prospectEmail?: string}>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const STANDARD_REASONS = ['Unable to afford', 'Unable to decide', 'Due to Health / Occupation', 'Needs more time'];
 
@@ -129,16 +130,21 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   };
 
   const handleCreate = async () => {
-    if (isReadOnly) return;
+    if (isReadOnly || isSubmitting) return;
     if (validateStep1()) {
-      const fullPhone = `+60${phoneSuffix}`;
-      const newProspect = await addProspect({
-        ...formData,
-        prospectPhone: fullPhone,
-        currentStage: ProspectStage.PROSPECT,
-        productsSold: productRows,
-      });
-      setFormData(newProspect);
+      setIsSubmitting(true);
+      try {
+        const fullPhone = `+60${phoneSuffix}`;
+        const newProspect = await addProspect({
+          ...formData,
+          prospectPhone: fullPhone,
+          currentStage: ProspectStage.PROSPECT,
+          productsSold: productRows,
+        });
+        setFormData(newProspect);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -381,8 +387,8 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
 
               {isNew && !isReadOnly && (
                 <div className="flex justify-end pt-2 mt-4 border-t">
-                  <button onClick={handleCreate} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors">
-                    Confirm & Start Workflow
+                  <button onClick={handleCreate} disabled={isSubmitting} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    {isSubmitting ? 'Creating...' : 'Confirm & Start Workflow'}
                   </button>
                 </div>
               )}
@@ -431,7 +437,9 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                         return;
                       }
                       setStartTimeInput(val);
-                      if (val > endTimeInput) setEndTimeInput(val);
+                      const [h, m] = val.split(':').map(Number);
+                      const endH = String((h + 1) % 24).padStart(2, '0');
+                      setEndTimeInput(`${endH}:${String(m).padStart(2, '0')}`);
                     }}
                     className="block w-full bg-gray-50 hover:bg-blue-50 border border-gray-300 hover:border-blue-400 text-black rounded-lg p-2.5 text-sm focus:ring-blue-600 focus:border-blue-600 cursor-pointer transition-colors accent-blue-600"
                     disabled={isReadOnly}

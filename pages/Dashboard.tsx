@@ -31,10 +31,11 @@ const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC'];
 const Dashboard: React.FC = () => {
   const { currentUser, groups, users } = useAuth();
   const { prospects, getProspectsByScope, getGroupProspects, getEventsForUser } = useData();
-  
-  // --- MANAGEMENT DASHBOARD (Admin & Trainer ONLY) ---
+
+  // --- MANAGEMENT DASHBOARD (Admin, Master Trainer & Trainer ONLY) ---
   // Group Leaders now see Personal Dashboard by default, and access Group stats via "Group" page.
-  const isManagementRole = currentUser?.role === UserRole.TRAINER || 
+  const isManagementRole = currentUser?.role === UserRole.TRAINER ||
+                           currentUser?.role === UserRole.MASTER_TRAINER ||
                            currentUser?.role === UserRole.ADMIN;
 
   if (isManagementRole) {
@@ -76,13 +77,12 @@ const Dashboard: React.FC = () => {
     }).sort((a, b) => b.fyc - a.fyc);
 
     // --- 5. CHART DATA ---
-    const totalAppointmentsSet = scopeProspects.filter(p => 
-        p.appointmentStatus === 'Scheduled' || 
-        p.appointmentStatus === 'Rescheduled' || 
-        p.appointmentStatus === 'Completed'
+    const totalAppointmentsSet = scopeProspects.filter(p =>
+        p.appointmentStatus === 'scheduled' ||
+        p.appointmentStatus === 'rescheduled'
     ).length;
 
-    const totalSalesMeetings = scopeProspects.filter(p => p.appointmentStatus === 'Completed').length;
+    const totalSalesMeetings = scopeProspects.filter(p => p.appointmentStatus === 'completed').length;
 
     const funnelData = [
        { name: 'Prospects', value: scopeProspects.length },
@@ -133,7 +133,7 @@ const Dashboard: React.FC = () => {
                  </div>
                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between bg-gradient-to-br from-white to-green-50">
                     <div>
-                       <p className="text-sm font-medium text-gray-500">Total Revenue (FYC)</p>
+                       <p className="text-sm font-medium text-gray-500">Total Revenue (ACE)</p>
                        <h3 className="text-2xl font-bold text-green-700 mt-1">RM {totalFYC.toLocaleString()}</h3>
                     </div>
                     <div className="p-3 bg-green-100 text-green-700 rounded-lg"><TrendingUp className="w-6 h-6"/></div>
@@ -196,7 +196,7 @@ const Dashboard: React.FC = () => {
                           </>
                       ) : (
                           <>
-                            <h3 className="text-lg font-bold text-gray-900 truncate">FYC Generated</h3>
+                            <h3 className="text-lg font-bold text-gray-900 truncate">ACE Generated</h3>
                             <p className="text-sm font-mono text-green-600 font-bold">RM {totalFYC.toLocaleString() || '0'}</p>
                           </>
                       )}
@@ -230,20 +230,20 @@ const Dashboard: React.FC = () => {
                 </div>
              </div>
 
-             {/* Group Overview (No Points/Ranks) */}
+             {/* Group Overview */}
              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <h3 className="font-bold text-gray-800 mb-4 flex items-center">
                    <Users className="w-5 h-5 mr-2 text-blue-600" />
-                   {totalGroups > 1 ? 'Group Overview' : 'Group Agents Overview'}
+                   Group Overview
                 </h3>
                 <div className="overflow-y-auto max-h-64">
-                   {totalGroups > 1 ? (
+                   {totalGroups > 0 ? (
                        <table className="w-full">
                           <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
                              <tr>
                                 <th className="px-4 py-2 text-left">Group</th>
                                 <th className="px-4 py-2 text-right">Sales Count</th>
-                                <th className="px-4 py-2 text-right">Total FYC</th>
+                                <th className="px-4 py-2 text-right">Total ACE</th>
                              </tr>
                           </thead>
                           <tbody>
@@ -258,7 +258,7 @@ const Dashboard: React.FC = () => {
                        </table>
                    ) : (
                        <div className="p-8 text-center text-gray-500">
-                           <p>No groups found for current filters.</p>
+                           <p>No groups assigned to this trainer.</p>
                        </div>
                    )}
                 </div>
@@ -277,14 +277,13 @@ const Dashboard: React.FC = () => {
   // KPI Calculations
   const totalProspects = myProspects.length;
   
-  // "Appointments" = Scheduled or Rescheduled or Completed (Any appointment activity)
-  const appointmentsSet = myProspects.filter(p => 
-      p.appointmentStatus === 'Scheduled' || 
-      p.appointmentStatus === 'Rescheduled' || 
-      p.appointmentStatus === 'Completed'
+  // "Appointments" = Scheduled or Rescheduled only
+  const appointmentsSet = myProspects.filter(p =>
+      p.appointmentStatus === 'scheduled' ||
+      p.appointmentStatus === 'rescheduled'
   ).length;
 
-  const completedAppointments = myProspects.filter(p => p.appointmentStatus === 'Completed').length;
+  const completedAppointments = myProspects.filter(p => p.appointmentStatus === 'completed').length;
   const closedSales = myProspects.filter(p => p.salesOutcome === 'successful').length;
   const totalPersonalFYC = myProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
   
@@ -350,38 +349,6 @@ const Dashboard: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">My Dashboard</h1>
           <p className="text-sm text-gray-500">Welcome back, {currentUser?.name}. Here is your individual performance.</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
-        {/* KPI Cards */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-               <h3 className="text-sm font-medium text-gray-500">MDRT Progress</h3>
-               <p className="text-2xl font-bold text-gray-900 mt-1">{Math.round(fycProgress)}% <span className="text-xs text-gray-400 font-normal">FYC Achieved</span></p>
-            </div>
-            <div className="p-2 bg-pink-50 text-pink-600 rounded-lg"><Target className="w-6 h-6" /></div>
-          </div>
-          
-          <div className="space-y-3 mt-2">
-            <div>
-               <div className="flex justify-between text-xs mb-1">
-                 <span className="text-gray-500">Sales (RM {totalPersonalFYC.toLocaleString()} / 100k)</span>
-               </div>
-               <div className="w-full bg-gray-100 rounded-full h-2">
-                 <div className="bg-pink-600 h-2 rounded-full" style={{ width: `${fycProgress}%` }}></div>
-               </div>
-            </div>
-            <div>
-               <div className="flex justify-between text-xs mb-1">
-                 <span className="text-gray-500">Prospects ({totalProspects} / 100)</span>
-               </div>
-               <div className="w-full bg-gray-100 rounded-full h-2">
-                 <div className="bg-blue-400 h-2 rounded-full" style={{ width: `${prospectsProgress}%` }}></div>
-               </div>
-            </div>
-          </div>
         </div>
       </div>
 

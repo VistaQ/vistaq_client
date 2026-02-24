@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Prospect, ProspectStage, User, UserRole, BadgeTier, Event } from '../types';
 import { apiCall } from '../services/apiClient';
+import { getCache, setCache, invalidateCache, buildCacheKey } from '../services/cache';
 
 interface DataContextType {
   prospects: Prospect[];
@@ -20,6 +21,7 @@ interface DataContextType {
   updateEvent: (id: string, evt: Partial<Event>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
   getEventsForUser: (user: User) => Event[];
+  refetchEvents: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -39,6 +41,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [badgeTiers, setBadgeTiers] = useState<BadgeTier[]>(DEFAULT_MILESTONES);
   const [events, setEvents] = useState<Event[]>([]);
 
+  const getCurrentUserId = (): string | null => {
+    try {
+      const stored = localStorage.getItem('authUser');
+      if (stored) {
+        const user = JSON.parse(stored);
+        return user.id || user.uid || null;
+      }
+    } catch (_e) {}
+    return null;
+  };
+
   const getProspectsEndpoint = () => {
     try {
       const stored = localStorage.getItem('authUser');
@@ -46,6 +59,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const user = JSON.parse(stored);
         if (user.role === 'admin' || user.role === 'master_trainer') {
           return '/admin/all-prospects';
+        }
+        if (user.role === 'trainer') {
+          return '/prospects/managed-groups';
         }
       }
     } catch (_e) {}
@@ -64,6 +80,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     id: p.id || p.prospectId,
     prospectName: p.prospectName || '',
     appointmentDate: toISO(p.appointmentDate),
+    appointmentCompletedAt: toISO(p.appointmentCompletedAt),
+    salesCompletedAt: toISO(p.salesCompletedAt),
+    createdAt: toISO(p.createdAt),
+    updatedAt: toISO(p.updatedAt),
     productsSold: (p.productsSold || []).map((prod: any, i: number) => ({
       ...prod,
       id: prod.id || `prod_${i}`,
@@ -72,15 +92,52 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const fetchProspects = async () => {
     if (!localStorage.getItem('authToken')) return;
+
+    const userId = getCurrentUserId();
+    if (!userId) return;
+
+    const endpoint = getProspectsEndpoint();
+    const cacheKey = buildCacheKey(userId, `prospects_${endpoint}`);
+
+    // Try to get from cache first
+    const cached = getCache<Prospect[]>(cacheKey, userId);
+    if (cached) {
+      setProspects(cached);
+      return;
+    }
+
+    // Fetch from API if cache miss or stale
     try {
-      const data = await apiCall(getProspectsEndpoint());
+      const data = await apiCall(endpoint);
       const raw: any[] = Array.isArray(data) ? data : (data.prospects || []);
-      setProspects(raw.map(normalizeProspect));
+      const normalized = raw.map(normalizeProspect);
+      setProspects(normalized);
+      setCache(cacheKey, normalized, userId);
     } catch (_e) {}
   };
 
   const fetchEvents = async () => {
-    if (!localStorage.getItem('authToken')) return;
+    if (!localStorage.getItem('authToken')) {
+      setEvents([]);
+      return;
+    }
+
+    const userId = getCurrentUserId();
+    if (!userId) {
+      setEvents([]);
+      return;
+    }
+
+    const cacheKey = buildCacheKey(userId, 'events');
+
+    // Try to get from cache first
+    const cached = getCache<Event[]>(cacheKey, userId);
+    if (cached) {
+      setEvents(cached);
+      return;
+    }
+
+    // Fetch from API if cache miss or stale
     try {
       const data = await apiCall('/events/my-events');
       const raw: any[] = Array.isArray(data) ? data : (data.events || []);
@@ -91,18 +148,71 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updatedAt: toISO(e.updatedAt) || e.updatedAt,
       }));
       setEvents(items);
-    } catch (_e) {}
+      setCache(cacheKey, items, userId);
+    } catch (_e) {
+      setEvents([]);
+    }
   };
 
-  // 1. Sync Prospects
-  useEffect(() => {
-    fetchProspects();
-  }, []);
+  // Track authentication state to trigger refetch on login
+  const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('authToken'));
+  const [userRole, setUserRole] = useState<string | null>(() => {
+    try {
+      const stored = localStorage.getItem('authUser');
+      return stored ? JSON.parse(stored).role : null;
+    } catch {
+      return null;
+    }
+  });
 
-  // 2. Sync Events
+  // Watch for auth token and user changes in localStorage
   useEffect(() => {
-    fetchEvents();
-  }, []);
+    const checkAuth = () => {
+      const token = localStorage.getItem('authToken');
+      if (token !== authToken) {
+        setAuthToken(token);
+      }
+
+      try {
+        const stored = localStorage.getItem('authUser');
+        const role = stored ? JSON.parse(stored).role : null;
+        if (role !== userRole) {
+          setUserRole(role);
+        }
+      } catch {}
+    };
+
+    // Check periodically for auth changes
+    const interval = setInterval(checkAuth, 100);
+
+    // Also listen to storage events (for cross-tab sync)
+    window.addEventListener('storage', checkAuth);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', checkAuth);
+    };
+  }, [authToken, userRole]);
+
+  // 1. Sync Prospects when authenticated or user role changes, clear on logout
+  useEffect(() => {
+    if (authToken) {
+      fetchProspects();
+    } else {
+      // Clear data on logout
+      setProspects([]);
+    }
+  }, [authToken, userRole]);
+
+  // 2. Sync Events when authenticated, clear on logout
+  useEffect(() => {
+    if (authToken) {
+      fetchEvents();
+    } else {
+      // Clear data on logout
+      setEvents([]);
+    }
+  }, [authToken]);
 
   const addProspect = async (data: Partial<Prospect>) => {
     const payload: Record<string, any> = {
@@ -118,6 +228,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const detail = await apiCall(`/prospects/${prospectId}`);
     const created: Prospect = normalizeProspect(detail.prospect || detail);
 
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      const endpoint = getProspectsEndpoint();
+      invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+    }
+
     await fetchProspects();
     return created;
   };
@@ -127,6 +244,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       method: 'PUT',
       data: { ...updates, updatedAt: new Date().toISOString() }
     });
+
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      const endpoint = getProspectsEndpoint();
+      invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+    }
+
     await fetchProspects();
   };
 
@@ -143,11 +268,27 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await apiCall('/prospects', { method: 'POST', data: payload });
       }
     }
+
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      const endpoint = getProspectsEndpoint();
+      invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+    }
+
     await fetchProspects();
   };
 
   const deleteProspect = async (id: string) => {
     await apiCall(`/prospects/${id}`, { method: 'DELETE' });
+
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      const endpoint = getProspectsEndpoint();
+      invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+    }
+
     await fetchProspects();
   };
 
@@ -188,28 +329,53 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           date: evt.date || new Date().toISOString()
       };
       await apiCall('/events', { method: 'POST', data: payload });
+
+      // Invalidate cache before refetching
+      const userId = getCurrentUserId();
+      if (userId) {
+        invalidateCache(buildCacheKey(userId, 'events'));
+      }
+
       await fetchEvents();
   };
 
   const updateEvent = async (id: string, evt: Partial<Event>) => {
       await apiCall(`/events/${id}`, { method: 'PUT', data: evt });
+
+      // Invalidate cache before refetching
+      const userId = getCurrentUserId();
+      if (userId) {
+        invalidateCache(buildCacheKey(userId, 'events'));
+      }
+
       await fetchEvents();
   };
 
   const deleteEvent = async (id: string) => {
       await apiCall(`/events/${id}`, { method: 'DELETE' });
+
+      // Invalidate cache before refetching
+      const userId = getCurrentUserId();
+      if (userId) {
+        invalidateCache(buildCacheKey(userId, 'events'));
+      }
+
       await fetchEvents();
   };
 
   const getEventsForUser = (user: User): Event[] => {
       if (!user) return [];
-      
-      // Admin & Master Trainer sees all
-      if (user.role === UserRole.ADMIN || user.role === UserRole.MASTER_TRAINER) return events;
+
+      // Admin, Master Trainer, and Trainer see all events
+      if (user.role === UserRole.ADMIN ||
+          user.role === UserRole.MASTER_TRAINER ||
+          user.role === UserRole.TRAINER) {
+          return events;
+      }
 
       return events.filter(e => {
           const targetGroups = e.groupIds || [];
-          
+
           // 1. Created by me?
           if (e.createdBy === user.id) return true;
 
@@ -223,21 +389,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                return targetGroups.includes(user.groupId);
           }
 
-          // 4. For Trainer: Do managed groups overlap with target groups?
-          if (user.role === UserRole.TRAINER && user.managedGroupIds) {
-               return targetGroups.some(gid => user.managedGroupIds!.includes(gid));
-          }
-
           return false;
       });
   };
 
   return (
-    <DataContext.Provider value={{ 
-      prospects, badgeTiers, events, 
+    <DataContext.Provider value={{
+      prospects, badgeTiers, events,
       addProspect, updateProspect, importProspects, deleteProspect,
       getProspectsByScope, getGroupProspects, updateBadgeTiers,
-      addEvent, updateEvent, deleteEvent, getEventsForUser
+      addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents
     }}>
       {children}
     </DataContext.Provider>
