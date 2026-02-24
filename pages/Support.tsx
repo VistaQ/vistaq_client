@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import emailjs from '@emailjs/browser';
 import {
     HelpCircle,
     ChevronDown,
@@ -16,12 +15,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-// Initialise EmailJS once
-const EMAILJS_SERVICE = import.meta.env.VITE_EMAILJS_SERVICE_ID as string;
-const EMAILJS_NOTIF = import.meta.env.VITE_EMAILJS_TEMPLATE_NOTIFICATION as string;
-const EMAILJS_REPLY = import.meta.env.VITE_EMAILJS_TEMPLATE_AUTOREPLY as string;
-const EMAILJS_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY as string;
-emailjs.init(EMAILJS_KEY);
+// ─── Web3Forms access key (set VITE_WEB3FORMS_KEY in .env) ─────────────────
+const WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY as string;
+const SUPPORT_EMAIL = 'vistaqtech@gmail.com';
 
 const FAQS = [
     {
@@ -115,6 +111,73 @@ const FAQItem: React.FC<FAQItemProps> = ({ question, answer, isOpen, onToggle })
     </div>
 );
 
+// ─── Helper: send via Web3Forms ──────────────────────────────────────────────
+async function sendEnquiry(params: {
+    name: string;
+    email: string;
+    phone: string;
+    problemType: string;
+    message: string;
+}) {
+    const { name, email, phone, problemType, message } = params;
+
+    const htmlMessage = `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+  <div style="background:linear-gradient(135deg,#1e3a8a,#3b82f6);padding:28px 36px;border-radius:12px 12px 0 0;">
+    <h1 style="color:#fff;margin:0;font-size:22px;font-weight:700;">VistaQ Support</h1>
+    <p style="color:#bfdbfe;margin:4px 0 0;font-size:13px;">New Support Enquiry Received</p>
+  </div>
+  <div style="background:#fff;padding:32px 36px;border:1px solid #e2e8f0;border-top:none;">
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      <tr><td style="padding:8px 0;color:#64748b;width:34%;">Full Name</td>
+          <td style="padding:8px 0;color:#0f172a;font-weight:600;">${name}</td></tr>
+      <tr><td style="padding:8px 0;color:#64748b;">Email</td>
+          <td style="padding:8px 0;color:#0f172a;font-weight:600;">${email}</td></tr>
+      <tr><td style="padding:8px 0;color:#64748b;">Phone</td>
+          <td style="padding:8px 0;color:#0f172a;font-weight:600;">${phone}</td></tr>
+      <tr><td style="padding:8px 0;color:#64748b;">Type of Issue</td>
+          <td style="padding:8px 0;color:#0f172a;font-weight:600;">${problemType}</td></tr>
+    </table>
+    <div style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px;border-left:4px solid #3b82f6;">
+      <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.05em;">Message</p>
+      <p style="margin:0;font-size:14px;color:#334155;line-height:1.7;">${message.replace(/\n/g, '<br/>')}</p>
+    </div>
+  </div>
+  <div style="background:#f1f5f9;padding:16px 36px;border-radius:0 0 12px 12px;text-align:center;">
+    <p style="margin:0;font-size:11px;color:#94a3b8;">Sent via VistaQ Support Centre &mdash; reply directly to ${email}</p>
+  </div>
+</div>`;
+
+    const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+            access_key: WEB3FORMS_KEY,
+            subject: `[VistaQ Support] ${problemType} — from ${name}`,
+            from_name: name,
+            // Web3Forms sends notification to the registered address (vistaqtech@gmail.com)
+            // and auto-replies to the 'email' field if set.
+            email,           // triggers auto-reply to user
+            replyto: email,
+            message: `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\nType: ${problemType}\n\n${message}`,
+            // HTML version for clients that support it
+            html: htmlMessage,
+            // Copy to support inbox (already the registered address, stated for clarity)
+            redirect: false,
+            // Auto-reply settings
+            autoresponse: true,
+            autoresponse_subject: 'We have received your enquiry — VistaQ Support',
+            autoresponse_message: `Hi ${name},\n\nThank you for reaching out to the VistaQ Support team.\n\nWe have received your enquiry about "${problemType}" and our team will review it shortly. You can expect a response within 1–2 business days.\n\nIf you have any urgent concerns, please email us at ${SUPPORT_EMAIL}.\n\nBest regards,\nVistaQ Support Team`,
+        }),
+    });
+
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Submission failed');
+    return data;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 const Support: React.FC = () => {
     const { currentUser } = useAuth();
     const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -139,32 +202,27 @@ const Support: React.FC = () => {
         }
 
         setLoading(true);
-
-        const templateParams = {
-            from_name: name.trim(),
-            from_email: email.trim(),
-            user_email: email.trim(),   // used by auto-reply template "To Email"
-            phone: phone.trim(),
-            problem_type: problemType,
-            message: message.trim(),
-        };
-
         try {
-            // Fire both emails in parallel
-            await Promise.all([
-                emailjs.send(EMAILJS_SERVICE, EMAILJS_NOTIF, templateParams),
-                emailjs.send(EMAILJS_SERVICE, EMAILJS_REPLY, templateParams),
-            ]);
+            await sendEnquiry({
+                name: name.trim(),
+                email: email.trim(),
+                phone: phone.trim(),
+                problemType,
+                message: message.trim(),
+            });
             setSubmitted(true);
         } catch (err: any) {
-            console.error('EmailJS error:', err);
-            setError('Sorry, we could not send your enquiry right now. Please try again or email us directly at vistaqtk@gmail.com.');
+            console.error('Submission error:', err);
+            setError(
+                `Sorry, we could not send your enquiry right now. Please try again or email us directly at ${SUPPORT_EMAIL}.`
+            );
         } finally {
             setLoading(false);
         }
     };
 
-    const fieldClass = 'block w-full pl-10 pr-3 py-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900 text-sm';
+    const fieldClass =
+        'block w-full pl-10 pr-3 py-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900 text-sm';
 
     return (
         <div className="max-w-4xl mx-auto space-y-10">
@@ -209,14 +267,16 @@ const Support: React.FC = () => {
 
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                     {submitted ? (
-                        /* Success State */
+                        /* ── Success State ── */
                         <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
                             <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-5">
                                 <CheckCircle className="w-9 h-9 text-green-500" />
                             </div>
                             <h3 className="text-xl font-bold text-gray-900 mb-2">Enquiry Submitted!</h3>
                             <p className="text-gray-500 max-w-sm leading-relaxed">
-                                Thank you for reaching out. Our support team has received your enquiry and will be in touch with you shortly, usually within 1–2 business days.
+                                Thank you for reaching out. Our support team has received your enquiry and will be in touch
+                                with you shortly, usually within 1–2 business days. A confirmation has been sent to{' '}
+                                <span className="font-semibold text-gray-700">{email}</span>.
                             </p>
                             <button
                                 onClick={() => {
@@ -234,8 +294,8 @@ const Support: React.FC = () => {
                     ) : (
                         <form onSubmit={handleSubmit} className="p-8 space-y-5">
                             {error && (
-                                <div className="flex items-center gap-2 bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg border border-red-100">
-                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                <div className="flex items-start gap-2 bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg border border-red-100">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                                     {error}
                                 </div>
                             )}
