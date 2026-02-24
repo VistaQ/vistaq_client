@@ -1,7 +1,0 @@
-{
-  "regions": ["sin1"],
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "https://stg-api.vistaq.co/api/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
