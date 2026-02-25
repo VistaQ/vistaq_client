@@ -41,7 +41,6 @@ const Profile: React.FC = () => {
           await updateProfile({
               name: formData.name,
               email: formData.email,
-              agentCode: formData.agentCode
           });
           setStatus({ msg: 'Profile updated successfully!', type: 'success' });
       } catch (err: any) {
@@ -117,7 +116,7 @@ const Profile: React.FC = () => {
                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email Address</label>
                        <div className="relative">
                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                           <input 
+                           <input
                                type="email"
                                value={formData.email || ''}
                                onChange={e => setFormData({...formData, email: e.target.value})}
@@ -130,13 +129,14 @@ const Profile: React.FC = () => {
                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Agent Code</label>
                        <div className="relative">
                            <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                           <input 
+                           <input
                                type="text"
                                value={formData.agentCode || ''}
-                               onChange={e => setFormData({...formData, agentCode: e.target.value})}
-                               className="block w-full pl-10 bg-gray-50 border-gray-300 text-gray-900 rounded-lg border p-2.5 focus:ring-blue-500 focus:border-blue-500"
+                               readOnly
+                               className="block w-full pl-10 bg-gray-100 border-gray-200 text-gray-500 rounded-lg border p-2.5 cursor-not-allowed"
                            />
                        </div>
+                       <p className="text-xs text-gray-400 mt-1">Agent code can only be changed by an administrator.</p>
                    </div>
 
                    <div>
