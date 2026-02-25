@@ -245,7 +245,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const updateUser = async (id: string, updates: Partial<User>) => {
-    await apiCall(`/admin/users/${id}`, { method: 'PUT', data: updates });
+    const { name, email, role, agentCode } = updates;
+    const payload = { name, email, role, agentCode };
+    await apiCall(`/users/${id}`, { method: 'PUT', data: payload });
     showNotification("User Updated", "User profile has been updated successfully.", "success");
 
     // Invalidate cache before refetching
