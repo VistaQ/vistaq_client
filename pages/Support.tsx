@@ -155,19 +155,14 @@ async function sendEnquiry(params: {
             access_key: WEB3FORMS_KEY,
             subject: `[VistaQ Support] ${problemType} — from ${name}`,
             from_name: name,
-            // Web3Forms sends notification to the registered address (vistaqtech@gmail.com)
-            // and auto-replies to the 'email' field if set.
-            email,           // triggers auto-reply to user
+            // Web3Forms sends the notification to the registered admin address (vistaqtech@gmail.com).
+            // The 'cc' field is the correct Web3Forms way to send a copy to the submitter.
             replyto: email,
+            cc: email,       // user receives a copy of the enquiry email as confirmation
             message: `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\nType: ${problemType}\n\n${message}`,
             // HTML version for clients that support it
             html: htmlMessage,
-            // Copy to support inbox (already the registered address, stated for clarity)
             redirect: false,
-            // Auto-reply settings
-            autoresponse: true,
-            autoresponse_subject: 'We have received your enquiry — VistaQ Support',
-            autoresponse_message: `Hi ${name},\n\nThank you for reaching out to the VistaQ Support team.\n\nWe have received your enquiry about "${problemType}" and our team will review it shortly. You can expect a response within 1–2 business days.\n\nIf you have any urgent concerns, please email us at ${SUPPORT_EMAIL}.\n\nBest regards,\nVistaQ Support Team`,
         }),
     });
 
