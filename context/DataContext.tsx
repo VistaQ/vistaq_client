@@ -15,12 +15,12 @@ interface DataContextType {
   getGroupProspects: (groupId: string) => Prospect[];
   deleteProspect: (id: string) => Promise<void>;
   updateBadgeTiers: (tiers: BadgeTier[]) => Promise<void>;
-  
+
   // Event Methods
   addEvent: (evt: Partial<Event>) => Promise<void>;
   updateEvent: (id: string, evt: Partial<Event>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
-  getEventsForUser: (user: User) => Event[];
+  getEventsForUser: (user: User, includeArchived?: boolean) => Event[];
   refetchEvents: () => Promise<void>;
 }
 
@@ -48,7 +48,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const user = JSON.parse(stored);
         return user.id || user.uid || null;
       }
-    } catch (_e) {}
+    } catch (_e) { }
     return null;
   };
 
@@ -64,7 +64,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return '/prospects/managed-groups';
         }
       }
-    } catch (_e) {}
+    } catch (_e) { }
     return '/prospects/my-prospects';
   };
 
@@ -113,7 +113,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const normalized = raw.map(normalizeProspect);
       setProspects(normalized);
       setCache(cacheKey, normalized, userId);
-    } catch (_e) {}
+    } catch (_e) { }
   };
 
   const fetchEvents = async () => {
@@ -179,7 +179,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (role !== userRole) {
           setUserRole(role);
         }
-      } catch {}
+      } catch { }
     };
 
     // Check periodically for auth changes
@@ -306,7 +306,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const getProspectsByScope = (user: User): Prospect[] => {
     // 1. Admin & Master Trainer (View All)
     if (user.role === UserRole.ADMIN || user.role === UserRole.MASTER_TRAINER) {
-        return prospects;
+      return prospects;
     }
 
     // 2. Trainer (Managed Groups)
@@ -323,74 +323,89 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- EVENTS ---
   const addEvent = async (evt: Partial<Event>) => {
-      const payload = {
-          ...evt,
-          eventTitle: evt.eventTitle || 'New Event',
-          date: evt.date || new Date().toISOString()
-      };
-      await apiCall('/events', { method: 'POST', data: payload });
+    const payload = {
+      ...evt,
+      eventTitle: evt.eventTitle || 'New Event',
+      date: evt.date || new Date().toISOString()
+    };
+    await apiCall('/events', { method: 'POST', data: payload });
 
-      // Invalidate cache before refetching
-      const userId = getCurrentUserId();
-      if (userId) {
-        invalidateCache(buildCacheKey(userId, 'events'));
-      }
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      invalidateCache(buildCacheKey(userId, 'events'));
+    }
 
-      await fetchEvents();
+    await fetchEvents();
   };
 
   const updateEvent = async (id: string, evt: Partial<Event>) => {
-      await apiCall(`/events/${id}`, { method: 'PUT', data: evt });
+    await apiCall(`/events/${id}`, { method: 'PUT', data: evt });
 
-      // Invalidate cache before refetching
-      const userId = getCurrentUserId();
-      if (userId) {
-        invalidateCache(buildCacheKey(userId, 'events'));
-      }
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      invalidateCache(buildCacheKey(userId, 'events'));
+    }
 
-      await fetchEvents();
+    await fetchEvents();
   };
 
   const deleteEvent = async (id: string) => {
-      await apiCall(`/events/${id}`, { method: 'DELETE' });
+    await apiCall(`/events/${id}`, { method: 'DELETE' });
 
-      // Invalidate cache before refetching
-      const userId = getCurrentUserId();
-      if (userId) {
-        invalidateCache(buildCacheKey(userId, 'events'));
-      }
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      invalidateCache(buildCacheKey(userId, 'events'));
+    }
 
-      await fetchEvents();
+    await fetchEvents();
   };
 
-  const getEventsForUser = (user: User): Event[] => {
-      if (!user) return [];
+  const getEventsForUser = (user: User, includeArchived = false): Event[] => {
+    if (!user) return [];
 
-      // Admin, Master Trainer, and Trainer see all events
-      if (user.role === UserRole.ADMIN ||
-          user.role === UserRole.MASTER_TRAINER ||
-          user.role === UserRole.TRAINER) {
-          return events;
+    const currentYear = new Date().getFullYear();
+
+    // Helper: is this event archived (from a prior calendar year)?
+    const isArchived = (e: Event): boolean => {
+      if (e.archived) return true;
+      const evtYear = new Date(e.date).getFullYear();
+      return evtYear < currentYear;
+    };
+
+    // Admin sees all events (archived and active), filterable via includeArchived param
+    if (user.role === UserRole.ADMIN) {
+      return includeArchived ? events : events.filter(e => !isArchived(e));
+    }
+
+    // Master Trainer and Trainer see all non-archived events
+    if (user.role === UserRole.MASTER_TRAINER || user.role === UserRole.TRAINER) {
+      return events.filter(e => !isArchived(e));
+    }
+
+    return events.filter(e => {
+      // Non-admins never see archived events
+      if (isArchived(e)) return false;
+
+      const targetGroups = e.groupIds || [];
+
+      // 1. Created by me?
+      if (e.createdBy === user.id) return true;
+
+      // 2. For Agent: Is my group in target?
+      if (user.role === UserRole.AGENT && user.groupId) {
+        return targetGroups.includes(user.groupId);
       }
 
-      return events.filter(e => {
-          const targetGroups = e.groupIds || [];
+      // 3. For Leader: Is my group in target?
+      if (user.role === UserRole.GROUP_LEADER && user.groupId) {
+        return targetGroups.includes(user.groupId);
+      }
 
-          // 1. Created by me?
-          if (e.createdBy === user.id) return true;
-
-          // 2. For Agent: Is my group in target?
-          if (user.role === UserRole.AGENT && user.groupId) {
-              return targetGroups.includes(user.groupId);
-          }
-
-          // 3. For Leader: Is my group in target?
-          if (user.role === UserRole.GROUP_LEADER && user.groupId) {
-               return targetGroups.includes(user.groupId);
-          }
-
-          return false;
-      });
+      return false;
+    });
   };
 
   return (

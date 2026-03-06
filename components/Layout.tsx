@@ -93,7 +93,15 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
 
           <NavItem id="prospects" label="Prospects" icon={Users} />
 
-          <NavItem id="events" label="Events & Meetups" icon={CalendarDays} />
+          <NavItem id="events" label="Events & Meetings" icon={CalendarDays} />
+
+          {/* Personal Views for Agent and Group Leader */}
+          {(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER) && (
+            <>
+              <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Personal</div>
+              <NavItem id="sales" label="My Sales" icon={Award} />
+            </>
+          )}
 
           {/* Management Views for Admin, Master Trainer, Trainer & Leaders */}
           {isManagement && (
@@ -182,7 +190,15 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
 
                 <NavItem id="prospects" label="Prospects" icon={Users} />
 
-                <NavItem id="events" label="Events & Meetups" icon={CalendarDays} />
+                <NavItem id="events" label="Events & Meetings" icon={CalendarDays} />
+
+                {/* Personal Views for Agent and Group Leader */}
+                {(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER) && (
+                  <>
+                    <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Personal</div>
+                    <NavItem id="sales" label="My Sales" icon={Award} />
+                  </>
+                )}
 
                 {/* Management */}
                 {isManagement && (

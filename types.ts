@@ -121,6 +121,7 @@ export interface Event {
   createdByRole?: string;
 
   status?: 'upcoming' | 'completed' | 'cancelled';
+  archived?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
