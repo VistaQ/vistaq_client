@@ -98,29 +98,35 @@ const Coaching: React.FC = () => {
         if (selectedSessionId === sessionId) setSelectedSessionId(null);
     };
 
-    // Only admin, master trainer, and group trainers manage sessions.
-    // Group Leader and Agent are view-only.
+    // Only admin, master trainer, group trainers, and group leaders manage sessions.
     const isManagement = currentUser.role === UserRole.TRAINER ||
         currentUser.role === UserRole.MASTER_TRAINER ||
-        currentUser.role === UserRole.ADMIN;
+        currentUser.role === UserRole.ADMIN ||
+        currentUser.role === UserRole.GROUP_LEADER;
 
     // Who can manage attendance for a given session:
     // - Admin: full control over ALL sessions
     // - Master Trainer: full control over ALL sessions
     // - Group Trainer: only sessions THEY created
-    const canManageSession = (sessionCreatorId: string) => {
+    // - Group Leader: only Peer Circle sessions THEY created
+    const canManageSession = (sessionCreatorId: string, sessionType?: string) => {
         if (currentUser.role === UserRole.ADMIN) return true;
         if (currentUser.role === UserRole.MASTER_TRAINER) return true;
         if (currentUser.role === UserRole.TRAINER) return sessionCreatorId === currentUser.id;
+        if (currentUser.role === UserRole.GROUP_LEADER) return sessionCreatorId === currentUser.id;
         return false;
     };
 
-    // Within a manageable session, can a trainer confirm this specific agent?
+    // Within a manageable session, can a trainer/leader confirm this specific agent?
     // Group Trainer: only their managed group members
+    // Group Leader: only their own group members
     const canConfirmAgent = (agentGroupId?: string) => {
         if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MASTER_TRAINER) return true;
         if (currentUser.role === UserRole.TRAINER) {
             return currentUser.managedGroupIds?.includes(agentGroupId || '') ?? false;
+        }
+        if (currentUser.role === UserRole.GROUP_LEADER) {
+            return agentGroupId === currentUser.groupId;
         }
         return false;
     };
@@ -156,7 +162,9 @@ const Coaching: React.FC = () => {
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Coaching & Attendance</h1>
                     <p className="text-slate-500 mt-1">
-                        {isManagement
+                        {currentUser.role === UserRole.GROUP_LEADER
+                            ? 'Schedule Peer Circle sessions and track attendance for your team.'
+                            : isManagement
                             ? 'Manage coaching sessions and track attendance.'
                             : 'View your assigned coaching sessions below.'}
                     </p>
@@ -180,7 +188,9 @@ const Coaching: React.FC = () => {
                     </div>
                     <h3 className="text-lg font-bold text-slate-900">No Coaching Sessions</h3>
                     <p className="text-slate-500 max-w-sm mx-auto mt-2">
-                        {isManagement
+                        {currentUser.role === UserRole.GROUP_LEADER
+                            ? "No sessions yet. Click 'Create Session' to run a Peer Circle with your agents."
+                            : isManagement
                             ? "You haven't scheduled any coaching sessions yet. Click the button above to create one."
                             : "You don't have any upcoming coaching sessions assigned right now."}
                     </p>

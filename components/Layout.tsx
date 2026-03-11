@@ -72,6 +72,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
     currentUser?.role === UserRole.GROUP_LEADER ||
     currentUser?.role === UserRole.MASTER_TRAINER;
 
+  // Only Admin, Agent and Group Leader can access Prospects
+  // Master Trainer and Trainer are view/management only — no prospect list access
+  const canSeeProspects = currentUser?.role === UserRole.ADMIN ||
+    currentUser?.role === UserRole.AGENT ||
+    currentUser?.role === UserRole.GROUP_LEADER;
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar - Desktop */}
@@ -91,7 +97,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
         <nav className="flex-1 overflow-y-auto py-6 space-y-1">
           <NavItem id="dashboard" label="Dashboard" icon={LayoutDashboard} />
 
-          <NavItem id="prospects" label="Prospects" icon={Users} />
+          {canSeeProspects && (
+            <NavItem id="prospects" label="Prospects" icon={Users} />
+          )}
 
           <NavItem id="events" label="Calendar" icon={CalendarDays} />
           <NavItem id="coaching" label="Coaching" icon={Users} />
@@ -189,7 +197,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
               <nav className="py-4 overflow-y-auto max-h-[calc(100vh-180px)]">
                 <NavItem id="dashboard" label="Dashboard" icon={LayoutDashboard} />
 
-                <NavItem id="prospects" label="Prospects" icon={Users} />
+                {canSeeProspects && (
+                  <NavItem id="prospects" label="Prospects" icon={Users} />
+                )}
 
                 <NavItem id="events" label="My Calendar" icon={CalendarDays} />
                 <NavItem id="coaching" label="Coaching" icon={Users} />

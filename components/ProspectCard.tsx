@@ -750,7 +750,8 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                     <DollarSign className="w-10 h-10 text-green-600" />
                   </div>
                   <h2 className="text-3xl font-extrabold text-green-800 mb-2">Congratulations!</h2>
-                  <p className="text-green-700 mb-4 font-medium">You have successfully secured a sale of <br /><span className="text-2xl font-bold">RM {productRows.reduce((sum, p) => sum + (p.aceAmount || 0), 0).toLocaleString()}</span></p>
+                  <p className="text-green-700 mb-2 font-medium">You have successfully secured a sale of <br /><span className="text-2xl font-bold">RM {productRows.reduce((sum, p) => sum + (p.aceAmount || 0), 0).toLocaleString()}</span></p>
+                  <p className="text-sm font-semibold text-emerald-700 bg-emerald-100 border border-emerald-300 rounded-lg px-4 py-2 inline-block mb-4">🤝 Remember to ask for Referrals!</p>
                   <p className="text-sm text-green-600">Click <strong>Save & Close</strong> below to save your changes.</p>
                 </div>
               )}
