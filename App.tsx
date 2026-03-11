@@ -13,13 +13,14 @@ import AdminUsers from './pages/AdminUsers';
 import AdminGroups from './pages/AdminGroups';
 import AdminRewards from './pages/AdminRewards';
 import Import from './pages/Import';
-import Events from './pages/Events';
+import MyCalendar from './pages/MyCalendar';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Support from './pages/Support';
 import Tutorials from './pages/Tutorials';
+import Coaching from './pages/Coaching';
 import GlobalNotification from './components/GlobalNotification';
 
 const AuthenticatedApp: React.FC = () => {
@@ -28,7 +29,7 @@ const AuthenticatedApp: React.FC = () => {
 
   const renderPage = () => {
     switch (activePage) {
-      case 'dashboard': return <Dashboard />;
+      case 'dashboard': return <Dashboard onNavigate={setActivePage} />;
       case 'prospects': return <Prospects />;
       case 'profile': return <Profile />;
 
@@ -42,7 +43,8 @@ const AuthenticatedApp: React.FC = () => {
       case 'group': return <Group />;
       case 'sales': return <Sales />;
       case 'reports': return <Reports />;
-      case 'events': return <Events />;
+      case 'events': return <MyCalendar />;
+      case 'coaching': return <Coaching />;
       case 'import': return <Import />;
       case 'support': return <Support />;
       case 'tutorials': return <Tutorials />;

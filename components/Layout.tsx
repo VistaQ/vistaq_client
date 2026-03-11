@@ -93,7 +93,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
 
           <NavItem id="prospects" label="Prospects" icon={Users} />
 
-          <NavItem id="events" label="Events & Meetings" icon={CalendarDays} />
+          <NavItem id="events" label="Calendar" icon={CalendarDays} />
+          <NavItem id="coaching" label="Coaching" icon={Users} />
 
           {/* Personal Views for Agent and Group Leader */}
           {(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER) && (
@@ -190,7 +191,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
 
                 <NavItem id="prospects" label="Prospects" icon={Users} />
 
-                <NavItem id="events" label="Events & Meetings" icon={CalendarDays} />
+                <NavItem id="events" label="My Calendar" icon={CalendarDays} />
+                <NavItem id="coaching" label="Coaching" icon={Users} />
 
                 {/* Personal Views for Agent and Group Leader */}
                 {(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER) && (

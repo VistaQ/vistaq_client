@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Prospect, ProspectStage, User, UserRole, BadgeTier, Event } from '../types';
+import { Prospect, ProspectStage, User, UserRole, BadgeTier, Event, CoachingSession } from '../types';
 import { apiCall } from '../services/apiClient';
 import { getCache, setCache, invalidateCache, buildCacheKey } from '../services/cache';
 
@@ -20,8 +20,16 @@ interface DataContextType {
   addEvent: (evt: Partial<Event>) => Promise<void>;
   updateEvent: (id: string, evt: Partial<Event>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
-  getEventsForUser: (user: User, includeArchived?: boolean) => Event[];
+  getEventsForUser: (user: User) => Event[];
   refetchEvents: () => Promise<void>;
+
+  // Coaching Methods
+  coachingSessions: CoachingSession[];
+  addCoachingSession: (session: Partial<CoachingSession>) => Promise<void>;
+  updateCoachingSession: (id: string, updates: Partial<CoachingSession>) => Promise<void>;
+  deleteCoachingSession: (id: string) => Promise<void>;
+  getCoachingSessionsForUser: (user: User) => CoachingSession[];
+  refetchCoachingSessions: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -40,6 +48,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [badgeTiers, setBadgeTiers] = useState<BadgeTier[]>(DEFAULT_MILESTONES);
   const [events, setEvents] = useState<Event[]>([]);
+  const [coachingSessions, setCoachingSessions] = useState<CoachingSession[]>([]);
 
   const getCurrentUserId = (): string | null => {
     try {
@@ -154,6 +163,50 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const fetchCoachingSessions = async () => {
+    if (!localStorage.getItem('authToken')) {
+      setCoachingSessions([]);
+      return;
+    }
+
+    const userId = getCurrentUserId();
+    if (!userId) {
+      setCoachingSessions([]);
+      return;
+    }
+
+    const cacheKey = buildCacheKey(userId, 'coaching');
+
+    // Simulated Backend Storage Key (Global across all users for accurate simulation)
+    const DB_KEY = 'mock_coaching_db';
+    let raw: any[] = [];
+
+    try {
+      const storedDb = localStorage.getItem(DB_KEY);
+      if (storedDb) {
+        raw = JSON.parse(storedDb);
+      }
+    } catch (e) {
+      raw = [];
+    }
+
+    const items: CoachingSession[] = raw.map(s => ({
+      ...s,
+      coachingType: s.coachingType || 'Individual Coaching',
+      durationStart: s.durationStart || '09:00',
+      durationEnd: s.durationEnd || '10:00',
+      date: toISO(s.date) || s.date,
+      createdAt: toISO(s.createdAt) || s.createdAt,
+      updatedAt: toISO(s.updatedAt) || s.updatedAt,
+      attendance: s.attendance || [],
+      targetGroupIds: s.targetGroupIds || [],
+      targetAgentIds: s.targetAgentIds || []
+    }));
+
+    setCoachingSessions(items);
+    setCache(cacheKey, items, userId);
+  };
+
   // Track authentication state to trigger refetch on login
   const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('authToken'));
   const [userRole, setUserRole] = useState<string | null>(() => {
@@ -211,6 +264,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } else {
       // Clear data on logout
       setEvents([]);
+    }
+  }, [authToken]);
+
+  // 3. Sync Coaching Sessions when authenticated
+  useEffect(() => {
+    if (authToken) {
+      fetchCoachingSessions();
+    } else {
+      setCoachingSessions([]);
     }
   }, [authToken]);
 
@@ -363,32 +425,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await fetchEvents();
   };
 
-  const getEventsForUser = (user: User, includeArchived = false): Event[] => {
+  const getEventsForUser = (user: User): Event[] => {
     if (!user) return [];
 
-    const currentYear = new Date().getFullYear();
-
-    // Helper: is this event archived (from a prior calendar year)?
-    const isArchived = (e: Event): boolean => {
-      if (e.archived) return true;
-      const evtYear = new Date(e.date).getFullYear();
-      return evtYear < currentYear;
-    };
-
-    // Admin sees all events (archived and active), filterable via includeArchived param
-    if (user.role === UserRole.ADMIN) {
-      return includeArchived ? events : events.filter(e => !isArchived(e));
-    }
-
-    // Master Trainer and Trainer see all non-archived events
-    if (user.role === UserRole.MASTER_TRAINER || user.role === UserRole.TRAINER) {
-      return events.filter(e => !isArchived(e));
+    // Admin, Master Trainer, and Trainer see all events
+    if (user.role === UserRole.ADMIN ||
+      user.role === UserRole.MASTER_TRAINER ||
+      user.role === UserRole.TRAINER) {
+      return events;
     }
 
     return events.filter(e => {
-      // Non-admins never see archived events
-      if (isArchived(e)) return false;
-
       const targetGroups = e.groupIds || [];
 
       // 1. Created by me?
@@ -408,12 +455,107 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   };
 
+  // --- COACHING SESSIONS (Mocked) ---
+  const getMockDb = (): CoachingSession[] => {
+    try {
+      const stored = localStorage.getItem('mock_coaching_db');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const setMockDb = (data: CoachingSession[]) => {
+    localStorage.setItem('mock_coaching_db', JSON.stringify(data));
+  };
+
+  const addCoachingSession = async (session: Partial<CoachingSession>) => {
+    const newSession = {
+      ...session,
+      id: `coach_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      coachingType: session.coachingType || 'Individual Coaching',
+      title: session.title || 'New Coaching Session',
+      durationStart: session.durationStart || '09:00',
+      durationEnd: session.durationEnd || '10:00',
+      date: session.date || new Date().toISOString(),
+      attendance: session.attendance || [],
+      targetGroupIds: session.targetGroupIds || [],
+      targetAgentIds: session.targetAgentIds || [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: session.status || 'upcoming'
+    } as CoachingSession;
+
+    // Write to mock DB
+    const db = getMockDb();
+    db.push(newSession);
+    setMockDb(db);
+
+    const userId = getCurrentUserId();
+    if (userId) invalidateCache(buildCacheKey(userId, 'coaching'));
+    await fetchCoachingSessions();
+  };
+
+  const updateCoachingSession = async (id: string, updates: Partial<CoachingSession>) => {
+    // Update in mock DB
+    const db = getMockDb();
+    const index = db.findIndex(s => s.id === id);
+    if (index >= 0) {
+      db[index] = { ...db[index], ...updates, updatedAt: new Date().toISOString() };
+      setMockDb(db);
+    }
+
+    const userId = getCurrentUserId();
+    if (userId) invalidateCache(buildCacheKey(userId, 'coaching'));
+    await fetchCoachingSessions();
+  };
+
+  const deleteCoachingSession = async (id: string) => {
+    // Delete from mock DB
+    const db = getMockDb();
+    const filtered = db.filter(s => s.id !== id);
+    setMockDb(filtered);
+
+    const userId = getCurrentUserId();
+    if (userId) invalidateCache(buildCacheKey(userId, 'coaching'));
+    await fetchCoachingSessions();
+  };
+
+  const getCoachingSessionsForUser = (user: User): CoachingSession[] => {
+    if (!user) return [];
+
+    return coachingSessions.filter(s => {
+      // 1. Created by me?
+      if (s.createdBy === user.id) return true;
+
+      // 2. Is target audience "All" (empty arrays) and I am an agent/leader?
+      if (s.targetGroupIds?.length === 0 && s.targetAgentIds?.length === 0) {
+        return true;
+      }
+
+      // 3. Am I specifically targeted?
+      if (s.targetAgentIds?.includes(user.id)) return true;
+
+      // 4. Is my group targeted?
+      if (user.groupId && s.targetGroupIds?.includes(user.groupId)) return true;
+
+      // 5. Admin or Master Trainer sees all
+      if (user.role === UserRole.ADMIN || user.role === UserRole.MASTER_TRAINER) {
+        return true;
+      }
+
+      return false;
+    });
+  };
+
   return (
     <DataContext.Provider value={{
       prospects, badgeTiers, events,
       addProspect, updateProspect, importProspects, deleteProspect,
       getProspectsByScope, getGroupProspects, updateBadgeTiers,
-      addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents
+      addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents,
+      coachingSessions, addCoachingSession, updateCoachingSession, deleteCoachingSession,
+      getCoachingSessionsForUser, refetchCoachingSessions: fetchCoachingSessions
     }}>
       {children}
     </DataContext.Provider>

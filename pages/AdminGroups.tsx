@@ -69,8 +69,8 @@ const AdminGroups: React.FC = () => {
   };
 
   const handleSave = () => {
-    if (!formName || !formLeaderId) {
-        alert("Group Name and Leader are required.");
+    if (!formName) {
+        alert("Group Name is required.");
         return;
     }
 
@@ -251,7 +251,7 @@ const AdminGroups: React.FC = () => {
                                           }
                                       }}
                                   >
-                                      <option value="">Select Leader...</option>
+                                      <option value="">Select Leader (Optional)...</option>
                                       {potentialLeaders.map(l => (
                                           <option key={l.id} value={l.id}>
                                               {l.name} {l.groupId && l.groupId !== editingGroup?.id ? `(In ${groups.find(g=>g.id===l.groupId)?.name})` : ''}

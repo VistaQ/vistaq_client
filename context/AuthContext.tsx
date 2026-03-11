@@ -21,8 +21,8 @@ interface AuthContextType {
   addUser: (user: Partial<User>) => Promise<void>;
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
-  addGroup: (name: string, leaderId: string, trainerIds: string[], memberIds: string[]) => Promise<void>;
-  updateGroup: (groupId: string, name: string, leaderId: string, trainerIds: string[], memberIds: string[]) => Promise<void>;
+  addGroup: (name: string, leaderId: string | undefined, trainerIds: string[], memberIds: string[]) => Promise<void>;
+  updateGroup: (groupId: string, name: string, leaderId: string | undefined, trainerIds: string[], memberIds: string[]) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
   notification: Notification | null;
   showNotification: (title: string, message: string, type?: 'success' | 'error' | 'info') => void;
@@ -271,7 +271,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // --- ADMIN: GROUPS ---
-  const addGroup = async (name: string, leaderId: string, trainerIds: string[], memberIds: string[]) => {
+  const addGroup = async (name: string, leaderId: string | undefined, trainerIds: string[], memberIds: string[]) => {
     await apiCall('/admin/groups', {
       method: 'POST',
       data: { name, leaderId, trainerIds, memberIds }
@@ -286,7 +286,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await fetchGroups();
   };
 
-  const updateGroup = async (groupId: string, name: string, leaderId: string, trainerIds: string[], memberIds: string[]) => {
+  const updateGroup = async (groupId: string, name: string, leaderId: string | undefined, trainerIds: string[], memberIds: string[]) => {
     await apiCall(`/admin/groups/${groupId}`, {
       method: 'PUT',
       data: { name, leaderId, trainerIds, memberIds }
