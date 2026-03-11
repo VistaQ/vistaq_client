@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Prospect, ProspectStage, User, UserRole, BadgeTier, Event } from '../types';
+import { Prospect, ProspectStage, User, UserRole, BadgeTier, Event, CoachingSession } from '../types';
 import { apiCall } from '../services/apiClient';
 import { getCache, setCache, invalidateCache, buildCacheKey } from '../services/cache';
 
@@ -15,13 +15,21 @@ interface DataContextType {
   getGroupProspects: (groupId: string) => Prospect[];
   deleteProspect: (id: string) => Promise<void>;
   updateBadgeTiers: (tiers: BadgeTier[]) => Promise<void>;
-  
+
   // Event Methods
   addEvent: (evt: Partial<Event>) => Promise<void>;
   updateEvent: (id: string, evt: Partial<Event>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
   getEventsForUser: (user: User) => Event[];
   refetchEvents: () => Promise<void>;
+
+  // Coaching Methods
+  coachingSessions: CoachingSession[];
+  addCoachingSession: (session: Partial<CoachingSession>) => Promise<void>;
+  updateCoachingSession: (id: string, updates: Partial<CoachingSession>) => Promise<void>;
+  deleteCoachingSession: (id: string) => Promise<void>;
+  getCoachingSessionsForUser: (user: User) => CoachingSession[];
+  refetchCoachingSessions: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -40,6 +48,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [badgeTiers, setBadgeTiers] = useState<BadgeTier[]>(DEFAULT_MILESTONES);
   const [events, setEvents] = useState<Event[]>([]);
+  const [coachingSessions, setCoachingSessions] = useState<CoachingSession[]>([]);
 
   const getCurrentUserId = (): string | null => {
     try {
@@ -48,7 +57,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const user = JSON.parse(stored);
         return user.id || user.uid || null;
       }
-    } catch (_e) {}
+    } catch (_e) { }
     return null;
   };
 
@@ -64,7 +73,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return '/prospects/managed-groups';
         }
       }
-    } catch (_e) {}
+    } catch (_e) { }
     return '/prospects/my-prospects';
   };
 
@@ -113,7 +122,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const normalized = raw.map(normalizeProspect);
       setProspects(normalized);
       setCache(cacheKey, normalized, userId);
-    } catch (_e) {}
+    } catch (_e) { }
   };
 
   const fetchEvents = async () => {
@@ -154,6 +163,50 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const fetchCoachingSessions = async () => {
+    if (!localStorage.getItem('authToken')) {
+      setCoachingSessions([]);
+      return;
+    }
+
+    const userId = getCurrentUserId();
+    if (!userId) {
+      setCoachingSessions([]);
+      return;
+    }
+
+    const cacheKey = buildCacheKey(userId, 'coaching');
+
+    // Simulated Backend Storage Key (Global across all users for accurate simulation)
+    const DB_KEY = 'mock_coaching_db';
+    let raw: any[] = [];
+
+    try {
+      const storedDb = localStorage.getItem(DB_KEY);
+      if (storedDb) {
+        raw = JSON.parse(storedDb);
+      }
+    } catch (e) {
+      raw = [];
+    }
+
+    const items: CoachingSession[] = raw.map(s => ({
+      ...s,
+      coachingType: s.coachingType || 'Individual Coaching',
+      durationStart: s.durationStart || '09:00',
+      durationEnd: s.durationEnd || '10:00',
+      date: toISO(s.date) || s.date,
+      createdAt: toISO(s.createdAt) || s.createdAt,
+      updatedAt: toISO(s.updatedAt) || s.updatedAt,
+      attendance: s.attendance || [],
+      targetGroupIds: s.targetGroupIds || [],
+      targetAgentIds: s.targetAgentIds || []
+    }));
+
+    setCoachingSessions(items);
+    setCache(cacheKey, items, userId);
+  };
+
   // Track authentication state to trigger refetch on login
   const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('authToken'));
   const [userRole, setUserRole] = useState<string | null>(() => {
@@ -179,7 +232,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (role !== userRole) {
           setUserRole(role);
         }
-      } catch {}
+      } catch { }
     };
 
     // Check periodically for auth changes
@@ -211,6 +264,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } else {
       // Clear data on logout
       setEvents([]);
+    }
+  }, [authToken]);
+
+  // 3. Sync Coaching Sessions when authenticated
+  useEffect(() => {
+    if (authToken) {
+      fetchCoachingSessions();
+    } else {
+      setCoachingSessions([]);
     }
   }, [authToken]);
 
@@ -306,7 +368,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const getProspectsByScope = (user: User): Prospect[] => {
     // 1. Admin & Master Trainer (View All)
     if (user.role === UserRole.ADMIN || user.role === UserRole.MASTER_TRAINER) {
-        return prospects;
+      return prospects;
     }
 
     // 2. Trainer (Managed Groups)
@@ -323,74 +385,167 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- EVENTS ---
   const addEvent = async (evt: Partial<Event>) => {
-      const payload = {
-          ...evt,
-          eventTitle: evt.eventTitle || 'New Event',
-          date: evt.date || new Date().toISOString()
-      };
-      await apiCall('/events', { method: 'POST', data: payload });
+    const payload = {
+      ...evt,
+      eventTitle: evt.eventTitle || 'New Event',
+      date: evt.date || new Date().toISOString()
+    };
+    await apiCall('/events', { method: 'POST', data: payload });
 
-      // Invalidate cache before refetching
-      const userId = getCurrentUserId();
-      if (userId) {
-        invalidateCache(buildCacheKey(userId, 'events'));
-      }
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      invalidateCache(buildCacheKey(userId, 'events'));
+    }
 
-      await fetchEvents();
+    await fetchEvents();
   };
 
   const updateEvent = async (id: string, evt: Partial<Event>) => {
-      await apiCall(`/events/${id}`, { method: 'PUT', data: evt });
+    await apiCall(`/events/${id}`, { method: 'PUT', data: evt });
 
-      // Invalidate cache before refetching
-      const userId = getCurrentUserId();
-      if (userId) {
-        invalidateCache(buildCacheKey(userId, 'events'));
-      }
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      invalidateCache(buildCacheKey(userId, 'events'));
+    }
 
-      await fetchEvents();
+    await fetchEvents();
   };
 
   const deleteEvent = async (id: string) => {
-      await apiCall(`/events/${id}`, { method: 'DELETE' });
+    await apiCall(`/events/${id}`, { method: 'DELETE' });
 
-      // Invalidate cache before refetching
-      const userId = getCurrentUserId();
-      if (userId) {
-        invalidateCache(buildCacheKey(userId, 'events'));
-      }
+    // Invalidate cache before refetching
+    const userId = getCurrentUserId();
+    if (userId) {
+      invalidateCache(buildCacheKey(userId, 'events'));
+    }
 
-      await fetchEvents();
+    await fetchEvents();
   };
 
   const getEventsForUser = (user: User): Event[] => {
-      if (!user) return [];
+    if (!user) return [];
 
-      // Admin, Master Trainer, and Trainer see all events
-      if (user.role === UserRole.ADMIN ||
-          user.role === UserRole.MASTER_TRAINER ||
-          user.role === UserRole.TRAINER) {
-          return events;
+    // Admin, Master Trainer, and Trainer see all events
+    if (user.role === UserRole.ADMIN ||
+      user.role === UserRole.MASTER_TRAINER ||
+      user.role === UserRole.TRAINER) {
+      return events;
+    }
+
+    return events.filter(e => {
+      const targetGroups = e.groupIds || [];
+
+      // 1. Created by me?
+      if (e.createdBy === user.id) return true;
+
+      // 2. For Agent: Is my group in target?
+      if (user.role === UserRole.AGENT && user.groupId) {
+        return targetGroups.includes(user.groupId);
       }
 
-      return events.filter(e => {
-          const targetGroups = e.groupIds || [];
+      // 3. For Leader: Is my group in target?
+      if (user.role === UserRole.GROUP_LEADER && user.groupId) {
+        return targetGroups.includes(user.groupId);
+      }
 
-          // 1. Created by me?
-          if (e.createdBy === user.id) return true;
+      return false;
+    });
+  };
 
-          // 2. For Agent: Is my group in target?
-          if (user.role === UserRole.AGENT && user.groupId) {
-              return targetGroups.includes(user.groupId);
-          }
+  // --- COACHING SESSIONS (Mocked) ---
+  const getMockDb = (): CoachingSession[] => {
+    try {
+      const stored = localStorage.getItem('mock_coaching_db');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  };
 
-          // 3. For Leader: Is my group in target?
-          if (user.role === UserRole.GROUP_LEADER && user.groupId) {
-               return targetGroups.includes(user.groupId);
-          }
+  const setMockDb = (data: CoachingSession[]) => {
+    localStorage.setItem('mock_coaching_db', JSON.stringify(data));
+  };
 
-          return false;
-      });
+  const addCoachingSession = async (session: Partial<CoachingSession>) => {
+    const newSession = {
+      ...session,
+      id: `coach_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      coachingType: session.coachingType || 'Individual Coaching',
+      title: session.title || 'New Coaching Session',
+      durationStart: session.durationStart || '09:00',
+      durationEnd: session.durationEnd || '10:00',
+      date: session.date || new Date().toISOString(),
+      attendance: session.attendance || [],
+      targetGroupIds: session.targetGroupIds || [],
+      targetAgentIds: session.targetAgentIds || [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: session.status || 'upcoming'
+    } as CoachingSession;
+
+    // Write to mock DB
+    const db = getMockDb();
+    db.push(newSession);
+    setMockDb(db);
+
+    const userId = getCurrentUserId();
+    if (userId) invalidateCache(buildCacheKey(userId, 'coaching'));
+    await fetchCoachingSessions();
+  };
+
+  const updateCoachingSession = async (id: string, updates: Partial<CoachingSession>) => {
+    // Update in mock DB
+    const db = getMockDb();
+    const index = db.findIndex(s => s.id === id);
+    if (index >= 0) {
+      db[index] = { ...db[index], ...updates, updatedAt: new Date().toISOString() };
+      setMockDb(db);
+    }
+
+    const userId = getCurrentUserId();
+    if (userId) invalidateCache(buildCacheKey(userId, 'coaching'));
+    await fetchCoachingSessions();
+  };
+
+  const deleteCoachingSession = async (id: string) => {
+    // Delete from mock DB
+    const db = getMockDb();
+    const filtered = db.filter(s => s.id !== id);
+    setMockDb(filtered);
+
+    const userId = getCurrentUserId();
+    if (userId) invalidateCache(buildCacheKey(userId, 'coaching'));
+    await fetchCoachingSessions();
+  };
+
+  const getCoachingSessionsForUser = (user: User): CoachingSession[] => {
+    if (!user) return [];
+
+    return coachingSessions.filter(s => {
+      // 1. Created by me?
+      if (s.createdBy === user.id) return true;
+
+      // 2. Is target audience "All" (empty arrays) and I am an agent/leader?
+      if (s.targetGroupIds?.length === 0 && s.targetAgentIds?.length === 0) {
+        return true;
+      }
+
+      // 3. Am I specifically targeted?
+      if (s.targetAgentIds?.includes(user.id)) return true;
+
+      // 4. Is my group targeted?
+      if (user.groupId && s.targetGroupIds?.includes(user.groupId)) return true;
+
+      // 5. Admin or Master Trainer sees all
+      if (user.role === UserRole.ADMIN || user.role === UserRole.MASTER_TRAINER) {
+        return true;
+      }
+
+      return false;
+    });
   };
 
   return (
@@ -398,7 +553,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       prospects, badgeTiers, events,
       addProspect, updateProspect, importProspects, deleteProspect,
       getProspectsByScope, getGroupProspects, updateBadgeTiers,
-      addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents
+      addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents,
+      coachingSessions, addCoachingSession, updateCoachingSession, deleteCoachingSession,
+      getCoachingSessionsForUser, refetchCoachingSessions: fetchCoachingSessions
     }}>
       {children}
     </DataContext.Provider>

@@ -84,7 +84,7 @@ const Prospects: React.FC = () => {
       else if (p.salesOutcome === 'unsuccessful') outcomeLabel = 'Lose';
       else if (p.salesOutcome === 'kiv') outcomeLabel = 'KIV';
 
-      const totalAce = (p.productsSold || []).reduce((sum, prod) => sum + (prod.aceAmount || 0), 0);
+      const totalAce = p.salesOutcome === 'successful' ? (p.productsSold || []).reduce((sum, prod) => sum + (prod.aceAmount || 0), 0) : 0;
       const productNames = (p.productsSold || []).map(prod => prod.productName).filter(Boolean).join(', ');
 
       return [

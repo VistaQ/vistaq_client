@@ -49,10 +49,10 @@ const Sales: React.FC = () => {
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
            <h3 className="font-bold text-gray-800 flex items-center">
              <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
-             Successful Policies
+             Successful Certificates
            </h3>
            <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold">
-             {mySales.length} Policies
+             {mySales.length} Certificates
            </span>
         </div>
         
@@ -106,8 +106,8 @@ const Sales: React.FC = () => {
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                     <DollarSign className="w-8 h-8 text-gray-400" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900">No Sales Yet</h3>
-                <p className="max-w-xs mx-auto mt-2">Successful sales transactions will appear here once you close deals in the prospects workflow.</p>
+                <h3 className="text-lg font-medium text-gray-900">No Sales Outcome Yet</h3>
+                <p className="max-w-xs mx-auto mt-2">Successful sales outcome will appear here once you close deals in the prospects workflow.</p>
             </div>
         )}
       </div>

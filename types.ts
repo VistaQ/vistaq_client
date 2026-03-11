@@ -121,6 +121,7 @@ export interface Event {
   createdByRole?: string;
 
   status?: 'upcoming' | 'completed' | 'cancelled';
+  archived?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -160,4 +161,51 @@ export interface AIChatMessage {
   role: 'user' | 'model';
   text: string;
   timestamp: number;
+}
+
+// Coaching & Attendance Types
+export interface CoachingAttendance {
+  agentId: string;
+  agentName: string;
+  agentEmail?: string;
+  groupId?: string; // Group the agent belongs to
+  groupName?: string;
+  status: 'pending' | 'joined' | 'completed';
+  joinedAt?: string; // ISO String when agent clicks "Join"
+  confirmedAt?: string; // ISO String when trainer clicks "Confirm"
+}
+
+export type CoachingType =
+  | 'Individual Coaching'
+  | 'Group Coaching'
+  | 'Peer Circles'
+  | '2 Full Days Seminar'
+  | '2 Hours Online Seminar';
+
+export interface CoachingSession {
+  id: string;
+  coachingType: CoachingType;
+  title: string;
+  description?: string;
+  date: string; // ISO String for the selected date
+  durationStart: string; // e.g., "14:00"
+  durationEnd: string; // e.g., "15:00"
+  venue: 'Online' | 'Face to Face';
+  link?: string; // e.g. Zoom link or venue location
+
+  // Creator Info
+  createdBy: string;
+  createdByName: string;
+  createdByRole: string; // e.g. 'master_trainer', 'trainer', 'group_leader'
+
+  // Target Audience (Assigned Groups/Agents)
+  targetGroupIds?: string[]; // Empty means all groups (for master trainer) or specific groups
+  targetAgentIds?: string[]; // Specific agents selected
+
+  // Attendance tracking
+  attendance: CoachingAttendance[];
+
+  status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
+  createdAt?: string;
+  updatedAt?: string;
 }

@@ -409,8 +409,15 @@ const Events: React.FC = () => {
         currentUser.role === UserRole.TRAINER ||
         currentUser.role === UserRole.GROUP_LEADER;
 
-    const myEvents = getEventsForUser(currentUser, isAdmin && showArchived);
-    const sortedEvents = [...myEvents].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const myEvents = getEventsForUser(currentUser);
+    // Locally filter archived events based on showArchived toggle for Admin
+    const visibleEvents = myEvents.filter(e => {
+        if (!isAdmin) return !e.archived;
+        if (!showArchived) return !e.archived;
+        return true;
+    });
+
+    const sortedEvents = [...visibleEvents].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     let targetableGroups = groups;
     if (currentUser.role === UserRole.TRAINER) {

@@ -4,6 +4,7 @@ import { Prospect, ProspectStage, UserRole, ProspectProduct } from '../types';
 import { CheckCircle, Clock, XCircle, ChevronRight, Lock, MessageCircle, DollarSign, Save, Trash2, ShieldCheck, Undo2, Eye, MapPin, AlertTriangle, Calendar, Check, PauseCircle, Plus, MinusCircle } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { useCalendarConflicts, checkConflict } from '../hooks/useCalendarConflicts';
 
 interface Props {
   prospect: Prospect | Partial<Prospect>;
@@ -27,6 +28,7 @@ const toLocalISOString = (date: Date): string => {
 const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   const { updateProspect, addProspect, deleteProspect } = useData();
   const { currentUser } = useAuth();
+  const { occupiedSlots } = useCalendarConflicts();
   const [formData, setFormData] = useState<Partial<Prospect>>(prospect);
 
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -44,8 +46,9 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const [errors, setErrors] = useState<{prospectName?: string, prospectPhone?: string, prospectEmail?: string}>({});
+  const [errors, setErrors] = useState<{ prospectName?: string, prospectPhone?: string, prospectEmail?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [appointmentConflict, setAppointmentConflict] = useState<{ has: boolean; with: string; type: string }>({ has: false, with: '', type: '' });
 
   const STANDARD_REASONS = ['Unable to afford', 'Unable to decide', 'Due to Health / Occupation', 'Needs more time'];
 
@@ -102,14 +105,24 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
     }
   }, [prospect]);
 
-  // Sync date inputs into formData (no API call — saved on Save & Close)
+  // Sync date inputs into formData AND run conflict check
   useEffect(() => {
     if (!dateInput) return;
     const d = new Date(`${dateInput}T${startTimeInput || '00:00'}`);
     if (isNaN(d.getTime())) return;
     const combinedDate = toLocalISOString(d);
     setFormData(prev => ({ ...prev, appointmentDate: combinedDate, appointmentStartTime: startTimeInput, appointmentEndTime: endTimeInput }));
-  }, [dateInput, startTimeInput, endTimeInput]);
+
+    // Real-time conflict detection — exclude the current prospect itself
+    const { hasConflict, conflictWith, conflictType } = checkConflict(
+      occupiedSlots,
+      dateInput,
+      startTimeInput,
+      endTimeInput,
+      prospect.id ? `Appt: ${prospect.prospectName}` : undefined // skip self when editing
+    );
+    setAppointmentConflict({ has: hasConflict, with: conflictWith, type: conflictType });
+  }, [dateInput, startTimeInput, endTimeInput, occupiedSlots]);
 
   // Permission logic
   const isNew = !formData.id;
@@ -159,6 +172,12 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   const handleSaveAndClose = async () => {
     if (isReadOnly) {
       onClose();
+      return;
+    }
+
+    // Block save if there is an unresolved appointment conflict
+    if (appointmentConflict.has && !formData.salesOutcome) {
+      alert(`Cannot save: this time slot conflicts with "${appointmentConflict.with}". Please choose a different date or time.`);
       return;
     }
 
@@ -248,10 +267,19 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
       }
     }
 
+    // If not successful, we should zero out the ACE amounts so they are not captured/accumulated anywhere
+    const finalProducts = outcome === 'successful' 
+      ? productRows 
+      : productRows.map(p => ({ ...p, aceAmount: 0 }));
+
+    if (outcome !== 'successful') {
+        setProductRows(finalProducts);
+    }
+
     const updates: Partial<Prospect> = {
       salesOutcome: outcome,
       currentStage: ProspectStage.SALES_OUTCOME,
-      productsSold: productRows,
+      productsSold: finalProducts,
     };
 
     handleSave(updates);
@@ -397,151 +425,163 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
 
           {/* STEP 2 + 3: Appointment Details & Sales Meeting */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className={`bg-white border rounded-xl overflow-hidden shadow-sm transition-all ${!isStep2Unlocked ? 'opacity-60 pointer-events-none grayscale' : ''}`}>
-            <CardHeader
-              number={2}
-              title="Appointment Details"
-              isActive={isStep2Unlocked && formData.appointmentStatus !== 'completed'}
-              isDone={formData.appointmentStatus === 'completed'}
-            />
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
-                <div className="relative">
-                  <input
-                    ref={dateInputRef}
-                    type="date"
-                    min={todayStr}
-                    value={dateInput}
-                    onChange={e => setDateInput(e.target.value)}
-                    onClick={() => (dateInputRef.current as any)?.showPicker?.()}
-                    className="block w-full pl-10 bg-gray-50 hover:bg-blue-50 border border-gray-300 hover:border-blue-400 text-black rounded-lg p-2.5 text-sm focus:ring-blue-600 focus:border-blue-600 cursor-pointer transition-colors accent-blue-600"
-                    disabled={isReadOnly}
-                  />
-                  <Calendar onClick={() => (dateInputRef.current as any)?.showPicker?.()} className="absolute left-3 top-2.5 text-blue-600 w-4 h-4 cursor-pointer hover:text-blue-800" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
+            <div className={`bg-white border rounded-xl overflow-hidden shadow-sm transition-all ${!isStep2Unlocked ? 'opacity-60 pointer-events-none grayscale' : ''}`}>
+              <CardHeader
+                number={2}
+                title="Appointment Details"
+                isActive={isStep2Unlocked && formData.appointmentStatus !== 'completed'}
+                isDone={formData.appointmentStatus === 'completed'}
+              />
+              <div className="p-5 space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start</label>
-                  <input
-                    type="time"
-                    min={isDateToday ? currentHm : undefined}
-                    value={startTimeInput}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (isDateToday && val < currentHm) {
-                        alert("Cannot select a time in the past.");
-                        setStartTimeInput(currentHm);
-                        return;
-                      }
-                      setStartTimeInput(val);
-                      const [h, m] = val.split(':').map(Number);
-                      const endH = String((h + 1) % 24).padStart(2, '0');
-                      setEndTimeInput(`${endH}:${String(m).padStart(2, '0')}`);
-                    }}
-                    className="block w-full bg-gray-50 hover:bg-blue-50 border border-gray-300 hover:border-blue-400 text-black rounded-lg p-2.5 text-sm focus:ring-blue-600 focus:border-blue-600 cursor-pointer transition-colors accent-blue-600"
-                    disabled={isReadOnly}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">End</label>
-                  <input
-                    type="time"
-                    min={startTimeInput}
-                    value={endTimeInput}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val < startTimeInput) return;
-                      setEndTimeInput(val);
-                    }}
-                    className="block w-full bg-gray-50 hover:bg-blue-50 border border-gray-300 hover:border-blue-400 text-black rounded-lg p-2.5 text-sm focus:ring-blue-600 focus:border-blue-600 cursor-pointer transition-colors accent-blue-600"
-                    disabled={isReadOnly}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Location</label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    value={formData.appointmentLocation || ''}
-                    onChange={e => handleSave({ appointmentLocation: e.target.value })}
-                    placeholder="e.g. Starbucks KLCC"
-                    className="block w-full pl-10 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500"
-                    disabled={isReadOnly}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
-                <select
-                  value={formData.appointmentStatus || 'not_done'}
-                  onChange={e => handleSave({ appointmentStatus: e.target.value as any })}
-                  className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500"
-                  disabled={isReadOnly}
-                >
-                  <option value="not_done">Not done (Default)</option>
-                  <option value="scheduled">Scheduled</option>
-                  <option value="rescheduled">Rescheduled</option>
-                  <option value="completed">Completed</option>
-                  <option value="kiv">KIV</option>
-                  <option value="declined">Declined</option>
-                </select>
-                <p className="text-xs text-gray-400 mt-1">Set to <strong>Completed</strong> to unlock Sales Outcome.</p>
-              </div>
-
-              <button
-                onClick={sendWhatsAppInvite}
-                className="w-full mt-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 font-medium py-2 px-4 rounded-lg flex items-center justify-center transition-colors text-sm"
-              >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Send WhatsApp Invite
-              </button>
-            </div>
-          </div>
-
-          {/* STEP 3: Sales Meeting */}
-          <div className={`bg-white border rounded-xl overflow-hidden shadow-sm transition-all ${!isStep3Unlocked ? 'opacity-60 pointer-events-none grayscale' : ''}`}>
-            <CardHeader
-              number={3}
-              title="Sales Meeting"
-              isActive={isStep3Unlocked && !allMeetingDone}
-              isDone={allMeetingDone}
-            />
-            <div className="p-5 space-y-3">
-              <p className="text-xs text-gray-500">Tick each part as it is completed. Sales Outcome unlocks once all three are done.</p>
-              {[
-                { key: 'social', label: 'Social' },
-                { key: 'fact_find', label: 'Fact Find' },
-                { key: 'presentation', label: 'Presentation' },
-              ].map(({ key, label }) => {
-                const checked = meetingParts.includes(key);
-                return (
-                  <label key={key} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${checked ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200 hover:bg-blue-50 hover:border-blue-200'} ${isReadOnly ? 'pointer-events-none' : ''}`}>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
+                  <div className="relative">
                     <input
-                      type="checkbox"
-                      className="w-4 h-4 accent-blue-600"
-                      checked={checked}
+                      ref={dateInputRef}
+                      type="date"
+                      min={todayStr}
+                      value={dateInput}
+                      onChange={e => setDateInput(e.target.value)}
+                      onClick={() => (dateInputRef.current as any)?.showPicker?.()}
+                      className="block w-full pl-10 bg-gray-50 hover:bg-blue-50 border border-gray-300 hover:border-blue-400 text-black rounded-lg p-2.5 text-sm focus:ring-blue-600 focus:border-blue-600 cursor-pointer transition-colors accent-blue-600"
                       disabled={isReadOnly}
-                      onChange={() => {
-                        const next = checked
-                          ? meetingParts.filter(p => p !== key)
-                          : [...meetingParts, key];
-                        handleSave({ salesPartsCompleted: next });
-                      }}
                     />
-                    <span className={`font-medium text-sm ${checked ? 'text-green-700 line-through' : 'text-gray-700'}`}>{label}</span>
-                    {checked && <CheckCircle className="w-4 h-4 text-green-500 ml-auto" />}
-                  </label>
-                );
-              })}
+                    <Calendar onClick={() => (dateInputRef.current as any)?.showPicker?.()} className="absolute left-3 top-2.5 text-blue-600 w-4 h-4 cursor-pointer hover:text-blue-800" />
+                  </div>
+                </div>
+
+                {/* Conflict Warning */}
+                {appointmentConflict.has && (
+                  <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-300 rounded-lg">
+                    <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-red-700">
+                      <p className="font-bold">Time Conflict!</p>
+                      <p>You already have <span className="font-semibold capitalize">{appointmentConflict.type === 'coaching' ? 'a Coaching Session' : appointmentConflict.type === 'event' ? 'an Event' : 'an Appointment'}</span> — <span className="font-semibold">&ldquo;{appointmentConflict.with}&rdquo;</span> — scheduled at this time. Please choose a different date or time.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start</label>
+                    <input
+                      type="time"
+                      min={isDateToday ? currentHm : undefined}
+                      value={startTimeInput}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (isDateToday && val < currentHm) {
+                          alert("Cannot select a time in the past.");
+                          setStartTimeInput(currentHm);
+                          return;
+                        }
+                        setStartTimeInput(val);
+                        const [h, m] = val.split(':').map(Number);
+                        const endH = String((h + 1) % 24).padStart(2, '0');
+                        setEndTimeInput(`${endH}:${String(m).padStart(2, '0')}`);
+                      }}
+                      className="block w-full bg-gray-50 hover:bg-blue-50 border border-gray-300 hover:border-blue-400 text-black rounded-lg p-2.5 text-sm focus:ring-blue-600 focus:border-blue-600 cursor-pointer transition-colors accent-blue-600"
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">End</label>
+                    <input
+                      type="time"
+                      min={startTimeInput}
+                      value={endTimeInput}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val < startTimeInput) return;
+                        setEndTimeInput(val);
+                      }}
+                      className="block w-full bg-gray-50 hover:bg-blue-50 border border-gray-300 hover:border-blue-400 text-black rounded-lg p-2.5 text-sm focus:ring-blue-600 focus:border-blue-600 cursor-pointer transition-colors accent-blue-600"
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Location</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
+                    <input
+                      type="text"
+                      value={formData.appointmentLocation || ''}
+                      onChange={e => handleSave({ appointmentLocation: e.target.value })}
+                      placeholder="e.g. Starbucks KLCC"
+                      className="block w-full pl-10 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500"
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status</label>
+                  <select
+                    value={formData.appointmentStatus || 'not_done'}
+                    onChange={e => handleSave({ appointmentStatus: e.target.value as any })}
+                    className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500"
+                    disabled={isReadOnly}
+                  >
+                    <option value="not_done">Not done (Default)</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="rescheduled">Rescheduled</option>
+                    <option value="completed">Completed</option>
+                    <option value="kiv">KIV</option>
+                    <option value="declined">Declined</option>
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">Set to <strong>Completed</strong> to unlock Sales Outcome.</p>
+                </div>
+
+                <button
+                  onClick={sendWhatsAppInvite}
+                  className="w-full mt-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 font-medium py-2 px-4 rounded-lg flex items-center justify-center transition-colors text-sm"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Send WhatsApp Invite
+                </button>
+              </div>
             </div>
-          </div>
+
+            {/* STEP 3: Sales Meeting */}
+            <div className={`bg-white border rounded-xl overflow-hidden shadow-sm transition-all ${!isStep3Unlocked ? 'opacity-60 pointer-events-none grayscale' : ''}`}>
+              <CardHeader
+                number={3}
+                title="Sales Meeting"
+                isActive={isStep3Unlocked && !allMeetingDone}
+                isDone={allMeetingDone}
+              />
+              <div className="p-5 space-y-3">
+                <p className="text-xs text-gray-500">Tick each part as it is completed. Sales Outcome unlocks once all three are done.</p>
+                {[
+                  { key: 'social', label: 'Social' },
+                  { key: 'fact_find', label: 'Fact Find' },
+                  { key: 'presentation', label: 'Presentation' },
+                ].map(({ key, label }) => {
+                  const checked = meetingParts.includes(key);
+                  return (
+                    <label key={key} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${checked ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200 hover:bg-blue-50 hover:border-blue-200'} ${isReadOnly ? 'pointer-events-none' : ''}`}>
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 accent-blue-600"
+                        checked={checked}
+                        disabled={isReadOnly}
+                        onChange={() => {
+                          const next = checked
+                            ? meetingParts.filter(p => p !== key)
+                            : [...meetingParts, key];
+                          handleSave({ salesPartsCompleted: next });
+                        }}
+                      />
+                      <span className={`font-medium text-sm ${checked ? 'text-green-700 line-through' : 'text-gray-700'}`}>{label}</span>
+                      {checked && <CheckCircle className="w-4 h-4 text-green-500 ml-auto" />}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
           </div>{/* end grid */}
 
           {/* STEP 4: Sales Outcome */}

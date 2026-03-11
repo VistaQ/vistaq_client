@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole, Prospect, ProspectStage } from '../types';
+import { UserRole, Prospect, ProspectStage, CoachingSession } from '../types';
 import {
    Calendar,
    Target,
@@ -9,7 +9,6 @@ import {
    Clock,
    Briefcase,
    Users,
-   TrendingUp,
    BarChart2,
    PieChart,
    Layers,
@@ -18,7 +17,8 @@ import {
    CalendarDays,
    MapPin,
    ExternalLink,
-   DollarSign
+   DollarSign,
+   TrendingUp
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 
@@ -28,9 +28,13 @@ const MDRT_TARGET_PROSPECTS = 100;
 // Zurich Palette for Charts
 const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC'];
 
-const Dashboard: React.FC = () => {
+interface DashboardProps {
+   onNavigate?: (page: string) => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    const { currentUser, groups, users } = useAuth();
-   const { prospects, getProspectsByScope, getGroupProspects, getEventsForUser } = useData();
+   const { prospects, getProspectsByScope, getGroupProspects, getEventsForUser, getCoachingSessionsForUser } = useData();
 
    // --- MANAGEMENT DASHBOARD (Admin, Master Trainer & Trainer ONLY) ---
    // Group Leaders now see Personal Dashboard by default, and access Group stats via "Group" page.
@@ -63,7 +67,8 @@ const Dashboard: React.FC = () => {
       const totalAgents = relevantAgents.length;
 
       // --- 3. PERFORMANCE METRICS (AGGREGATE) ---
-      const totalFYC = scopeProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+      const successfulScopeProspects = scopeProspects.filter(p => p.salesOutcome === 'successful');
+      const totalFYC = successfulScopeProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
       const totalSales = scopeProspects.filter(p => p.salesOutcome === 'successful').length;
       const totalClosed = scopeProspects.filter(p => p.salesOutcome === 'successful' || p.salesOutcome === 'unsuccessful').length;
       const conversionRate = totalClosed > 0 ? (totalSales / totalClosed) * 100 : 0;
@@ -90,6 +95,92 @@ const Dashboard: React.FC = () => {
          { name: 'Sales Meeting', value: totalSalesMeetings },
          { name: 'Sales', value: totalSales },
       ];
+
+      // --- MTD Calculations for Management ---
+      const now = new Date();
+      const currentYear = now.getFullYear();
+
+      // YTD Dates
+      const startYTD = new Date(currentYear, 0, 1);
+      const endYTD = new Date(currentYear, 11, 31, 23, 59, 59);
+
+      // Helper for date ranges
+      const isWithinDateRange = (dateStr: string | undefined, start: Date, end: Date) => {
+         if (!dateStr) return false;
+         const d = new Date(dateStr);
+         if (isNaN(d.getTime())) return false;
+         return d >= start && d <= end;
+      };
+
+      // YTD Metrics Filtered
+      const ytdAppointments_Mgmt = scopeProspects.filter(p =>
+         (p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled') &&
+         isWithinDateRange(p.appointmentDate, startYTD, endYTD)
+      ).length;
+
+      const ytdSalesMeetings_Mgmt = scopeProspects.filter(p =>
+         p.appointmentStatus === 'completed' &&
+         isWithinDateRange(p.appointmentCompletedAt || p.appointmentDate, startYTD, endYTD)
+      ).length;
+
+      const ytdSales_Mgmt = scopeProspects.filter(p =>
+         p.salesOutcome === 'successful' &&
+         isWithinDateRange(p.salesCompletedAt || p.updatedAt, startYTD, endYTD)
+      );
+
+      const totalSalesNOC_YTD_Mgmt = ytdSales_Mgmt.length;
+      const totalSalesACE_YTD_Mgmt = ytdSales_Mgmt.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+
+      // Unique Agents YTD
+      // Agent with any pipeline activity YTD
+      const ytdActiveAgentIds = new Set<string>();
+      scopeProspects.forEach(p => {
+         if (isWithinDateRange(p.createdAt, startYTD, endYTD) ||
+             isWithinDateRange(p.updatedAt, startYTD, endYTD) ||
+             isWithinDateRange(p.appointmentDate, startYTD, endYTD) ||
+             isWithinDateRange(p.salesCompletedAt, startYTD, endYTD)) {
+            ytdActiveAgentIds.add(p.uid);
+         }
+      });
+      const noOfAgentsYTD = ytdActiveAgentIds.size;
+
+      const acsYTD_Mgmt = totalSalesNOC_YTD_Mgmt > 0 ? (totalSalesACE_YTD_Mgmt / totalSalesNOC_YTD_Mgmt) : 0;
+
+
+      // --- Upcoming Schedule for Management ---
+      const mgmtNow = new Date();
+      const mgmtEvents = currentUser ? getEventsForUser(currentUser) : [];
+      const mgmtSessions = currentUser ? getCoachingSessionsForUser(currentUser) : [];
+
+      type ScheduleItem = { id: string; title: string; date: string; type: 'event' | 'coaching'; meta?: string; link?: string; isOwned: boolean; };
+
+      const mgmtScheduleItems: ScheduleItem[] = [
+         ...mgmtEvents
+            .filter(e => e.status !== 'cancelled')
+            .map(e => ({
+               id: `evt_${e.id}`, title: e.eventTitle, date: e.date,
+               type: 'event' as const, meta: e.venue, link: e.meetingLink || undefined,
+               isOwned: e.createdBy === currentUser?.id
+            })),
+         ...mgmtSessions
+            .filter(s => s.status !== 'cancelled')
+            .map(s => {
+               let sessionDate = s.date;
+               try {
+                  const b = new Date(s.date);
+                  if (s.durationStart) { const [h, m] = s.durationStart.split(':').map(Number); b.setHours(h, m, 0, 0); sessionDate = b.toISOString(); }
+               } catch { }
+               return {
+                  id: `cs_${s.id}`, title: s.title, date: sessionDate, type: 'coaching' as const,
+                  meta: `${s.durationStart || ''} – ${s.durationEnd || ''} · ${s.venue}`,
+                  link: s.venue === 'Online' ? s.link || undefined : undefined,
+                  isOwned: s.createdBy === currentUser?.id
+               };
+            })
+      ]
+         .filter(i => { const d = new Date(i.date); return !isNaN(d.getTime()) && d >= mgmtNow; })
+         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+         .slice(0, 5);
 
       return (
          <div className="space-y-6">
@@ -131,78 +222,77 @@ const Dashboard: React.FC = () => {
                      </div>
                      <div className="p-3 bg-blue-50 text-blue-600 rounded-lg"><Users className="w-6 h-6" /></div>
                   </div>
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between bg-gradient-to-br from-white to-green-50">
-                     <div>
-                        <p className="text-sm font-medium text-gray-500">Total Revenue (ACE)</p>
-                        <h3 className="text-2xl font-bold text-green-700 mt-1">RM {totalFYC.toLocaleString()}</h3>
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden">
+                     <div className="absolute right-0 top-0 p-4 opacity-5">
+                        <Trophy className="w-24 h-24" />
                      </div>
-                     <div className="p-3 bg-green-100 text-green-700 rounded-lg"><TrendingUp className="w-6 h-6" /></div>
+                     <div className="z-10 w-full">
+                        <p className="text-sm font-medium text-gray-500">{totalGroups > 1 ? 'Top Group KPI' : 'Total Revenue'}</p>
+                        {totalGroups > 1 ? (
+                           <div className="mt-1 flex justify-between items-end w-full">
+                              <div>
+                                 <h3 className="text-xl font-bold text-gray-900 truncate">{groupRankings[0]?.name || 'N/A'}</h3>
+                                 <p className="text-sm font-mono text-green-600 font-bold">RM {groupRankings[0]?.fyc.toLocaleString() || '0'}</p>
+                              </div>
+                              <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg"><Crown className="w-5 h-5" /></div>
+                           </div>
+                        ) : (
+                           <div className="mt-1 flex justify-between items-end w-full">
+                              <div>
+                                 <h3 className="text-xl font-bold text-gray-900 truncate">ACE Generated</h3>
+                                 <p className="text-sm font-mono text-green-600 font-bold">RM {totalFYC.toLocaleString() || '0'}</p>
+                              </div>
+                              <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg"><Crown className="w-5 h-5" /></div>
+                           </div>
+                        )}
+                     </div>
                   </div>
                </div>
             )}
 
-            {/* Performance Metrics Row */}
+            {/* Performance Metrics Row (YTD) */}
             <h3 className="text-lg font-bold text-gray-800 flex items-center">
                <BarChart2 className="w-5 h-5 mr-2 text-gray-500" />
-               Performance Metrics
+               Performance Metrics (YTD)
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <div className="flex justify-between items-start">
-                     <div>
-                        <p className="text-sm text-gray-500">Conversion Rate</p>
-                        <h3 className="text-2xl font-bold text-gray-900">{Math.round(conversionRate)}%</h3>
-                     </div>
-                     <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><PieChart className="w-5 h-5" /></div>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 mt-3">
-                     <div className="bg-purple-600 h-1.5 rounded-full" style={{ width: `${conversionRate}%` }}></div>
-                  </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
+                  <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Calendar className="w-5 h-5" /></div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Total Appointments</p>
+                  <h3 className="text-2xl font-bold text-gray-900">{ytdAppointments_Mgmt}</h3>
+                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
                </div>
 
-               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <div className="flex justify-between items-start">
-                     <div>
-                        <p className="text-sm text-gray-500">Total Sales</p>
-                        <h3 className="text-2xl font-bold text-gray-900">{totalSales}</h3>
-                     </div>
-                     <div className="p-2 bg-green-50 text-green-600 rounded-lg"><Target className="w-5 h-5" /></div>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2">Successful Closings</p>
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg mb-3"><Target className="w-5 h-5" /></div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Total Sales Meetings</p>
+                  <h3 className="text-2xl font-bold text-gray-900">{ytdSalesMeetings_Mgmt}</h3>
+                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
                </div>
 
-               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <div className="flex justify-between items-start">
-                     <div>
-                        <p className="text-sm text-gray-500">Total Prospects</p>
-                        <h3 className="text-2xl font-bold text-gray-900">{scopeProspects.length}</h3>
-                     </div>
-                     <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Users className="w-5 h-5" /></div>
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
+                  <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Total Sales (NOC & ACE)</p>
+                  <div className="flex items-baseline gap-2">
+                     <h3 className="text-2xl font-bold text-gray-900">{totalSalesNOC_YTD_Mgmt}</h3>
+                     <span className="text-xs text-gray-400">NOC</span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">Total Pipeline Volume</p>
+                  <p className="text-sm font-bold text-green-600 mt-1">RM {totalSalesACE_YTD_Mgmt.toLocaleString()}</p>
+                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
                </div>
 
-               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
-                  <div className="absolute right-0 top-0 p-4 opacity-5">
-                     <Trophy className="w-24 h-24" />
-                  </div>
-                  <div className="flex justify-between items-start relative z-10">
-                     <div>
-                        <p className="text-sm text-gray-500">{totalGroups > 1 ? 'Top Group KPI' : 'Total Revenue'}</p>
-                        {totalGroups > 1 ? (
-                           <>
-                              <h3 className="text-lg font-bold text-gray-900 truncate">{groupRankings[0]?.name || 'N/A'}</h3>
-                              <p className="text-sm font-mono text-green-600 font-bold">RM {groupRankings[0]?.fyc.toLocaleString() || '0'}</p>
-                           </>
-                        ) : (
-                           <>
-                              <h3 className="text-lg font-bold text-gray-900 truncate">ACE Generated</h3>
-                              <p className="text-sm font-mono text-green-600 font-bold">RM {totalFYC.toLocaleString() || '0'}</p>
-                           </>
-                        )}
-                     </div>
-                     <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg"><Crown className="w-5 h-5" /></div>
-                  </div>
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">No. of Agents</p>
+                  <h3 className="text-2xl font-bold text-gray-900">{noOfAgentsYTD}</h3>
+                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+               </div>
+
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
+                  <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg mb-3"><BarChart2 className="w-5 h-5" /></div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">ACS (ACE/NOC)</p>
+                  <h3 className="text-xl font-bold text-yellow-600 mt-1">RM {acsYTD_Mgmt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
+                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
                </div>
             </div>
 
@@ -262,6 +352,76 @@ const Dashboard: React.FC = () => {
                         </div>
                      )}
                   </div>
+               </div>
+            </div>
+            {/* Upcoming Schedule Widget - Management */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+               <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-gray-800 flex items-center">
+                     <Calendar className="w-5 h-5 mr-2 text-blue-600" />
+                     Upcoming Schedule
+                  </h3>
+                  <div className="flex items-center gap-2">
+
+                     {onNavigate && (
+                        <button onClick={() => onNavigate('events')} className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
+                           View Calendar <ExternalLink className="w-3 h-3" />
+                        </button>
+                     )}
+                  </div>
+               </div>
+               <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+                  {mgmtScheduleItems.length > 0 ? mgmtScheduleItems.map(item => (
+                     <div
+                        key={item.id}
+                        className={`flex flex-col p-3 rounded-lg border transition-colors ${item.type === 'event' ? 'bg-indigo-50/50 border-indigo-100' : 'bg-green-50/50 border-green-100'
+                           } ${item.isOwned && onNavigate ? 'cursor-pointer hover:brightness-95' : ''}`}
+                        onClick={item.isOwned && onNavigate ? () => onNavigate(item.type === 'coaching' ? 'coaching' : 'events') : undefined}
+                     >
+                        <div className="flex items-start">
+                           <div className="mt-1 mr-3">
+                              {item.type === 'event' ? <CalendarDays className="w-4 h-4 text-indigo-500" /> : <GraduationCap className="w-4 h-4 text-green-500" />}
+                           </div>
+                           <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                 <p className="text-sm font-semibold text-gray-900 line-clamp-1">{item.title}</p>
+                                 {item.isOwned && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded flex-shrink-0">MINE</span>}
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                 {(() => { try { return new Date(item.date).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } })()}
+                              </p>
+                              {item.meta && (
+                                 <div className="flex items-center text-[10px] mt-1 font-medium" style={{ color: item.type === 'event' ? '#4f46e5' : '#16a34a' }}>
+                                    <MapPin className="w-3 h-3 mr-1" />{item.meta}
+                                 </div>
+                              )}
+                           </div>
+                        </div>
+                        {item.link ? (
+                           <div className="mt-2 ml-7">
+                              <a href={item.link} target="_blank" rel="noreferrer"
+                                 className={`inline-flex items-center text-xs font-bold text-white px-3 py-1.5 rounded transition-colors ${
+                                    item.type === 'coaching' && item.meta?.includes('Online') ? 'bg-green-600 hover:bg-green-700' :
+                                    item.type === 'coaching' && item.meta?.includes('Face to Face') ? 'bg-orange-600 hover:bg-orange-700' :
+                                    'bg-indigo-600 hover:bg-indigo-700'
+                                 }`}>
+                                 <ExternalLink className="w-3 h-3 mr-1" /> 
+                                 {item.type === 'coaching' && item.meta?.includes('Face to Face') 
+                                    ? 'Event Info' 
+                                    : (item.type === 'coaching' && item.meta?.includes('Online') && new Date() < new Date(item.date))
+                                       ? 'Wait for Start'
+                                       : 'Join Now'
+                                 }
+                              </a>
+                           </div>
+                        ) : null}
+                     </div>
+                  )) : (
+                     <div className="flex flex-col items-center justify-center py-8 text-gray-400 text-sm">
+                        <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                        <p className="text-gray-500">No upcoming schedule</p>
+                     </div>
+                  )}
                </div>
             </div>
          </div>
@@ -347,59 +507,57 @@ const Dashboard: React.FC = () => {
    const mtdSalesACE = mtdSales.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
 
 
-   // --- UPCOMING SCHEDULE LOGIC (Combined Events & Meetings) ---
-   const next7Days = new Date();
-   next7Days.setDate(now.getDate() + 7);
+   // --- UPCOMING SCHEDULE LOGIC — Next 5 items (all types combined) ---
+   type ScheduleItem = { id: string; title: string; date: string; type: 'event' | 'coaching' | 'meeting'; meta?: string; link?: string; isOwned: boolean; };
 
-   // 1. Process Appointments (Next 7 Days)
-   const upcomingAppointments = myProspects
+   const upcomingAppointments: ScheduleItem[] = myProspects
       .filter(p => {
          if (!p.appointmentDate) return false;
-         const apptDate = new Date(p.appointmentDate);
-         if (isNaN(apptDate.getTime())) return false; // Safety check
-         // Ensure we show appointments that are upcoming within 7 days
-         const isFuture = apptDate >= now && apptDate <= next7Days;
-         const isActive = p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled';
-         return isFuture && isActive;
+         const isActive = p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled' || p.appointmentStatus === 'not_done';
+         return isActive && new Date(p.appointmentDate) >= now;
       })
       .map(p => {
-         // Find correct time if available
          let finalDate = new Date(p.appointmentDate!);
          if (p.appointmentStartTime) {
             const [hours, minutes] = p.appointmentStartTime.split(':');
             finalDate.setHours(parseInt(hours, 10));
             finalDate.setMinutes(parseInt(minutes, 10));
          }
-
          return {
-            id: p.id,
-            title: `Appt: ${p.prospectName}`,
-            date: finalDate.toISOString(),
-            type: 'meeting',
-            meta: p.appointmentLocation || p.prospectName,
-            link: undefined
+            id: p.id, title: `Appt: ${p.prospectName}`, date: finalDate.toISOString(),
+            type: 'meeting' as const, meta: p.appointmentLocation || undefined, link: undefined, isOwned: true
          };
       });
 
-   // 2. Process Events (Next 7 Days, Admin/Trainer/Group)
-   const upcomingEvents = myEvents
-      .filter(e => {
-         const evtDate = new Date(e.date);
-         if (isNaN(evtDate.getTime())) return false; // Safety check
-         return evtDate >= now && evtDate <= next7Days;
-      })
+   const upcomingEvents: ScheduleItem[] = myEvents
+      .filter(e => e.status !== 'cancelled' && new Date(e.date) >= now)
       .map(e => ({
-         id: e.id,
-         title: e.eventTitle,
-         date: e.date,
-         type: 'event',
-         meta: e.venue,
-         link: e.meetingLink
+         id: e.id, title: e.eventTitle, date: e.date, type: 'event' as const,
+         meta: e.venue, link: e.meetingLink || undefined, isOwned: e.createdBy === currentUser?.id
       }));
 
-   // 3. Combine & Sort
-   const combinedSchedule = [...upcomingAppointments, ...upcomingEvents]
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+   const myCoachingSessions = currentUser ? getCoachingSessionsForUser(currentUser) : [];
+   const upcomingCoachingSessions: ScheduleItem[] = myCoachingSessions
+      .filter(s => s.status !== 'cancelled')
+      .map(s => {
+         let sessionDate = s.date;
+         try {
+            const base = new Date(s.date);
+            if (s.durationStart) { const [h, m] = s.durationStart.split(':').map(Number); base.setHours(h, m, 0, 0); sessionDate = base.toISOString(); }
+         } catch { }
+         return {
+            id: s.id, title: s.title, date: sessionDate, type: 'coaching' as const,
+            meta: `${s.durationStart || ''} – ${s.durationEnd || ''} · ${s.venue}`,
+            link: s.venue === 'Online' ? s.link || undefined : undefined,
+            isOwned: s.createdBy === currentUser?.id
+         };
+      })
+      .filter(i => new Date(i.date) >= now);
+
+   // Take the 5 soonest upcoming items across all 3 types
+   const combinedSchedule = [...upcomingAppointments, ...upcomingEvents, ...upcomingCoachingSessions]
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 5);
 
    // Chart Data (Month-To-Date Funnel)
    // We use separate bars conceptually if possible. Recharts allows Custom Tooltips or multi-bar if needed.
@@ -498,75 +656,96 @@ const Dashboard: React.FC = () => {
                </div>
             </div>
 
-            {/* Upcoming Meetings & Events */}
+            {/* Upcoming Schedule */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col">
                <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-gray-800 flex items-center">
                      <Calendar className="w-5 h-5 mr-2 text-blue-600" />
                      Upcoming Schedule
                   </h3>
-                  <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">Next 7 Days</span>
+                  <div className="flex items-center gap-2">
+                     {onNavigate && (
+                        <button onClick={() => onNavigate('events')} className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
+                           View Calendar <ExternalLink className="w-3 h-3" />
+                        </button>
+                     )}
+                  </div>
                </div>
 
                <div className="flex-1 overflow-y-auto space-y-3 pr-1">
                   {combinedSchedule.length > 0 ? (
                      combinedSchedule.map(item => (
-                        <div key={item.id} className={`flex flex-col p-3 rounded-lg border ${item.type === 'event' ? 'bg-indigo-50/50 border-indigo-100' : 'bg-gray-50 border-gray-100'
-                           }`}>
+                        <div
+                           key={item.id}
+                           className={`flex flex-col p-3 rounded-lg border transition-colors ${item.type === 'event' ? 'bg-indigo-50/50 border-indigo-100'
+                              : item.type === 'coaching' ? 'bg-green-50/50 border-green-100'
+                                 : 'bg-gray-50 border-gray-100'
+                              } ${item.isOwned && onNavigate ? 'cursor-pointer hover:brightness-95' : ''}`}
+                           onClick={item.isOwned && onNavigate
+                              ? () => onNavigate(item.type === 'coaching' ? 'coaching' : item.type === 'meeting' ? 'prospects' : 'events')
+                              : undefined}
+                        >
                            <div className="flex items-start">
                               <div className="mt-1 mr-3">
                                  {item.type === 'event'
                                     ? <CalendarDays className="w-4 h-4 text-indigo-500" />
-                                    : <Clock className="w-4 h-4 text-gray-400" />
+                                    : item.type === 'coaching'
+                                       ? <GraduationCap className="w-4 h-4 text-green-500" />
+                                       : <Clock className="w-4 h-4 text-gray-400" />
                                  }
                               </div>
-                              <div className="flex-1">
-                                 <p className="text-sm font-semibold text-gray-900 line-clamp-1">{item.title}</p>
-                                 <p className="text-xs text-gray-500 mb-1">
-                                    {(() => {
-                                       try {
-                                          return new Date(item.date).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-                                       } catch (e) {
-                                          return 'Invalid Date';
-                                       }
-                                    })()}
+                              <div className="flex-1 min-w-0">
+                                 <div className="flex items-start justify-between gap-1">
+                                    <p className="text-sm font-semibold text-gray-900 line-clamp-1">{item.title}</p>
+                                    {item.isOwned && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded flex-shrink-0">MINE</span>}
+                                 </div>
+                                 <p className="text-xs text-gray-500 mt-0.5">
+                                    {(() => { try { return new Date(item.date).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } })()}
                                  </p>
-                                 {item.type === 'event' && (
-                                    <div className="flex items-center text-[10px] text-indigo-600 font-medium mt-1">
-                                       <MapPin className="w-3 h-3 mr-1" />
-                                       {item.meta || 'Venue TBD'}
-                                    </div>
-                                 )}
-                                 {item.type === 'meeting' && (
-                                    <div className="mt-1">
-                                       <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-700 rounded uppercase tracking-wider font-bold">
-                                          Client Meeting
-                                       </span>
+                                 {item.meta && (
+                                    <div className={`flex items-center text-[10px] font-medium mt-1 ${item.type === 'event' ? 'text-indigo-600'
+                                       : item.type === 'coaching' ? 'text-green-700'
+                                          : 'text-gray-500'
+                                       }`}>
+                                       <MapPin className="w-3 h-3 mr-1" />{item.meta}
                                     </div>
                                  )}
                               </div>
                            </div>
 
-                           {/* JOIN BUTTON FOR EVENTS */}
-                           {item.type === 'event' && item.link && (
-                              <div className="mt-2 ml-7">
-                                 <a
-                                    href={item.link}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded transition-colors"
-                                 >
-                                    <ExternalLink className="w-3 h-3 mr-1" /> Join Here
-                                 </a>
-                              </div>
-                           )}
+                           {/* JOIN BUTTON — Everyone sees link interactions */}
+                           {(item.type === 'event' || item.type === 'coaching') && item.link && (
+                                 <div className="mt-2 ml-7">
+                                    <a
+                                       href={(item.type === 'coaching' && item.meta?.includes('Online') && new Date() < new Date(item.date)) ? '#' : item.link}
+                                       target={(item.type === 'coaching' && item.meta?.includes('Online') && new Date() < new Date(item.date)) ? '_self' : '_blank'}
+                                       rel="noreferrer"
+                                       onClick={e => e.stopPropagation()}
+                                       className={`inline-flex items-center text-xs font-bold text-white px-3 py-1.5 rounded transition-colors ${
+                                          item.type === 'coaching' && item.meta?.includes('Online') 
+                                             ? new Date() < new Date(item.date) ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                                             : item.type === 'coaching' && item.meta?.includes('Face to Face')
+                                                ? 'bg-orange-600 hover:bg-orange-700'
+                                                : 'bg-indigo-600 hover:bg-indigo-700'
+                                       }`}
+                                    >
+                                       <ExternalLink className="w-3 h-3 mr-1" /> 
+                                       {item.type === 'coaching' && item.meta?.includes('Face to Face') 
+                                          ? 'Event Info' 
+                                          : (item.type === 'coaching' && item.meta?.includes('Online') && new Date() < new Date(item.date))
+                                             ? 'Wait for Start'
+                                             : 'Join Now'
+                                       }
+                                    </a>
+                                 </div>
+                              )}
                         </div>
                      ))
                   ) : (
-                     <div className="flex flex-col items-center justify-center py-12 text-gray-400 text-sm h-full">
+                     <div className="flex flex-col items-center justify-center py-10 text-gray-400 text-sm h-full">
                         <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-30 text-gray-500" />
-                        <p className="text-gray-500">No scheduled activities</p>
-                        <p className="text-xs mt-1 text-gray-400">Next 7 days are clear</p>
+                        <p className="text-gray-500">No upcoming activities</p>
+                        <p className="text-xs mt-1 text-gray-400">Your schedule is clear</p>
                      </div>
                   )}
                </div>
