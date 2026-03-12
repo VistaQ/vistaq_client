@@ -48,6 +48,28 @@ export interface BadgeTier {
   threshold: number;
   color: string;
   bg: string;
+  lottieUrl?: string; // Optional Lottie animation JSON URL
+}
+
+export interface PointConfig {
+  prospectBasicInfo: number;      // default 2
+  appointmentCompleted: number;   // default 3
+  salesMeetingCompleted: number;  // default 6
+  salesSuccessful: number;        // default 15
+  coachingIndividual: number;     // default 10
+  coachingGroup: number;          // default 10
+  coachingPeerCircles: number;    // default 10
+  coachingFullDays: number;       // default 40
+  coachingOnlineSeminar: number;  // default 10
+}
+
+export interface PointEntry {
+  id: string;
+  date: string;
+  category: 'prospect' | 'coaching';
+  action: string;
+  subject: string;
+  points: number;
 }
 
 export enum ProspectStage {

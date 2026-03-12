@@ -1,12 +1,14 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Prospect, ProspectStage, User, UserRole, BadgeTier, Event, CoachingSession } from '../types';
+import { Prospect, ProspectStage, User, UserRole, BadgeTier, Event, CoachingSession, PointConfig } from '../types';
 import { apiCall } from '../services/apiClient';
+import { DEFAULT_POINT_CONFIG } from '../services/points';
 
 interface DataContextType {
   prospects: Prospect[];
   badgeTiers: BadgeTier[];
-  events: Event[]; // New
+  pointConfig: PointConfig;
+  events: Event[];
   addProspect: (p: Partial<Prospect>) => Promise<Prospect>;
   updateProspect: (id: string, updates: Partial<Prospect>) => Promise<void>;
   importProspects: (newData: Prospect[]) => Promise<void>;
@@ -14,6 +16,7 @@ interface DataContextType {
   getGroupProspects: (groupId: string) => Prospect[];
   deleteProspect: (id: string) => Promise<void>;
   updateBadgeTiers: (tiers: BadgeTier[]) => Promise<void>;
+  updatePointConfig: (cfg: PointConfig) => Promise<void>;
 
   // Event Methods
   addEvent: (evt: Partial<Event>) => Promise<void>;
@@ -52,6 +55,7 @@ const DEFAULT_MILESTONES: BadgeTier[] = [
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [badgeTiers, setBadgeTiers] = useState<BadgeTier[]>(DEFAULT_MILESTONES);
+  const [pointConfig, setPointConfig] = useState<PointConfig>(DEFAULT_POINT_CONFIG);
   const [events, setEvents] = useState<Event[]>([]);
   const [coachingSessions, setCoachingSessions] = useState<CoachingSession[]>([]);
   const [isLoadingProspects, setIsLoadingProspects] = useState(false);
@@ -233,13 +237,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [authToken, userRole]);
 
-  // 1. Sync Prospects when authenticated or user role changes, clear on logout
+  // 1. Sync Prospects + config when authenticated or user role changes, clear on logout
   useEffect(() => {
     if (authToken) {
       fetchProspects();
+      fetchPointConfig();
     } else {
       // Clear data on logout
       setProspects([]);
+      setPointConfig(DEFAULT_POINT_CONFIG);
     }
   }, [authToken, userRole]);
 
@@ -321,6 +327,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateBadgeTiers = async (tiers: BadgeTier[]) => {
     await apiCall('/config/badges', { method: 'PUT', data: { tiers } });
     setBadgeTiers(tiers);
+  };
+
+  const fetchPointConfig = async () => {
+    try {
+      const data = await apiCall('/config/points');
+      if (data && typeof data === 'object') {
+        setPointConfig({ ...DEFAULT_POINT_CONFIG, ...data });
+      }
+    } catch (_e) {
+      // Use defaults if endpoint not available yet
+    }
+  };
+
+  const updatePointConfig = async (cfg: PointConfig) => {
+    await apiCall('/config/points', { method: 'PUT', data: cfg });
+    setPointConfig(cfg);
   };
 
   // --- SCOPING HELPER ---
@@ -520,10 +542,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <DataContext.Provider value={{
-      prospects, badgeTiers, events,
+      prospects, badgeTiers, pointConfig, events,
       isLoadingProspects, isLoadingEvents, isLoadingCoaching,
       addProspect, updateProspect, importProspects, deleteProspect,
-      getProspectsByScope, getGroupProspects, updateBadgeTiers,
+      getProspectsByScope, getGroupProspects, updateBadgeTiers, updatePointConfig,
       addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents,
       coachingSessions, addCoachingSession, updateCoachingSession, deleteCoachingSession,
       joinCoachingSession, getCoachingSessionsForUser, refetchCoachingSessions: fetchCoachingSessions

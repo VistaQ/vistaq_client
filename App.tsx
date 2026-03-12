@@ -11,6 +11,7 @@ const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const Prospects = React.lazy(() => import('./pages/Prospects'));
 const Reports = React.lazy(() => import('./pages/Reports'));
 const PointsHistory = React.lazy(() => import('./pages/PointsHistory'));
+const Leaderboard = React.lazy(() => import('./pages/Leaderboard'));
 const Group = React.lazy(() => import('./pages/Group'));
 const Sales = React.lazy(() => import('./pages/Sales'));
 const AdminUsers = React.lazy(() => import('./pages/AdminUsers'));
@@ -45,8 +46,8 @@ const AuthenticatedApp: React.FC = () => {
       case 'users': return <AdminUsers />;
       case 'admin-groups': return <AdminGroups />;
 
-      // Hidden / Disabled for Phase 1 but code preserved
       case 'points': return <PointsHistory />;
+      case 'leaderboard': return <Leaderboard />;
       case 'admin-rewards': return <AdminRewards />;
       case 'group': return <Group />;
       case 'sales': return <Sales />;

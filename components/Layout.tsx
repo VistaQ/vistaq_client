@@ -25,7 +25,8 @@ import {
   Globe,
   HelpCircle,
   FileText,
-  BookOpen
+  BookOpen,
+  Trophy
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -109,6 +110,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
             <>
               <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Personal</div>
               <NavItem id="sales" label="My Sales" icon={Award} />
+              <NavItem id="points" label="My Points" icon={Award} />
+              <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
             </>
           )}
 
@@ -119,6 +122,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
 
               {/* Group View: Group Dashboard (Aggregated) */}
               <NavItem id="group" label="Group Progress" icon={TrendingUp} />
+              <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
             </>
           )}
 
@@ -128,6 +132,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
               <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">System</div>
               <NavItem id="users" label="User Management" icon={Settings} />
               <NavItem id="admin-groups" label="Group Management" icon={Layers} />
+              <NavItem id="admin-rewards" label="Rewards Config" icon={Gift} />
             </>
           )}
 
@@ -209,6 +214,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                   <>
                     <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Personal</div>
                     <NavItem id="sales" label="My Sales" icon={Award} />
+                    <NavItem id="points" label="My Points" icon={Award} />
+                    <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
                   </>
                 )}
 
@@ -217,6 +224,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                   <>
                     <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Performance</div>
                     <NavItem id="group" label="Group Progress" icon={TrendingUp} />
+                    <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
                   </>
                 )}
 
@@ -226,6 +234,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                     <div className="my-2 border-t border-gray-800 mx-6"></div>
                     <NavItem id="users" label="User Management" icon={Settings} />
                     <NavItem id="admin-groups" label="Group Management" icon={Layers} />
+                    <NavItem id="admin-rewards" label="Rewards Config" icon={Gift} />
                   </>
                 )}
 
