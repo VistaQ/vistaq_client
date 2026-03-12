@@ -1,33 +1,58 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole } from '../types';
+import { User, UserRole } from '../types';
 import { Trophy, Medal, Award, Crown } from 'lucide-react';
 import { computeUserPoints } from '../services/points';
+import { apiCall } from '../services/apiClient';
 
 const Leaderboard: React.FC = () => {
-  const { currentUser, users } = useAuth();
+  const { currentUser, users, groups } = useAuth();
   const { prospects, coachingSessions, pointConfig, badgeTiers, refetchCoachingSessions } = useData();
+  const [trainerUsers, setTrainerUsers] = useState<User[]>([]);
 
   useEffect(() => {
     refetchCoachingSessions();
   }, []);
 
+  // Trainers: /users is restricted — fetch members from each managed group instead
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== UserRole.TRAINER) return;
+
+    const managedGroups = groups.filter(g => g.trainerIds?.includes(currentUser.id));
+    if (managedGroups.length === 0) return;
+
+    Promise.all(managedGroups.map(g => apiCall(`/users/group/${g.id}`)))
+      .then(responses => {
+        const all: any[] = responses.flatMap(r => r.users || []);
+        const normalized: User[] = all.map(u => ({ ...u, id: u.uid || u.id }));
+        const unique = normalized.filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i);
+        setTrainerUsers(unique);
+      })
+      .catch(() => {});
+  }, [currentUser?.id, groups.length]);
+
   if (!currentUser) return null;
 
-  const isManagement =
-    currentUser.role === UserRole.ADMIN ||
-    currentUser.role === UserRole.MASTER_TRAINER ||
-    currentUser.role === UserRole.TRAINER;
+  const isAdmin = currentUser.role === UserRole.ADMIN;
+  const isMasterTrainer = currentUser.role === UserRole.MASTER_TRAINER;
+  const isTrainer = currentUser.role === UserRole.TRAINER;
+  const isManagement = isAdmin || isMasterTrainer || isTrainer;
 
-  // Determine which users to rank
   const eligibleRoles = [UserRole.AGENT, UserRole.GROUP_LEADER];
-  let scopedUsers = users.filter(u => eligibleRoles.includes(u.role));
 
-  // Non-management sees only their group
-  if (!isManagement && currentUser.groupId) {
-    scopedUsers = scopedUsers.filter(u => u.groupId === currentUser.groupId);
+  // Build the user pool based on role
+  let scopedUsers: User[];
+  if (isTrainer) {
+    // Use per-group fetched users
+    scopedUsers = trainerUsers.filter(u => eligibleRoles.includes(u.role));
+  } else if (isAdmin || isMasterTrainer) {
+    // See all agents and group leaders
+    scopedUsers = users.filter(u => eligibleRoles.includes(u.role));
+  } else {
+    // Agent / Group Leader — scope to own group
+    scopedUsers = users.filter(u => eligibleRoles.includes(u.role) && u.groupId === currentUser.groupId);
   }
 
   const sortedBadges = [...badgeTiers].sort((a, b) => a.threshold - b.threshold);
@@ -37,7 +62,6 @@ const Leaderboard: React.FC = () => {
     return reversed.find(b => pts >= b.threshold) || sortedBadges[0];
   };
 
-  // Compute points for each user
   const ranked = scopedUsers
     .map(user => {
       const userProspects = prospects.filter(p => p.uid === user.id);
@@ -47,10 +71,9 @@ const Leaderboard: React.FC = () => {
     .sort((a, b) => b.points - a.points);
 
   const top3 = ranked.slice(0, 3);
-  const rest = ranked.slice(3);
 
   const podiumOrder = top3.length === 3
-    ? [top3[1], top3[0], top3[2]]  // 2nd, 1st, 3rd for visual podium
+    ? [top3[1], top3[0], top3[2]]
     : top3;
 
   const podiumHeights = ['h-24', 'h-36', 'h-20'];
@@ -61,6 +84,12 @@ const Leaderboard: React.FC = () => {
     <Award key="3" className="w-6 h-6 text-amber-700" />,
   ];
 
+  const scopeLabel = isAdmin || isMasterTrainer
+    ? 'All agents & group leaders ranked by total points'
+    : isTrainer
+    ? 'Agents & group leaders in your managed groups'
+    : `Your group's rankings`;
+
   return (
     <div className="space-y-8">
       <div>
@@ -68,9 +97,7 @@ const Leaderboard: React.FC = () => {
           <Trophy className="w-7 h-7 mr-3 text-yellow-500" />
           Leaderboard
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {isManagement ? 'All agents & group leaders ranked by total points' : `Your group's rankings`}
-        </p>
+        <p className="text-sm text-gray-500 mt-1">{scopeLabel}</p>
       </div>
 
       {ranked.length === 0 ? (
@@ -91,7 +118,6 @@ const Leaderboard: React.FC = () => {
                   const isFirst = rank === 1;
                   return (
                     <div key={entry.user.id} className="flex flex-col items-center">
-                      {/* Avatar + info above podium */}
                       <div className={`flex flex-col items-center mb-3 ${isFirst ? 'scale-110' : ''}`}>
                         {top3.length === 3 && podiumIcons[podiumIdx]}
                         <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg mt-1 ${isFirst ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 ring-4 ring-yellow-300' : 'bg-gradient-to-br from-slate-500 to-slate-700'}`}>
@@ -106,7 +132,6 @@ const Leaderboard: React.FC = () => {
                           {entry.badge.name}
                         </span>
                       </div>
-                      {/* Podium block */}
                       <div className={`${top3.length === 3 ? podiumHeights[podiumIdx] : 'h-20'} w-24 md:w-32 rounded-t-xl flex items-center justify-center ${isFirst ? 'bg-gradient-to-t from-yellow-600 to-yellow-400' : 'bg-slate-600'}`}>
                         <span className="text-white font-black text-3xl opacity-30">#{rank}</span>
                       </div>
@@ -130,7 +155,6 @@ const Leaderboard: React.FC = () => {
                 const isCurrentUser = entry.user.id === currentUser.id;
                 return (
                   <div key={entry.user.id} className={`flex items-center px-6 py-4 transition-colors ${isCurrentUser ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50'}`}>
-                    {/* Rank */}
                     <div className="w-10 flex-shrink-0 text-center">
                       {rank === 1 ? (
                         <Crown className="w-5 h-5 text-yellow-500 mx-auto" />
@@ -143,12 +167,10 @@ const Leaderboard: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Avatar */}
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center text-white font-bold text-sm mx-4 flex-shrink-0">
                       {entry.user.name.charAt(0)}
                     </div>
 
-                    {/* Name + group */}
                     <div className="flex-1 min-w-0">
                       <p className={`font-semibold truncate ${isCurrentUser ? 'text-blue-800' : 'text-gray-900'}`}>
                         {entry.user.name} {isCurrentUser && <span className="text-xs font-normal text-blue-500">(you)</span>}
@@ -156,14 +178,12 @@ const Leaderboard: React.FC = () => {
                       <p className="text-xs text-gray-500 truncate">{entry.user.groupName || '—'}</p>
                     </div>
 
-                    {/* Badge */}
                     <div className="hidden md:block mx-4">
                       <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${entry.badge.bg} ${entry.badge.color}`}>
                         {entry.badge.name}
                       </span>
                     </div>
 
-                    {/* Points */}
                     <div className="text-right flex-shrink-0">
                       <p className="font-extrabold text-gray-900">{entry.points.toLocaleString()}</p>
                       <p className="text-xs text-gray-400">points</p>
