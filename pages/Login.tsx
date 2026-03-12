@@ -67,10 +67,9 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 relative z-10">
         <div className="bg-blue-600 p-10 text-center">
-          <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm shadow-inner">
-             <span className="font-brand text-4xl text-white font-bold italic">V</span>
+          <div className="flex justify-center mb-4">
+            <img src="/vistaq-logo.png" alt="VistaQ" className="h-16 w-auto" />
           </div>
-          <h1 className="text-3xl font-brand font-medium text-white mb-1">VistaQ</h1>
           <p className="text-blue-100 text-sm tracking-wide">Sales Performance & Coaching</p>
         </div>
 
