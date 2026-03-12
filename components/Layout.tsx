@@ -122,7 +122,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
 
               {/* Group View: Group Dashboard (Aggregated) */}
               <NavItem id="group" label="Group Progress" icon={TrendingUp} />
-              <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
+              {/* Leaderboard only for non-Group-Leader management (GL already has it in Personal) */}
+              {currentUser?.role !== UserRole.GROUP_LEADER && (
+                <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
+              )}
             </>
           )}
 
@@ -224,7 +227,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                   <>
                     <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Performance</div>
                     <NavItem id="group" label="Group Progress" icon={TrendingUp} />
-                    <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
+                    {currentUser?.role !== UserRole.GROUP_LEADER && (
+                      <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
+                    )}
                   </>
                 )}
 
