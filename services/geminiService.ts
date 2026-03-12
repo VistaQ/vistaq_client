@@ -3,8 +3,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 // Lazy-initialize Gemini client so missing API key doesn't crash the app on load.
 let _ai: GoogleGenAI | null = null;
 const getAI = (): GoogleGenAI | null => {
-  if (!process.env.API_KEY) return null;
-  if (!_ai) _ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  if (!import.meta.env.VITE_API_KEY) return null;
+  if (!_ai) _ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
   return _ai;
 };
 

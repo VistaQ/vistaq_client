@@ -131,23 +131,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (identifier: string, password?: string): Promise<boolean> => {
     if (!password) return false;
 
-    // Clear all cache before login to ensure clean state for new user
-    clearAllCache();
+    try {
+      clearAllCache();
 
-    const response = await apiCall('/auth/login', {
-      method: 'POST',
-      data: { email: identifier, password }
-    });
-    localStorage.setItem('authToken', response.token);
+      const response = await apiCall('/auth/login', {
+        method: 'POST',
+        data: { email: identifier, password }
+      });
+      localStorage.setItem('authToken', response.token);
 
-    // Fetch complete user data from /users/me instead of using login response
-    // This ensures we have all fields including managedGroupIds
-    const meData = await apiCall('/users/me');
-    const raw = meData.user || meData;
-    const user: User = { ...raw, id: raw.uid || raw.id };
-    localStorage.setItem('authUser', JSON.stringify(user));
-    setCurrentUser(user);
-    return true;
+      const meData = await apiCall('/users/me');
+      const raw = meData.user || meData;
+      const user: User = { ...raw, id: raw.uid || raw.id };
+      localStorage.setItem('authUser', JSON.stringify(user));
+      setCurrentUser(user);
+      return true;
+    } catch (_e) {
+      return false;
+    }
   };
 
   const register = async (name: string, email: string, password: string, groupId: string, agentCode: string): Promise<boolean> => {

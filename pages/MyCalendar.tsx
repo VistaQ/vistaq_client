@@ -456,10 +456,13 @@ const CardList: React.FC<CardListProps> = ({ items, isAdminOrCreator, onSelect, 
 /* ─── Main Page ──────────────────────────────────────────── */
 const MyCalendar: React.FC = () => {
     const { currentUser, groups } = useAuth();
-    const { addEvent, deleteEvent, updateEvent, getEventsForUser, refetchEvents, getCoachingSessionsForUser, prospects } = useData();
+    const { addEvent, deleteEvent, updateEvent, getEventsForUser, refetchEvents, getCoachingSessionsForUser, refetchCoachingSessions, prospects } = useData();
     const { occupiedSlots } = useCalendarConflicts();
 
-    useEffect(() => { refetchEvents(); }, []);
+    useEffect(() => {
+      refetchEvents();
+      refetchCoachingSessions();
+    }, []);
 
     const [viewMode, setViewMode] = useState<'calendar' | 'card'>('calendar');
     const [showArchived, setShowArchived] = useState(false);

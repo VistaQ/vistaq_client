@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { UserRole, Prospect, ProspectStage, CoachingSession } from '../types';
@@ -34,7 +34,13 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    const { currentUser, groups, users } = useAuth();
-   const { prospects, getProspectsByScope, getGroupProspects, getEventsForUser, getCoachingSessionsForUser } = useData();
+   const { prospects, getProspectsByScope, getGroupProspects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions } = useData();
+
+   // Fetch events and coaching sessions on mount (deferred fetch — not loaded on app start)
+   useEffect(() => {
+      refetchEvents();
+      refetchCoachingSessions();
+   }, []);
 
    // --- MANAGEMENT DASHBOARD (Admin, Master Trainer & Trainer ONLY) ---
    // Group Leaders now see Personal Dashboard by default, and access Group stats via "Group" page.
@@ -131,24 +137,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       const totalSalesNOC_YTD_Mgmt = ytdSales_Mgmt.length;
       const totalSalesACE_YTD_Mgmt = ytdSales_Mgmt.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
 
-      // Unique Agents YTD
-      // Agent with any pipeline activity YTD
-      const ytdActiveAgentIds = new Set<string>();
-      scopeProspects.forEach(p => {
-         if (isWithinDateRange(p.createdAt, startYTD, endYTD) ||
-             isWithinDateRange(p.updatedAt, startYTD, endYTD) ||
-             isWithinDateRange(p.appointmentDate, startYTD, endYTD) ||
-             isWithinDateRange(p.salesCompletedAt, startYTD, endYTD)) {
-            ytdActiveAgentIds.add(p.uid);
-         }
-      });
-      const noOfAgentsYTD = ytdActiveAgentIds.size;
+      // Total agents in scope — counts ALL registered members regardless of activity
+      const noOfAgentsYTD = relevantAgents.length;
 
       const acsYTD_Mgmt = totalSalesNOC_YTD_Mgmt > 0 ? (totalSalesACE_YTD_Mgmt / totalSalesNOC_YTD_Mgmt) : 0;
 
 
       // --- Upcoming Schedule for Management ---
       const mgmtNow = new Date();
+      const sevenDaysFromNow = new Date(mgmtNow.getTime() + 7 * 24 * 60 * 60 * 1000);
       const mgmtEvents = currentUser ? getEventsForUser(currentUser) : [];
       const mgmtSessions = currentUser ? getCoachingSessionsForUser(currentUser) : [];
 
@@ -173,12 +170,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                return {
                   id: `cs_${s.id}`, title: s.title, date: sessionDate, type: 'coaching' as const,
                   meta: `${s.durationStart || ''} – ${s.durationEnd || ''} · ${s.venue}`,
-                  link: s.venue === 'Online' ? s.link || undefined : undefined,
+                  link: s.link || undefined,
                   isOwned: s.createdBy === currentUser?.id
                };
             })
       ]
-         .filter(i => { const d = new Date(i.date); return !isNaN(d.getTime()) && d >= mgmtNow; })
+         .filter(i => { const d = new Date(i.date); return !isNaN(d.getTime()) && d >= mgmtNow && d <= sevenDaysFromNow; })
          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
          .slice(0, 5);
 
@@ -285,7 +282,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
                   <p className="text-xs font-medium text-gray-500 mb-1">No. of Agents</p>
                   <h3 className="text-2xl font-bold text-gray-900">{noOfAgentsYTD}</h3>
-                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+                  <p className="text-[10px] text-gray-400 mt-1">Total in Scope</p>
                </div>
 
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
@@ -406,8 +403,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                                     'bg-indigo-600 hover:bg-indigo-700'
                                  }`}>
                                  <ExternalLink className="w-3 h-3 mr-1" /> 
-                                 {item.type === 'coaching' && item.meta?.includes('Face to Face') 
-                                    ? 'Event Info' 
+                                 {item.type === 'coaching' && item.meta?.includes('Face to Face')
+                                    ? 'Venue Info'
                                     : (item.type === 'coaching' && item.meta?.includes('Online') && new Date() < new Date(item.date))
                                        ? 'Wait for Start'
                                        : 'Join Now'
@@ -442,6 +439,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    // MTD Dates: 1st of Current Month to Last day of Current Month
    const startMTD = new Date(currentYear, currentMonth, 1);
    const endMTD = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+
+   const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
    // --- STRICTLY PERSONAL DATA ---
    const myProspects = prospects.filter(p => p.uid === currentUser?.id);
@@ -488,10 +487,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    // --- MTD Calculations ---
    // Prospects entered MTD
    const mtdProspectsCount = myProspects.filter(p => isWithinDateRange(p.createdAt, startMTD, endMTD)).length;
-   // Appointments Scheduled MTD
+   // Appointments Scheduled MTD — counts when the appointment was SET this month (by updatedAt)
    const mtdAppointmentsCount = myProspects.filter(p =>
       (p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled') &&
-      isWithinDateRange(p.appointmentDate, startMTD, endMTD)
+      isWithinDateRange(p.updatedAt, startMTD, endMTD)
    ).length;
    // Sales Meetings Completed MTD
    const mtdSalesMeetingsCount = myProspects.filter(p =>
@@ -514,7 +513,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       .filter(p => {
          if (!p.appointmentDate) return false;
          const isActive = p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled' || p.appointmentStatus === 'not_done';
-         return isActive && new Date(p.appointmentDate) >= now;
+         const d = new Date(p.appointmentDate);
+         return isActive && d >= now && d <= sevenDaysFromNow;
       })
       .map(p => {
          let finalDate = new Date(p.appointmentDate!);
@@ -530,7 +530,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       });
 
    const upcomingEvents: ScheduleItem[] = myEvents
-      .filter(e => e.status !== 'cancelled' && new Date(e.date) >= now)
+      .filter(e => { const d = new Date(e.date); return e.status !== 'cancelled' && d >= now && d <= sevenDaysFromNow; })
       .map(e => ({
          id: e.id, title: e.eventTitle, date: e.date, type: 'event' as const,
          meta: e.venue, link: e.meetingLink || undefined, isOwned: e.createdBy === currentUser?.id
@@ -548,11 +548,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
          return {
             id: s.id, title: s.title, date: sessionDate, type: 'coaching' as const,
             meta: `${s.durationStart || ''} – ${s.durationEnd || ''} · ${s.venue}`,
-            link: s.venue === 'Online' ? s.link || undefined : undefined,
+            link: s.link || undefined,
             isOwned: s.createdBy === currentUser?.id
          };
       })
-      .filter(i => new Date(i.date) >= now);
+      .filter(i => { const d = new Date(i.date); return d >= now && d <= sevenDaysFromNow; });
 
    // Take the 5 soonest upcoming items across all 3 types
    const combinedSchedule = [...upcomingAppointments, ...upcomingEvents, ...upcomingCoachingSessions]
@@ -730,8 +730,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                                        }`}
                                     >
                                        <ExternalLink className="w-3 h-3 mr-1" /> 
-                                       {item.type === 'coaching' && item.meta?.includes('Face to Face') 
-                                          ? 'Event Info' 
+                                       {item.type === 'coaching' && item.meta?.includes('Face to Face')
+                                          ? 'Venue Info'
                                           : (item.type === 'coaching' && item.meta?.includes('Online') && new Date() < new Date(item.date))
                                              ? 'Wait for Start'
                                              : 'Join Now'

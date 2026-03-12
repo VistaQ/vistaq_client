@@ -115,40 +115,35 @@ const Prospects: React.FC = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  // UPDATED: Logic to handle new labeling requirements
   const getStageBadge = (prospect: Prospect) => {
     const { currentStage, appointmentStatus, salesOutcome } = prospect;
 
-    // 1. Sales Outcome Priorities
-    if (salesOutcome === 'successful') {
+    // Priority 1: Sales outcome overrides everything
+    if (salesOutcome === 'successful')
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Successful</span>;
-    }
-    if (salesOutcome === 'unsuccessful') {
+    if (salesOutcome === 'unsuccessful')
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Non-Successful</span>;
-    }
-    if (salesOutcome === 'kiv') {
+    if (salesOutcome === 'kiv')
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">KIV</span>;
-    }
 
-    // 2. Appointment Statuses
-    if (appointmentStatus === 'declined') {
-      return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-700">Appt Declined</span>;
-    }
-    if (appointmentStatus === 'completed') {
-      return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-700">Sales Meeting</span>;
-    }
+    // Priority 2: Appointment completed → entered Sales Meeting
+    if (appointmentStatus === 'completed')
+      return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-700">Appointment Completed</span>;
 
-    // 3. Appointment stage
-    if (currentStage === ProspectStage.APPOINTMENT) {
-      return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">Appointment</span>;
-    }
+    // Priority 3: Appointment sub-states
+    if (appointmentStatus === 'declined')
+      return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Declined</span>;
+    if (appointmentStatus === 'scheduled')
+      return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">Scheduled</span>;
+    if (appointmentStatus === 'rescheduled')
+      return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Rescheduled</span>;
+    if (appointmentStatus === 'kiv')
+      return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">KIV</span>;
+    if (appointmentStatus === 'not_done' || currentStage === ProspectStage.APPOINTMENT)
+      return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-700">Not Scheduled</span>;
 
-    // 4. New prospect
-    if (currentStage === ProspectStage.PROSPECT) {
-      return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">New</span>;
-    }
-
-    return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Prospect</span>;
+    // Priority 4: Basic info stage
+    return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">New Prospect</span>;
   };
 
   // Logic: 

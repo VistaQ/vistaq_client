@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
-import { MessageSquarePlus, CalendarDays, MapPin, Users, CheckCircle2, ChevronRight, Clock, XCircle, Info, AlignLeft, CheckSquare, Edit2 } from 'lucide-react';
+import { MessageSquarePlus, CalendarDays, MapPin, Users, CheckCircle2, ChevronRight, Clock, XCircle, Info, AlignLeft, CheckSquare, Edit2, LogIn } from 'lucide-react';
 import CreateCoachingModal from '../components/CreateCoachingModal';
 import { CoachingSession, User } from '../types';
 
@@ -18,9 +18,28 @@ const isSessionOver = (session: CoachingSession) => {
     }
 };
 
+const isSessionOngoing = (session: CoachingSession) => {
+    try {
+        const sessionDate = new Date(session.date);
+        if (isNaN(sessionDate.getTime())) return false;
+        const [sh, sm] = session.durationStart.split(':').map(Number);
+        const [eh, em] = session.durationEnd.split(':').map(Number);
+        const startDate = new Date(sessionDate);
+        startDate.setHours(sh, sm, 0, 0);
+        const endDate = new Date(sessionDate);
+        endDate.setHours(eh, em, 0, 0);
+        const now = new Date();
+        return now >= startDate && now < endDate;
+    } catch {
+        return false;
+    }
+};
+
 const Coaching: React.FC = () => {
     const { currentUser, groups, users } = useAuth();
-    const { getCoachingSessionsForUser, updateCoachingSession } = useData();
+    const { getCoachingSessionsForUser, updateCoachingSession, joinCoachingSession, refetchCoachingSessions } = useData();
+
+    useEffect(() => { refetchCoachingSessions(); }, []);
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -38,7 +57,7 @@ const Coaching: React.FC = () => {
         // Check if agent is already in the attendance array
         const existingAttendance = session.attendance.find(a => a.agentId === agent.id);
 
-        let newAttendance;
+        let newAttendance: typeof session.attendance;
         if (existingAttendance) {
             newAttendance = session.attendance.map(a =>
                 a.agentId === agent.id
@@ -91,6 +110,11 @@ const Coaching: React.FC = () => {
         await updateCoachingSession(sessionId, { attendance: newAttendance });
     };
 
+    // Handler for agents/group leaders to self-register attendance
+    const handleJoinSession = async (sessionId: string) => {
+        await joinCoachingSession(sessionId, currentUser);
+    };
+
     // Handler to cancel a session (management only)
     const handleCancelSession = async (sessionId: string) => {
         if (!window.confirm('Are you sure you want to cancel this coaching session? Agents will be notified and the time slot will be freed.')) return;
@@ -109,7 +133,7 @@ const Coaching: React.FC = () => {
     // - Master Trainer: full control over ALL sessions
     // - Group Trainer: only sessions THEY created
     // - Group Leader: only Peer Circle sessions THEY created
-    const canManageSession = (sessionCreatorId: string, sessionType?: string) => {
+    const canManageSession = (sessionCreatorId: string) => {
         if (currentUser.role === UserRole.ADMIN) return true;
         if (currentUser.role === UserRole.MASTER_TRAINER) return true;
         if (currentUser.role === UserRole.TRAINER) return sessionCreatorId === currentUser.id;
@@ -204,14 +228,22 @@ const Coaching: React.FC = () => {
                         {sessions.map(session => {
                             const isCancelled = session.status === 'cancelled';
                             const sessionOver = isSessionOver(session);
-                            const isAgentConfirmed = !isManagement && session.attendance.some(a => a.agentId === currentUser.id && a.status === 'completed');
+                            const sessionOngoing = isSessionOngoing(session);
+                            // isParticipant: agents always, group leaders when they didn't create the session
+                            const isParticipant = currentUser.role === UserRole.AGENT ||
+                                (currentUser.role === UserRole.GROUP_LEADER && session.createdBy !== currentUser.id);
+                            const myAttendance = session.attendance.find(a => a.agentId === currentUser.id);
+                            const isAgentConfirmed = isParticipant && myAttendance?.status === 'completed';
+                            const hasJoined = isParticipant && myAttendance?.status === 'joined';
 
                             let cardClass = 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-sm';
                             if (isCancelled) {
                                 cardClass = 'bg-red-50 border-red-200 opacity-80';
-                            } else if (!isManagement) {
+                            } else if (isParticipant) {
                                 if (isAgentConfirmed) {
                                     cardClass = 'bg-emerald-50 border-emerald-500 shadow-sm';
+                                } else if (hasJoined) {
+                                    cardClass = 'bg-blue-50 border-blue-400 shadow-sm';
                                 } else if (sessionOver) {
                                     cardClass = 'bg-amber-50 border-amber-500 shadow-sm text-amber-900';
                                 } else if (selectedSessionId === session.id) {
@@ -295,27 +327,46 @@ const Coaching: React.FC = () => {
                                         </div>
                                     )}
 
-                                    {/* For Agents & Group Leaders: info-only notice */}
-                                    {!isManagement && !isCancelled && (
-                                        <div className={`mt-3 pt-3 border-t flex items-center gap-2 text-xs font-bold ${
-                                            isAgentConfirmed 
-                                                ? 'text-emerald-700 border-emerald-200' 
-                                                : sessionOver 
-                                                    ? 'text-amber-700 border-amber-200' 
-                                                    : 'text-slate-500 border-slate-100'
+                                    {/* For Agents & participating Group Leaders: attendance status + Join button */}
+                                    {isParticipant && !isCancelled && (
+                                        <div className={`mt-3 pt-3 border-t flex items-center justify-between gap-2 ${
+                                            isAgentConfirmed
+                                                ? 'border-emerald-200'
+                                                : hasJoined
+                                                    ? 'border-blue-200'
+                                                    : sessionOver
+                                                        ? 'border-amber-200'
+                                                        : 'border-slate-100'
                                         }`}>
                                             {isAgentConfirmed ? (
-                                                <><CheckCircle2 className="w-4 h-4" /> Attendance Confirmed</>
+                                                <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                                                    <CheckCircle2 className="w-4 h-4" /> Attendance Confirmed
+                                                </span>
+                                            ) : hasJoined ? (
+                                                <span className="flex items-center gap-1.5 text-xs font-bold text-blue-600">
+                                                    <CheckCircle2 className="w-4 h-4" /> Joined — Awaiting Confirmation
+                                                </span>
+                                            ) : sessionOngoing ? (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleJoinSession(session.id); }}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
+                                                >
+                                                    <LogIn className="w-3.5 h-3.5" /> Join Session
+                                                </button>
                                             ) : sessionOver ? (
-                                                <><Info className="w-4 h-4" /> Did Not Attend</>
+                                                <span className="flex items-center gap-1.5 text-xs font-bold text-amber-700">
+                                                    <Info className="w-4 h-4" /> Did Not Attend
+                                                </span>
                                             ) : (
-                                                <><Clock className="w-4 h-4" /> Attendance tracked by trainer.</>
+                                                <span className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                                                    <Clock className="w-4 h-4" /> Join button available at {session.durationStart}
+                                                </span>
                                             )}
                                         </div>
                                     )}
 
-                                    {/* Cancelled notice for agents */}
-                                    {!isManagement && isCancelled && (
+                                    {/* Cancelled notice for participants */}
+                                    {isParticipant && isCancelled && (
                                         <div className="mt-3 pt-3 border-t border-red-100">
                                             <p className="text-xs text-red-500 font-medium flex items-center gap-1.5">
                                                 <XCircle className="w-3.5 h-3.5" />
@@ -403,6 +454,7 @@ const Coaching: React.FC = () => {
                                                         <tr>
                                                             <th className="px-6 py-4">Agent Name</th>
                                                             <th className="px-6 py-4 hidden md:table-cell">Group</th>
+                                                            <th className="px-6 py-4 hidden lg:table-cell">Joined At</th>
                                                             <th className="px-6 py-4 w-36">Status</th>
                                                             <th className="px-6 py-4 text-right">Action</th>
                                                         </tr>
@@ -411,6 +463,7 @@ const Coaching: React.FC = () => {
                                                         {uniqueInvitedAgents.map(agent => {
                                                             const attendanceRecord = sel.attendance.find(a => a.agentId === agent.id);
                                                             const isConfirmed = attendanceRecord?.status === 'completed';
+                                                            const isJoined = attendanceRecord?.status === 'joined';
 
                                                             return (
                                                                 <tr key={agent.id} className="hover:bg-slate-50/50 transition-colors">
@@ -420,10 +473,18 @@ const Coaching: React.FC = () => {
                                                                     <td className="px-6 py-4 hidden md:table-cell text-slate-500">
                                                                         {agent.groupId ? groups.find(g => g.id === agent.groupId)?.name || '' : 'N/A'}
                                                                     </td>
+                                                                    <td className="px-6 py-4 hidden lg:table-cell text-slate-500 text-xs">
+                                                                        {attendanceRecord?.joinedAt
+                                                                            ? new Date(attendanceRecord.joinedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+                                                                            : <span className="text-slate-300">—</span>
+                                                                        }
+                                                                    </td>
                                                                     <td className="px-6 py-4">
                                                                         {isConfirmed
                                                                             ? <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800"><CheckCircle2 className="w-3 h-3 mr-1" />Confirmed</span>
-                                                                            : <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800"><Clock className="w-3 h-3 mr-1" />Pending</span>
+                                                                            : isJoined
+                                                                                ? <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"><LogIn className="w-3 h-3 mr-1" />Joined</span>
+                                                                                : <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800"><Clock className="w-3 h-3 mr-1" />Pending</span>
                                                                         }
                                                                     </td>
                                                                     <td className="px-6 py-4 text-right">
@@ -432,8 +493,8 @@ const Coaching: React.FC = () => {
                                                                                 disabled={!selOver}
                                                                                 onClick={() => handleConfirmAttendance(selectedSessionId, agent)}
                                                                                 className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors shadow-sm ${
-                                                                                    selOver 
-                                                                                        ? 'text-emerald-700 bg-emerald-100/50 hover:bg-emerald-200/50 border border-emerald-200' 
+                                                                                    selOver
+                                                                                        ? 'text-emerald-700 bg-emerald-100/50 hover:bg-emerald-200/50 border border-emerald-200'
                                                                                         : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed'
                                                                                 }`}
                                                                             >

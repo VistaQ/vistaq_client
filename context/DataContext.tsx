@@ -23,11 +23,17 @@ interface DataContextType {
   getEventsForUser: (user: User) => Event[];
   refetchEvents: () => Promise<void>;
 
+  // Loading states
+  isLoadingProspects: boolean;
+  isLoadingEvents: boolean;
+  isLoadingCoaching: boolean;
+
   // Coaching Methods
   coachingSessions: CoachingSession[];
   addCoachingSession: (session: Partial<CoachingSession>) => Promise<void>;
   updateCoachingSession: (id: string, updates: Partial<CoachingSession>) => Promise<void>;
   deleteCoachingSession: (id: string) => Promise<void>;
+  joinCoachingSession: (sessionId: string, user: User) => Promise<void>;
   getCoachingSessionsForUser: (user: User) => CoachingSession[];
   refetchCoachingSessions: () => Promise<void>;
 }
@@ -49,6 +55,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [badgeTiers, setBadgeTiers] = useState<BadgeTier[]>(DEFAULT_MILESTONES);
   const [events, setEvents] = useState<Event[]>([]);
   const [coachingSessions, setCoachingSessions] = useState<CoachingSession[]>([]);
+  const [isLoadingProspects, setIsLoadingProspects] = useState(false);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [isLoadingCoaching, setIsLoadingCoaching] = useState(false);
 
   const getCurrentUserId = (): string | null => {
     try {
@@ -116,13 +125,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // Fetch from API if cache miss or stale
+    setIsLoadingProspects(true);
     try {
       const data = await apiCall(endpoint);
       const raw: any[] = Array.isArray(data) ? data : (data.prospects || []);
       const normalized = raw.map(normalizeProspect);
       setProspects(normalized);
       setCache(cacheKey, normalized, userId);
-    } catch (_e) { }
+    } catch (_e) { } finally {
+      setIsLoadingProspects(false);
+    }
   };
 
   const fetchEvents = async () => {
@@ -147,6 +159,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // Fetch from API if cache miss or stale
+    setIsLoadingEvents(true);
     try {
       const data = await apiCall('/events/my-events');
       const raw: any[] = Array.isArray(data) ? data : (data.events || []);
@@ -160,6 +173,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setCache(cacheKey, items, userId);
     } catch (_e) {
       setEvents([]);
+    } finally {
+      setIsLoadingEvents(false);
     }
   };
 
@@ -190,6 +205,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       raw = [];
     }
 
+    setIsLoadingCoaching(true);
     const items: CoachingSession[] = raw.map(s => ({
       ...s,
       coachingType: s.coachingType || 'Individual Coaching',
@@ -205,6 +221,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     setCoachingSessions(items);
     setCache(cacheKey, items, userId);
+    setIsLoadingCoaching(false);
   };
 
   // Track authentication state to trigger refetch on login
@@ -235,8 +252,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } catch { }
     };
 
-    // Check periodically for auth changes
-    const interval = setInterval(checkAuth, 100);
+    // Check periodically for same-tab auth changes (cross-tab handled by storage event)
+    const interval = setInterval(checkAuth, 1000);
 
     // Also listen to storage events (for cross-tab sync)
     window.addEventListener('storage', checkAuth);
@@ -257,23 +274,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [authToken, userRole]);
 
-  // 2. Sync Events when authenticated, clear on logout
+  // 2. Clear events on logout (fetch is triggered by the Calendar/Events page on mount)
   useEffect(() => {
-    if (authToken) {
-      fetchEvents();
-    } else {
-      // Clear data on logout
-      setEvents([]);
-    }
+    if (!authToken) setEvents([]);
   }, [authToken]);
 
-  // 3. Sync Coaching Sessions when authenticated
+  // 3. Clear coaching sessions on logout (fetch is triggered by Coaching page on mount)
   useEffect(() => {
-    if (authToken) {
-      fetchCoachingSessions();
-    } else {
-      setCoachingSessions([]);
-    }
+    if (!authToken) setCoachingSessions([]);
   }, [authToken]);
 
   const addProspect = async (data: Partial<Prospect>) => {
@@ -283,75 +291,86 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (data.prospectEmail) payload.prospectEmail = data.prospectEmail;
     if (data.prospectPhone) payload.prospectPhone = data.prospectPhone;
 
-    const response = await apiCall('/prospects', { method: 'POST', data: payload });
-    const prospectId = response.prospectId || response.id;
+    try {
+      const response = await apiCall('/prospects', { method: 'POST', data: payload });
+      const prospectId = response.prospectId || response.id;
 
-    // Fetch the full created prospect from the API
-    const detail = await apiCall(`/prospects/${prospectId}`);
-    const created: Prospect = normalizeProspect(detail.prospect || detail);
+      const detail = await apiCall(`/prospects/${prospectId}`);
+      const created: Prospect = normalizeProspect(detail.prospect || detail);
 
-    // Invalidate cache before refetching
-    const userId = getCurrentUserId();
-    if (userId) {
-      const endpoint = getProspectsEndpoint();
-      invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+      const userId = getCurrentUserId();
+      if (userId) {
+        const endpoint = getProspectsEndpoint();
+        invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+      }
+
+      await fetchProspects();
+      return created;
+    } catch (e) {
+      throw e;
     }
-
-    await fetchProspects();
-    return created;
   };
 
   const updateProspect = async (id: string, updates: Partial<Prospect>) => {
-    await apiCall(`/prospects/${id}`, {
-      method: 'PUT',
-      data: { ...updates, updatedAt: new Date().toISOString() }
-    });
+    try {
+      await apiCall(`/prospects/${id}`, {
+        method: 'PUT',
+        data: { ...updates, updatedAt: new Date().toISOString() }
+      });
 
-    // Invalidate cache before refetching
-    const userId = getCurrentUserId();
-    if (userId) {
-      const endpoint = getProspectsEndpoint();
-      invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+      const userId = getCurrentUserId();
+      if (userId) {
+        const endpoint = getProspectsEndpoint();
+        invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+      }
+
+      await fetchProspects();
+    } catch (e) {
+      throw e;
     }
-
-    await fetchProspects();
   };
 
   const importProspects = async (importedData: Prospect[]) => {
-    for (const p of importedData) {
-      const payload = {
-        ...p,
-        updatedAt: new Date().toISOString(),
-        createdAt: p.createdAt || new Date().toISOString()
-      };
-      if (p.id) {
-        await apiCall(`/prospects/${p.id}`, { method: 'PUT', data: payload });
-      } else {
-        await apiCall('/prospects', { method: 'POST', data: payload });
+    try {
+      for (const p of importedData) {
+        const payload = {
+          ...p,
+          updatedAt: new Date().toISOString(),
+          createdAt: p.createdAt || new Date().toISOString()
+        };
+        if (p.id) {
+          await apiCall(`/prospects/${p.id}`, { method: 'PUT', data: payload });
+        } else {
+          await apiCall('/prospects', { method: 'POST', data: payload });
+        }
       }
-    }
 
-    // Invalidate cache before refetching
-    const userId = getCurrentUserId();
-    if (userId) {
-      const endpoint = getProspectsEndpoint();
-      invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
-    }
+      const userId = getCurrentUserId();
+      if (userId) {
+        const endpoint = getProspectsEndpoint();
+        invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+      }
 
-    await fetchProspects();
+      await fetchProspects();
+    } catch (e) {
+      throw e;
+    }
   };
 
   const deleteProspect = async (id: string) => {
-    await apiCall(`/prospects/${id}`, { method: 'DELETE' });
+    try {
+      await apiCall(`/prospects/${id}`, { method: 'DELETE' });
 
-    // Invalidate cache before refetching
-    const userId = getCurrentUserId();
-    if (userId) {
-      const endpoint = getProspectsEndpoint();
-      invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+      const userId = getCurrentUserId();
+      if (userId) {
+        const endpoint = getProspectsEndpoint();
+        invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
+      }
+
+      await fetchProspects();
+    } catch (e) {
+      throw e;
     }
-
-    await fetchProspects();
   };
 
   const updateBadgeTiers = async (tiers: BadgeTier[]) => {
@@ -521,6 +540,41 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await fetchCoachingSessions();
   };
 
+  const joinCoachingSession = async (sessionId: string, user: User) => {
+    const db = getMockDb();
+    const index = db.findIndex(s => s.id === sessionId);
+    if (index < 0) return;
+
+    const session = db[index];
+    const existingIdx = session.attendance.findIndex((a: { agentId: string }) => a.agentId === user.id);
+
+    if (existingIdx >= 0) {
+      if (session.attendance[existingIdx].status === 'pending') {
+        session.attendance[existingIdx] = {
+          ...session.attendance[existingIdx],
+          status: 'joined',
+          joinedAt: new Date().toISOString(),
+        };
+      }
+    } else {
+      session.attendance.push({
+        agentId: user.id,
+        agentName: user.name || user.email,
+        agentEmail: user.email,
+        groupId: user.groupId,
+        status: 'joined',
+        joinedAt: new Date().toISOString(),
+      });
+    }
+
+    db[index] = { ...session, updatedAt: new Date().toISOString() };
+    setMockDb(db);
+
+    const userId = getCurrentUserId();
+    if (userId) invalidateCache(buildCacheKey(userId, 'coaching'));
+    await fetchCoachingSessions();
+  };
+
   const getCoachingSessionsForUser = (user: User): CoachingSession[] => {
     if (!user) return [];
 
@@ -551,11 +605,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   return (
     <DataContext.Provider value={{
       prospects, badgeTiers, events,
+      isLoadingProspects, isLoadingEvents, isLoadingCoaching,
       addProspect, updateProspect, importProspects, deleteProspect,
       getProspectsByScope, getGroupProspects, updateBadgeTiers,
       addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents,
       coachingSessions, addCoachingSession, updateCoachingSession, deleteCoachingSession,
-      getCoachingSessionsForUser, refetchCoachingSessions: fetchCoachingSessions
+      joinCoachingSession, getCoachingSessionsForUser, refetchCoachingSessions: fetchCoachingSessions
     }}>
       {children}
     </DataContext.Provider>

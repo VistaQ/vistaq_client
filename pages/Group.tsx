@@ -203,16 +203,11 @@ const Group: React.FC = () => {
               const gSalesNOC_YTD = gSalesYTD.length;
               const gSalesACE_YTD = gSalesYTD.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
 
-              const gYtdActiveAgentIds = new Set<string>();
-              gProspects.forEach(p => {
-                 if (isWithinDateRange(p.createdAt, startYTD, endYTD) ||
-                     isWithinDateRange(p.updatedAt, startYTD, endYTD) ||
-                     isWithinDateRange(p.appointmentDate, startYTD, endYTD) ||
-                     isWithinDateRange(p.salesCompletedAt, startYTD, endYTD)) {
-                    gYtdActiveAgentIds.add(p.uid);
-                 }
-              });
-              const gNoOfAgentsYTD = gYtdActiveAgentIds.size;
+              // Count ALL registered members in this group regardless of activity
+              const gNoOfAgentsYTD = users.filter(u =>
+                u.groupId === group.id &&
+                (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
+              ).length;
               const gAcsYTD = gSalesNOC_YTD > 0 ? (gSalesACE_YTD / gSalesNOC_YTD) : 0;
 
               return (
@@ -245,7 +240,7 @@ const Group: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">No. of Agents (YTD)</span>
+                      <span className="text-gray-500">No. of Agents</span>
                       <span className="font-bold text-gray-900">{gNoOfAgentsYTD}</span>
                     </div>
                     <div className="flex justify-between text-sm">
@@ -333,17 +328,6 @@ const Group: React.FC = () => {
   const totalSalesNOC_YTD_Grp = ytdSales_Grp.length;
   const totalSalesACE_YTD_Grp = ytdSales_Grp.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
 
-  // Unique Agents YTD (agents with prospect activity)
-  const ytdActiveAgentIds = new Set<string>();
-  groupProspects.forEach(p => {
-     if (isWithinDateRange(p.createdAt, startYTD, endYTD) ||
-         isWithinDateRange(p.updatedAt, startYTD, endYTD) ||
-         isWithinDateRange(p.appointmentDate, startYTD, endYTD) ||
-         isWithinDateRange(p.salesCompletedAt, startYTD, endYTD)) {
-        ytdActiveAgentIds.add(p.uid);
-     }
-  });
-  const noOfAgentsYTD_Grp = ytdActiveAgentIds.size;
 
   // ACS YTD
   const acsYTD_Grp = totalSalesNOC_YTD_Grp > 0 ? (totalSalesACE_YTD_Grp / totalSalesNOC_YTD_Grp) : 0;
@@ -576,8 +560,8 @@ const Group: React.FC = () => {
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
             <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
             <p className="text-xs font-medium text-gray-500 mb-1">No. of Agents</p>
-            <h3 className="text-2xl font-bold text-gray-900">{noOfAgentsYTD_Grp}</h3>
-            <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+            <h3 className="text-2xl font-bold text-gray-900">{activeMembersCount}</h3>
+            <p className="text-[10px] text-gray-400 mt-1">Total in Group</p>
          </div>
 
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">

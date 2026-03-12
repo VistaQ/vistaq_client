@@ -1,30 +1,38 @@
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Prospects from './pages/Prospects';
-import Reports from './pages/Reports';
-import PointsHistory from './pages/PointsHistory';
-import Group from './pages/Group';
-import Sales from './pages/Sales';
-import AdminUsers from './pages/AdminUsers';
-import AdminGroups from './pages/AdminGroups';
-import AdminRewards from './pages/AdminRewards';
-import Import from './pages/Import';
-import MyCalendar from './pages/MyCalendar';
-import Profile from './pages/Profile';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import Support from './pages/Support';
-import Tutorials from './pages/Tutorials';
-import Coaching from './pages/Coaching';
 import GlobalNotification from './components/GlobalNotification';
 
+// Lazy-load all page components so Vite splits them into separate chunks.
+// Only the chunk for the active page is downloaded and parsed.
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const Prospects = React.lazy(() => import('./pages/Prospects'));
+const Reports = React.lazy(() => import('./pages/Reports'));
+const PointsHistory = React.lazy(() => import('./pages/PointsHistory'));
+const Group = React.lazy(() => import('./pages/Group'));
+const Sales = React.lazy(() => import('./pages/Sales'));
+const AdminUsers = React.lazy(() => import('./pages/AdminUsers'));
+const AdminGroups = React.lazy(() => import('./pages/AdminGroups'));
+const AdminRewards = React.lazy(() => import('./pages/AdminRewards'));
+const Import = React.lazy(() => import('./pages/Import'));
+const MyCalendar = React.lazy(() => import('./pages/MyCalendar'));
+const Profile = React.lazy(() => import('./pages/Profile'));
+const Login = React.lazy(() => import('./pages/Login'));
+const Signup = React.lazy(() => import('./pages/Signup'));
+const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
+const Support = React.lazy(() => import('./pages/Support'));
+const Tutorials = React.lazy(() => import('./pages/Tutorials'));
+const Coaching = React.lazy(() => import('./pages/Coaching'));
+
+const PageSpinner: React.FC = () => (
+  <div className="flex h-full min-h-[60vh] items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+  </div>
+);
+
 const AuthenticatedApp: React.FC = () => {
-  // Default to dashboard
   const [activePage, setActivePage] = useState('dashboard');
 
   const renderPage = () => {
@@ -33,7 +41,7 @@ const AuthenticatedApp: React.FC = () => {
       case 'prospects': return <Prospects />;
       case 'profile': return <Profile />;
 
-      // Admin Routes (Re-enabled for Phase 1 Config)
+      // Admin Routes
       case 'users': return <AdminUsers />;
       case 'admin-groups': return <AdminGroups />;
 
@@ -56,7 +64,9 @@ const AuthenticatedApp: React.FC = () => {
 
   return (
     <Layout activePage={activePage} onNavigate={setActivePage}>
-      {renderPage()}
+      <Suspense fallback={<PageSpinner />}>
+        {renderPage()}
+      </Suspense>
     </Layout>
   );
 };
@@ -74,22 +84,23 @@ const AuthFlow: React.FC = () => {
     return <AuthenticatedApp />;
   }
 
-  switch (view) {
-    case 'login':
-      return <Login onSwitchToSignup={() => setView('signup')} />;
-    case 'signup':
-      return (
+  return (
+    <Suspense fallback={<PageSpinner />}>
+      {view === 'login' && (
+        <Login onSwitchToSignup={() => setView('signup')} />
+      )}
+      {view === 'signup' && (
         <Signup
           onSwitchToLogin={() => setView('login')}
           onNavigateToPolicy={(page) => setView(page)}
         />
-      );
-    case 'privacy':
-      return <PrivacyPolicy onBack={() => setView('signup')} />;
-    default:
-      return <Login onSwitchToSignup={() => setView('signup')} />;
-  }
-}
+      )}
+      {view === 'privacy' && (
+        <PrivacyPolicy onBack={() => setView('signup')} />
+      )}
+    </Suspense>
+  );
+};
 
 const App: React.FC = () => {
   return (
