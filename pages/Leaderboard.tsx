@@ -16,14 +16,12 @@ const Leaderboard: React.FC = () => {
     refetchCoachingSessions();
   }, []);
 
-  // Trainers: /users is restricted — fetch members from each managed group instead
+  // Trainers: /users is restricted — fetch members from all groups instead
   useEffect(() => {
     if (!currentUser || currentUser.role !== UserRole.TRAINER) return;
+    if (groups.length === 0) return;
 
-    const managedGroups = groups.filter(g => g.trainerIds?.includes(currentUser.id));
-    if (managedGroups.length === 0) return;
-
-    Promise.all(managedGroups.map(g => apiCall(`/users/group/${g.id}`)))
+    Promise.all(groups.map(g => apiCall(`/users/group/${g.id}`)))
       .then(responses => {
         const all: any[] = responses.flatMap(r => r.users || []);
         const normalized: User[] = all.map(u => ({ ...u, id: u.uid || u.id }));
@@ -42,18 +40,10 @@ const Leaderboard: React.FC = () => {
 
   const eligibleRoles = [UserRole.AGENT, UserRole.GROUP_LEADER];
 
-  // Build the user pool based on role
-  let scopedUsers: User[];
-  if (isTrainer) {
-    // Use per-group fetched users
-    scopedUsers = trainerUsers.filter(u => eligibleRoles.includes(u.role));
-  } else if (isAdmin || isMasterTrainer) {
-    // See all agents and group leaders
-    scopedUsers = users.filter(u => eligibleRoles.includes(u.role));
-  } else {
-    // Agent / Group Leader — scope to own group
-    scopedUsers = users.filter(u => eligibleRoles.includes(u.role) && u.groupId === currentUser.groupId);
-  }
+  // All roles see system-wide rankings
+  const scopedUsers: User[] = isTrainer
+    ? trainerUsers.filter(u => eligibleRoles.includes(u.role))
+    : users.filter(u => eligibleRoles.includes(u.role));
 
   const sortedBadges = [...badgeTiers].sort((a, b) => a.threshold - b.threshold);
 
@@ -84,11 +74,7 @@ const Leaderboard: React.FC = () => {
     <Award key="3" className="w-6 h-6 text-amber-700" />,
   ];
 
-  const scopeLabel = isAdmin || isMasterTrainer
-    ? 'All agents & group leaders ranked by total points'
-    : isTrainer
-    ? 'Agents & group leaders in your managed groups'
-    : `Your group's rankings`;
+  const scopeLabel = 'All agents & group leaders ranked by total points';
 
   return (
     <div className="space-y-8">
