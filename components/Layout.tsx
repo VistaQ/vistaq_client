@@ -99,6 +99,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
 
           <NavItem id="events" label="Calendar" icon={CalendarDays} />
           <NavItem id="coaching" label="Coaching" icon={Users} />
+          <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
 
           {/* Personal Views for Agent and Group Leader */}
           {(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER) && (
@@ -106,7 +107,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
               <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Personal</div>
               <NavItem id="sales" label="My Sales" icon={Award} />
               <NavItem id="points" label="My Points" icon={Award} />
-              <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
             </>
           )}
 
@@ -114,13 +114,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
           {isManagement && (
             <>
               <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Performance</div>
-
-              {/* Group View: Group Dashboard (Aggregated) */}
               <NavItem id="group" label="Group Progress" icon={TrendingUp} />
-              {/* Leaderboard only for non-Group-Leader management (GL already has it in Personal) */}
-              {currentUser?.role !== UserRole.GROUP_LEADER && (
-                <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
-              )}
             </>
           )}
 
@@ -206,6 +200,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
 
                 <NavItem id="events" label="My Calendar" icon={CalendarDays} />
                 <NavItem id="coaching" label="Coaching" icon={Users} />
+                <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
 
                 {/* Personal Views for Agent and Group Leader */}
                 {(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER) && (
@@ -213,7 +208,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                     <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Personal</div>
                     <NavItem id="sales" label="My Sales" icon={Award} />
                     <NavItem id="points" label="My Points" icon={Award} />
-                    <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
                   </>
                 )}
 
@@ -222,9 +216,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                   <>
                     <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Performance</div>
                     <NavItem id="group" label="Group Progress" icon={TrendingUp} />
-                    {currentUser?.role !== UserRole.GROUP_LEADER && (
-                      <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
-                    )}
                   </>
                 )}
 
