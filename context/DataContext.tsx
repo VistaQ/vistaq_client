@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Prospect, ProspectStage, User, UserRole, BadgeTier, Event, CoachingSession } from '../types';
 import { apiCall } from '../services/apiClient';
-import { getCache, setCache, invalidateCache, buildCacheKey } from '../services/cache';
 
 interface DataContextType {
   prospects: Prospect[];
@@ -115,23 +114,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!userId) return;
 
     const endpoint = getProspectsEndpoint();
-    const cacheKey = buildCacheKey(userId, `prospects_${endpoint}`);
 
-    // Try to get from cache first
-    const cached = getCache<Prospect[]>(cacheKey, userId);
-    if (cached) {
-      setProspects(cached);
-      return;
-    }
-
-    // Fetch from API if cache miss or stale
     setIsLoadingProspects(true);
     try {
       const data = await apiCall(endpoint);
       const raw: any[] = Array.isArray(data) ? data : (data.prospects || []);
       const normalized = raw.map(normalizeProspect);
       setProspects(normalized);
-      setCache(cacheKey, normalized, userId);
     } catch (_e) { } finally {
       setIsLoadingProspects(false);
     }
@@ -149,16 +138,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    const cacheKey = buildCacheKey(userId, 'events');
-
-    // Try to get from cache first
-    const cached = getCache<Event[]>(cacheKey, userId);
-    if (cached) {
-      setEvents(cached);
-      return;
-    }
-
-    // Fetch from API if cache miss or stale
     setIsLoadingEvents(true);
     try {
       const data = await apiCall('/events/my-events');
@@ -170,7 +149,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updatedAt: toISO(e.updatedAt) || e.updatedAt,
       }));
       setEvents(items);
-      setCache(cacheKey, items, userId);
     } catch (_e) {
       setEvents([]);
     } finally {
@@ -183,14 +161,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setCoachingSessions([]);
       return;
     }
-
-    const userId = getCurrentUserId();
-    if (!userId) {
-      setCoachingSessions([]);
-      return;
-    }
-
-    const cacheKey = buildCacheKey(userId, 'coaching');
 
     // Simulated Backend Storage Key (Global across all users for accurate simulation)
     const DB_KEY = 'mock_coaching_db';
@@ -220,7 +190,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }));
 
     setCoachingSessions(items);
-    setCache(cacheKey, items, userId);
     setIsLoadingCoaching(false);
   };
 
@@ -298,12 +267,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const detail = await apiCall(`/prospects/${prospectId}`);
       const created: Prospect = normalizeProspect(detail.prospect || detail);
 
-      const userId = getCurrentUserId();
-      if (userId) {
-        const endpoint = getProspectsEndpoint();
-        invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
-      }
-
       await fetchProspects();
       return created;
     } catch (e) {
@@ -317,12 +280,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         method: 'PUT',
         data: { ...updates, updatedAt: new Date().toISOString() }
       });
-
-      const userId = getCurrentUserId();
-      if (userId) {
-        const endpoint = getProspectsEndpoint();
-        invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
-      }
 
       await fetchProspects();
     } catch (e) {
@@ -345,12 +302,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
 
-      const userId = getCurrentUserId();
-      if (userId) {
-        const endpoint = getProspectsEndpoint();
-        invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
-      }
-
       await fetchProspects();
     } catch (e) {
       throw e;
@@ -360,12 +311,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const deleteProspect = async (id: string) => {
     try {
       await apiCall(`/prospects/${id}`, { method: 'DELETE' });
-
-      const userId = getCurrentUserId();
-      if (userId) {
-        const endpoint = getProspectsEndpoint();
-        invalidateCache(buildCacheKey(userId, `prospects_${endpoint}`));
-      }
 
       await fetchProspects();
     } catch (e) {
@@ -410,37 +355,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       date: evt.date || new Date().toISOString()
     };
     await apiCall('/events', { method: 'POST', data: payload });
-
-    // Invalidate cache before refetching
-    const userId = getCurrentUserId();
-    if (userId) {
-      invalidateCache(buildCacheKey(userId, 'events'));
-    }
-
     await fetchEvents();
   };
 
   const updateEvent = async (id: string, evt: Partial<Event>) => {
     await apiCall(`/events/${id}`, { method: 'PUT', data: evt });
-
-    // Invalidate cache before refetching
-    const userId = getCurrentUserId();
-    if (userId) {
-      invalidateCache(buildCacheKey(userId, 'events'));
-    }
-
     await fetchEvents();
   };
 
   const deleteEvent = async (id: string) => {
     await apiCall(`/events/${id}`, { method: 'DELETE' });
-
-    // Invalidate cache before refetching
-    const userId = getCurrentUserId();
-    if (userId) {
-      invalidateCache(buildCacheKey(userId, 'events'));
-    }
-
     await fetchEvents();
   };
 
@@ -510,8 +434,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     db.push(newSession);
     setMockDb(db);
 
-    const userId = getCurrentUserId();
-    if (userId) invalidateCache(buildCacheKey(userId, 'coaching'));
     await fetchCoachingSessions();
   };
 
@@ -524,8 +446,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setMockDb(db);
     }
 
-    const userId = getCurrentUserId();
-    if (userId) invalidateCache(buildCacheKey(userId, 'coaching'));
     await fetchCoachingSessions();
   };
 
@@ -535,8 +455,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const filtered = db.filter(s => s.id !== id);
     setMockDb(filtered);
 
-    const userId = getCurrentUserId();
-    if (userId) invalidateCache(buildCacheKey(userId, 'coaching'));
     await fetchCoachingSessions();
   };
 
@@ -570,8 +488,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     db[index] = { ...session, updatedAt: new Date().toISOString() };
     setMockDb(db);
 
-    const userId = getCurrentUserId();
-    if (userId) invalidateCache(buildCacheKey(userId, 'coaching'));
     await fetchCoachingSessions();
   };
 
