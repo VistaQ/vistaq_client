@@ -85,13 +85,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
       <aside className="hidden md:flex flex-col w-72 bg-[#0F172A] border-r border-gray-800 shadow-xl z-20">
         <div className="flex flex-col justify-center h-24 px-8 border-b border-gray-800/50 bg-[#0F172A]">
           {/* Top Branding Area */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl shadow-lg shadow-blue-900/20">
-              <span className="font-brand text-2xl font-bold text-white italic transform -translate-y-0.5">V</span>
-            </div>
-            <div>
-              <h1 className="font-brand text-3xl font-bold text-white tracking-wide">VistaQ</h1>
-            </div>
+          <div className="flex items-center">
+            <img src="/vistaq-logo.png" alt="VistaQ" className="h-12 w-auto" />
           </div>
         </div>
 
@@ -187,8 +182,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
       {/* Mobile Header */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <header className="md:hidden flex items-center justify-between h-16 px-4 bg-[#0F172A] border-b border-gray-800 shadow-md z-20 text-white">
-          <div className="flex items-center space-x-2">
-            <span className="font-brand text-2xl font-bold">VistaQ</span>
+          <div className="flex items-center">
+            <img src="/vistaq-logo.png" alt="VistaQ" className="h-8 w-auto" />
           </div>
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-300 hover:text-white">
             {isMobileMenuOpen ? <X /> : <Menu />}
@@ -200,7 +195,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
             <div className="fixed inset-y-0 left-0 w-72 bg-[#0F172A] shadow-2xl border-r border-gray-800" onClick={e => e.stopPropagation()}>
               <div className="h-20 flex items-center px-6 border-b border-gray-800/50">
-                <span className="font-brand text-2xl font-bold text-white">VistaQ</span>
+                <img src="/vistaq-logo.png" alt="VistaQ" className="h-10 w-auto" />
               </div>
               <nav className="py-4 overflow-y-auto max-h-[calc(100vh-180px)]">
                 <NavItem id="dashboard" label="Dashboard" icon={LayoutDashboard} />
