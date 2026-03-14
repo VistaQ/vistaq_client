@@ -1,14 +1,14 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, UserRole, Group, Notification } from '../types';
-import { apiCall } from '../services/apiClient';
+import { apiCall, getTenantSlug } from '../services/apiClient';
 
 interface AuthContextType {
   currentUser: User | null;
   login: (identifier: string, password?: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string, groupId: string, agentCode: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, groupId: string, agentCode: string, location: string) => Promise<boolean>;
   resetPassword: (email: string) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   changePassword: (newPassword: string) => Promise<void>;
   isAuthenticated: boolean;
   getGroupMembers: (groupId: string) => User[];
@@ -30,6 +30,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -49,22 +50,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     if (token && storedUser) {
       try {
-        setCurrentUser(JSON.parse(storedUser));
-      } catch (_e) {}
+        const parsed = JSON.parse(storedUser);
+        setCurrentUser(parsed);
 
-      apiCall('/users/me')
-        .then(data => {
-          const raw = data.user || data;
-          const fresh: User = { ...raw, id: raw.uid || raw.id };
-          setCurrentUser(fresh);
-          localStorage.setItem('authUser', JSON.stringify(fresh));
-        })
-        .catch(() => {
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('authUser');
-          setCurrentUser(null);
-        })
-        .finally(() => setLoading(false));
+        // Validate token is still valid by fetching fresh user data
+        apiCall('/auth/me')
+          .then(res => {
+            const fresh: User = res.data;
+            setCurrentUser(fresh);
+            localStorage.setItem('authUser', JSON.stringify(fresh));
+          })
+          .catch(() => {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('authUser');
+            setCurrentUser(null);
+          })
+          .finally(() => setLoading(false));
+      } catch (_e) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('authUser');
+        setLoading(false);
+      }
     } else {
       setLoading(false);
     }
@@ -84,20 +90,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchUsers = async () => {
     if (!currentUser) return;
     try {
-      const data = await apiCall('/users');
-      const list: any[] = Array.isArray(data.users) ? data.users : (Array.isArray(data) ? data : []);
-      const normalized = list.map(u => ({ ...u, id: u.uid || u.id, name: u.name || u.email || '' }));
-      setUsers(normalized);
+      const res = await apiCall('/users');
+      const list: any[] = Array.isArray(res.data) ? res.data : [];
+      setUsers(list);
     } catch (_e) {}
   };
 
   const fetchGroups = async () => {
     if (!currentUser) return;
     try {
-      const data = await apiCall('/groups');
-      const list = data.groups || data;
-      const normalized = Array.isArray(list) ? list : [];
-      setGroups(normalized);
+      const res = await apiCall('/groups');
+      const list = Array.isArray(res.data) ? res.data : [];
+      setGroups(list);
     } catch (_e) {}
   };
 
@@ -107,13 +111,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const response = await apiCall('/auth/login', {
         method: 'POST',
-        data: { email: identifier, password }
+        data: { email: identifier, password },
+        headers: { 'X-Tenant-Slug': getTenantSlug() }
       });
-      localStorage.setItem('authToken', response.token);
-
-      const meData = await apiCall('/users/me');
-      const raw = meData.user || meData;
-      const user: User = { ...raw, id: raw.uid || raw.id };
+      const { user: rawUser, token } = response.data;
+      localStorage.setItem('authToken', token);
+      const user: User = rawUser;
       localStorage.setItem('authUser', JSON.stringify(user));
       setCurrentUser(user);
       return true;
@@ -122,16 +125,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const register = async (name: string, email: string, password: string, groupId: string, agentCode: string): Promise<boolean> => {
+  const register = async (name: string, email: string, password: string, groupId: string, agentCode: string, location: string): Promise<boolean> => {
     const response = await apiCall('/auth/register', {
       method: 'POST',
-      data: { email, password, fullName: name, agentCode, groupId, acknowledged: true }
+      data: { email, password, fullName: name, agentCode, groupId, location },
+      headers: { 'X-Tenant-Slug': getTenantSlug() }
     });
-    const raw = response.user;
-    const user: User = { ...raw, id: raw.uid || raw.id };
-    localStorage.setItem('authToken', response.token);
-    localStorage.setItem('authUser', JSON.stringify(user));
-    setCurrentUser(user);
+    const { user: rawUser, token } = response.data;
+    if (token) {
+      localStorage.setItem('authToken', token);
+      const user: User = rawUser;
+      localStorage.setItem('authUser', JSON.stringify(user));
+      setCurrentUser(user);
+    }
     setTimeout(() => {
       showNotification(
         "Registration Successful",
@@ -142,7 +148,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return true;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await apiCall('/auth/logout', { method: 'POST' });
+    } catch (_e) {
+      // Still clear local state even if server call fails
+    }
     localStorage.removeItem('authToken');
     localStorage.removeItem('authUser');
     setCurrentUser(null);
@@ -168,10 +179,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const refreshCurrentUser = async () => {
+    if (!currentUser) return;
     try {
-      const data = await apiCall('/users/me');
-      const raw = data.user || data;
-      const fresh: User = { ...raw, id: raw.uid || raw.id };
+      const res = await apiCall('/auth/me');
+      const fresh = res.data;
       setCurrentUser(fresh);
       localStorage.setItem('authUser', JSON.stringify(fresh));
     } catch (_e) {}
@@ -184,15 +195,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const getGroupMembers = (groupId: string) =>
-    users.filter((u: User) => u.groupId === groupId && u.role === UserRole.AGENT);
+    users.filter((u: User) => u.group_id === groupId && u.role === UserRole.AGENT);
 
   const getUserById = (id: string) => users.find((u: User) => u.id === id);
 
   // --- ADMIN: USERS ---
   const addUser = async (userData: Partial<User>) => {
-    await apiCall('/admin/users', {
+    await apiCall('/users', {
       method: 'POST',
-      data: { ...userData, role: userData.role || UserRole.AGENT }
+      data: {
+        name: userData.name,
+        email: userData.email,
+        password: userData.password,
+        role: userData.role || UserRole.AGENT,
+        agentCode: userData.agent_code,
+      }
     });
     showNotification(
       "User Created Successfully",
@@ -204,8 +221,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const updateUser = async (id: string, updates: Partial<User>) => {
-    const { name, email, role, agentCode } = updates;
-    const payload = { name, email, role, agentCode };
+    const { name, email, role } = updates;
+    const payload = { name, email, role };
     await apiCall(`/users/${id}`, { method: 'PUT', data: payload });
     showNotification("User Updated", "User profile has been updated successfully.", "success");
 
@@ -213,7 +230,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const deleteUser = async (id: string) => {
-    await apiCall(`/admin/users/${id}`, { method: 'DELETE' });
+    await apiCall(`/users/${id}`, { method: 'DELETE' });
     showNotification("User Deleted", "The user has been removed from the system.", "info");
 
     await fetchUsers();
@@ -221,27 +238,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- ADMIN: GROUPS ---
   const addGroup = async (name: string, leaderId: string | undefined, trainerIds: string[], memberIds: string[]) => {
-    await apiCall('/admin/groups', {
+    await apiCall('/groups', {
       method: 'POST',
-      data: { name, leaderId, trainerIds, memberIds }
+      data: {
+        name,
+        leader_id: leaderId,
+        trainer_id: trainerIds?.[0], // API accepts single trainer_id
+      }
     });
-    showNotification("Group Created", `Group "${name}" has been created with assigned members.`, "success");
+    showNotification("Group Created", `Group "${name}" has been created.`, "success");
 
     await fetchGroups();
+    await fetchUsers();
   };
 
   const updateGroup = async (groupId: string, name: string, leaderId: string | undefined, trainerIds: string[], memberIds: string[]) => {
-    await apiCall(`/admin/groups/${groupId}`, {
+    await apiCall(`/groups/${groupId}`, {
       method: 'PUT',
-      data: { name, leaderId, trainerIds, memberIds }
+      data: {
+        name,
+        leader_id: leaderId,
+        trainer_id: trainerIds?.[0], // API accepts single trainer_id
+        member_ids: memberIds.length > 0 ? memberIds : undefined,
+      }
     });
     showNotification("Group Updated", `Group configuration for "${name}" has been saved.`, "success");
 
     await fetchGroups();
+    await fetchUsers();
   };
 
   const deleteGroup = async (groupId: string) => {
-    await apiCall(`/admin/groups/${groupId}`, { method: 'DELETE' });
+    await apiCall(`/groups/${groupId}`, { method: 'DELETE' });
     showNotification("Group Deleted", "The group has been disbanded.", "info");
 
     await fetchGroups();

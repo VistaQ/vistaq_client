@@ -17,24 +17,41 @@ export const ROLE_LABELS: Record<string, string> = {
 
 export const getRoleLabel = (role: string): string => ROLE_LABELS[role] ?? role;
 
-export interface User {
-  id: string;
-  uid?: string; // Firebase UID
-  name: string;
-  email: string;
-  role: UserRole;
-  groupId?: string; // Primary group for Agents/Leaders
-  groupName?: string; // Group name from API
-  managedGroupIds?: string[]; // For Trainers handling multiple groups
-  avatarUrl?: string;
-  password?: string; // For mock auth only
-  agentCode?: string; // "Agent Code" - Required for AGENT only
-  // Performance metrics from API
-  totalProspects?: number;
-  totalAppointments?: number;
-  totalSales?: number;
-  totalACE?: number;
-}
+import type { components, paths } from './types.generated';
+
+// ─── API response types (source of truth: openapi.yaml → types.generated.ts) ───
+
+export type User = Omit<components['schemas']['UserObject'], 'role'> & {
+  role: UserRole;         // keep enum compatibility across the codebase
+  password?: string;      // form-only, used for admin user creation
+  managedGroupIds?: string[]; // derived from group_trainers junction table
+};
+
+export type Group = components['schemas']['GroupObject'] & {
+  memberIds?: string[];  // derived
+  memberCount?: number;  // derived
+};
+
+export type Prospect = Omit<components['schemas']['ProspectObject'], 'current_stage'> & {
+  current_stage: ProspectStage; // keep enum compatibility across the codebase
+};
+
+export type Event = components['schemas']['EventObject'] & {
+  // Derived from event_groups junction table
+  groupIds?: string[];
+  groupNames?: string[];
+  // Fields pending backend addition to openapi spec
+  created_by_name?: string | null;
+  status?: string;
+  archived?: boolean;
+};
+
+// ─── Request body types (compiler-enforced payloads) ────────────────────────
+
+export type ProspectCreateBody = paths['/prospects']['post']['requestBody']['content']['application/json'];
+export type ProspectUpdateBody = paths['/prospects/{prospectId}']['put']['requestBody']['content']['application/json'];
+export type EventCreateBody = paths['/events']['post']['requestBody']['content']['application/json'];
+export type EventUpdateBody = paths['/events/{eventId}']['put']['requestBody']['content']['application/json'];
 
 export interface Notification {
   title: string;
@@ -110,107 +127,15 @@ export interface PointEntry {
 export enum ProspectStage {
   PROSPECT = 'prospect',
   APPOINTMENT = 'appointment',
-  SALES_OUTCOME = 'sales_outcome'
+  SALES = 'sales'
 }
 
-export interface ProspectProduct {
-  id: string;
+// ProspectProduct matches the products_sold item shape from the API
+export type ProspectProduct = {
+  id?: string; // client-side only (used for keying product rows in the form)
   productName: string;
-  aceAmount: number;
-}
-
-export interface Prospect {
-  id: string;
-
-  // Agent info (auto-filled from auth token on create)
-  uid: string;
-  agentCode?: string;
-  agentName?: string;
-  agentEmail?: string;
-  groupId?: string;
-  groupName?: string;
-
-  // Prospect info
-  prospectName: string;
-  prospectPhone?: string;
-  prospectEmail?: string;
-  prospectEnteredAt?: string;
-
-  currentStage: ProspectStage;
-
-  // Appointment stage
-  appointmentDate?: string;
-  appointmentStartTime?: string;
-  appointmentEndTime?: string;
-  appointmentLocation?: string;
-  appointmentStatus?: 'not_done' | 'scheduled' | 'rescheduled' | 'completed' | 'declined' | 'kiv';
-  appointmentCompletedAt?: string;
-  salesPartsCompleted?: string[];
-
-  // Sales outcome stage
-  salesOutcome?: 'successful' | 'unsuccessful' | 'kiv';
-  productsSold?: ProspectProduct[];
-  totalACE?: number;
-  unsuccessfulReason?: string;
-  salesCompletedAt?: string;
-
-  stageHistory?: { stage: string; enteredAt: string }[];
-
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Event {
-  id: string;
-  eventTitle: string;
-  date: string; // ISO String
-  venue: string;
-  description: string;
-  meetingLink?: string;
-
-  // Groups
-  groupIds: string[];
-  groupNames?: string[];
-
-  // Creator info (auto-filled from auth token on create)
-  createdBy: string;
-  createdByName: string;
-  createdByRole?: string;
-
-  status?: 'upcoming' | 'completed' | 'cancelled';
-  archived?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface Group {
-  id: string;
-  name: string;
-
-  // Leadership
-  leaderId?: string;
-  leaderName?: string;
-  leaderEmail?: string;
-
-  // Trainers
-  trainerIds?: string[];
-  trainerNames?: string[];
-
-  // Members
-  memberIds?: string[];
-  memberCount?: number;
-
-  // Performance stats (from API)
-  totalProspects?: number;
-  totalAppointments?: number;
-  totalSales?: number;
-  totalACE?: number;
-  totalPoints?: number;
-
-  status?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
+  amount: number;
+};
 
 // AI Service Types
 export interface AIChatMessage {

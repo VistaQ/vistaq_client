@@ -2,9 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { User, ProspectStage, UserRole, Prospect } from '../types';
+import { User, UserRole, Prospect } from '../types';
 import { apiCall } from '../services/apiClient';
-import { getCache, setCache, buildCacheKey } from '../services/cache';
 import {
   Users,
   Crown,
@@ -49,62 +48,21 @@ const Group: React.FC = () => {
   const isMultiGroupUser = isTrainer || isMasterTrainer || isAdmin;
 
   // Determine current group ID (needed for useEffect dependency)
-  const currentGroupId = isMultiGroupUser ? trainerSelectedGroupId : currentUser?.groupId;
+  const currentGroupId = isMultiGroupUser ? trainerSelectedGroupId : currentUser?.group_id;
 
   // Fetch group prospects and users from API for group leaders
   // IMPORTANT: This must be before any early returns to comply with Rules of Hooks
   useEffect(() => {
     const fetchGroupData = async () => {
       if (currentUser?.role === UserRole.GROUP_LEADER && currentGroupId) {
-        const userId = currentUser.id;
-        const usersCacheKey = buildCacheKey(userId, `group_users_${currentGroupId}`);
-        const prospectsCacheKey = buildCacheKey(userId, `group_prospects_${currentGroupId}`);
-
-        const cachedUsers = getCache<any[]>(usersCacheKey, userId);
-        const cachedProspects = getCache<any[]>(prospectsCacheKey, userId);
-
-        if (cachedUsers) setGroupUsersFromAPI(cachedUsers);
-        if (cachedProspects) setGroupProspectsFromAPI(cachedProspects);
-        if (cachedUsers && cachedProspects) return;
-
         try {
-          if (!cachedProspects) {
-            const prospectsResponse = await apiCall(`/prospects/group/${currentGroupId}`);
-            const raw: any[] = prospectsResponse.prospects || [];
-            const normalized = raw.map((p: any) => ({
-              ...p,
-              id: p.id || p.prospectId,
-              prospectName: p.prospectName || '',
-              appointmentDate: p.appointmentDate?._seconds
-                ? new Date(p.appointmentDate._seconds * 1000).toISOString()
-                : p.appointmentDate,
-              appointmentCompletedAt: p.appointmentCompletedAt?._seconds
-                ? new Date(p.appointmentCompletedAt._seconds * 1000).toISOString()
-                : p.appointmentCompletedAt,
-              salesCompletedAt: p.salesCompletedAt?._seconds
-                ? new Date(p.salesCompletedAt._seconds * 1000).toISOString()
-                : p.salesCompletedAt,
-              createdAt: p.createdAt?._seconds
-                ? new Date(p.createdAt._seconds * 1000).toISOString()
-                : p.createdAt,
-              updatedAt: p.updatedAt?._seconds
-                ? new Date(p.updatedAt._seconds * 1000).toISOString()
-                : p.updatedAt,
-              productsSold: (p.productsSold || []).map((prod: any, i: number) => ({
-                ...prod,
-                id: prod.id || `prod_${i}`,
-              })),
-            }));
-            setGroupProspectsFromAPI(normalized);
-            setCache(prospectsCacheKey, normalized, userId);
-          }
+          const prospectsResponse = await apiCall(`/prospects/group/${currentGroupId}`);
+          const raw: any[] = prospectsResponse.prospects || [];
+          setGroupProspectsFromAPI(raw);
 
-          if (!cachedUsers) {
-            const usersResponse = await apiCall(`/users/group/${currentGroupId}`);
-            const groupUsers = usersResponse.users || [];
-            setGroupUsersFromAPI(groupUsers);
-            setCache(usersCacheKey, groupUsers, userId);
-          }
+          const usersResponse = await apiCall(`/users/group/${currentGroupId}`);
+          const groupUsers = usersResponse.users || [];
+          setGroupUsersFromAPI(groupUsers);
         } catch (error) {
           console.error('Failed to fetch group data:', error);
           setGroupProspectsFromAPI([]);
@@ -114,42 +72,6 @@ const Group: React.FC = () => {
     };
     fetchGroupData();
   }, [currentGroupId, currentUser?.role]);
-
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return !isNaN(d.getTime()) ? d.toLocaleDateString() : 'N/A';
-  };
-
-  // Normalize timestamp fields from Firestore format to ISO strings
-  const toISO = (ts: any): string | undefined => {
-    if (!ts) return undefined;
-    if (ts._seconds) return new Date(ts._seconds * 1000).toISOString();
-    if (typeof ts === 'string' || typeof ts === 'number') return new Date(ts).toISOString();
-    return undefined;
-  };
-
-  const normalizeProspect = (p: any): Prospect => ({
-    ...p,
-    id: p.id || p.prospectId,
-    prospectName: p.prospectName || '',
-    appointmentDate: toISO(p.appointmentDate),
-    createdAt: toISO(p.createdAt),
-    updatedAt: toISO(p.updatedAt),
-    productsSold: (p.productsSold || []).map((prod: any, i: number) => ({
-      ...prod,
-      id: prod.id || `prod_${i}`,
-    })),
-  });
-
-  // Helper to handle redacted prospect names for group leaders viewing other agents
-  const getProspectDisplayName = (prospect: Prospect) => {
-    // Show actual name only if it's the current user's prospect
-    if (prospect.uid === currentUser?.id) {
-      return prospect.prospectName || 'N/A';
-    }
-    // For other agents' prospects, show nothing
-    return '';
-  };
 
   // TRAINER / ADMIN VIEW: GROUP SELECTION GRID
   if (isMultiGroupUser && !trainerSelectedGroupId) {
@@ -186,26 +108,26 @@ const Group: React.FC = () => {
               };
 
               const gAppointmentsYTD = gProspects.filter(p =>
-                (p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled') &&
-                isWithinDateRange(p.appointmentDate, startYTD, endYTD)
+                (p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled') &&
+                isWithinDateRange(p.appointment_date, startYTD, endYTD)
               ).length;
 
               const gSalesMeetingsYTD = gProspects.filter(p =>
-                p.appointmentStatus === 'completed' &&
-                isWithinDateRange(p.appointmentCompletedAt || p.appointmentDate, startYTD, endYTD)
+                p.appointment_status === 'done' &&
+                isWithinDateRange(p.appointment_completed_at || p.appointment_date, startYTD, endYTD)
               ).length;
 
               const gSalesYTD = gProspects.filter(p =>
-                p.salesOutcome === 'successful' &&
-                isWithinDateRange(p.salesCompletedAt || p.updatedAt, startYTD, endYTD)
+                p.sales_outcome === 'successful' &&
+                isWithinDateRange(p.sales_completed_at || p.updated_at, startYTD, endYTD)
               );
               
               const gSalesNOC_YTD = gSalesYTD.length;
-              const gSalesACE_YTD = gSalesYTD.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+              const gSalesACE_YTD = gSalesYTD.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
 
               // Count ALL registered members in this group regardless of activity
               const gNoOfAgentsYTD = users.filter(u =>
-                u.groupId === group.id &&
+                u.group_id === group.id &&
                 (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
               ).length;
               const gAcsYTD = gSalesNOC_YTD > 0 ? (gSalesACE_YTD / gSalesNOC_YTD) : 0;
@@ -304,29 +226,29 @@ const Group: React.FC = () => {
 
   // Group Aggregates - only count successful sales (Total overall for the top right corner)
   const totalGroupFYC = groupProspects
-    .filter(p => p.salesOutcome === 'successful')
-    .reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+    .filter(p => p.sales_outcome === 'successful')
+    .reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
 
   // --- YTD Calculations ---
   // Appointments Scheduled YTD
   const ytdAppointments_Grp = groupProspects.filter(p =>
-    (p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled') &&
-    isWithinDateRange(p.appointmentDate, startYTD, endYTD)
+    (p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled') &&
+    isWithinDateRange(p.appointment_date, startYTD, endYTD)
   ).length;
 
   // Sales Meetings Completed YTD
   const ytdSalesMeetings_Grp = groupProspects.filter(p =>
-    p.appointmentStatus === 'completed' &&
-    isWithinDateRange(p.appointmentCompletedAt || p.appointmentDate, startYTD, endYTD)
+    p.appointment_status === 'done' &&
+    isWithinDateRange(p.appointment_completed_at || p.appointment_date, startYTD, endYTD)
   ).length;
 
   // Sales (Successful) YTD
   const ytdSales_Grp = groupProspects.filter(p =>
-    p.salesOutcome === 'successful' &&
-    isWithinDateRange(p.salesCompletedAt || p.updatedAt, startYTD, endYTD)
+    p.sales_outcome === 'successful' &&
+    isWithinDateRange(p.sales_completed_at || p.updated_at, startYTD, endYTD)
   );
   const totalSalesNOC_YTD_Grp = ytdSales_Grp.length;
-  const totalSalesACE_YTD_Grp = ytdSales_Grp.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+  const totalSalesACE_YTD_Grp = ytdSales_Grp.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
 
 
   // ACS YTD
@@ -337,7 +259,7 @@ const Group: React.FC = () => {
   const groupUsers = currentUser?.role === UserRole.GROUP_LEADER
     ? groupUsersFromAPI
     : users.filter(u =>
-      u.groupId === currentGroupId &&
+      u.group_id === currentGroupId &&
       (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
     );
   const activeMembersCount = groupUsers.length;
@@ -347,18 +269,18 @@ const Group: React.FC = () => {
 
   // Build agent list with performance metrics - calculate from prospects for all roles
   const agentList = allGroupUsers.map(member => {
-    const memberProspects = groupProspects.filter(p => p.uid === (member.uid || member.id));
+    const memberProspects = groupProspects.filter(p => p.agent_id === member.id);
     const memberFYC = memberProspects
-      .filter(p => p.salesOutcome === 'successful')
-      .reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
-    const memberSales = memberProspects.filter(p => p.salesOutcome === 'successful').length;
+      .filter(p => p.sales_outcome === 'successful')
+      .reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
+    const memberSales = memberProspects.filter(p => p.sales_outcome === 'successful').length;
     const memberAppointments = memberProspects.filter(p =>
-      p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled'
+      p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled'
     ).length;
-    const memberSalesMeetings = memberProspects.filter(p => p.appointmentStatus === 'completed').length;
+    const memberSalesMeetings = memberProspects.filter(p => p.appointment_status === 'done').length;
     return {
       ...member,
-      id: member.uid || member.id,
+      id: member.id,
       fyc: memberFYC,
       sales: memberSales,
       prospects: memberProspects.length,
@@ -377,15 +299,15 @@ const Group: React.FC = () => {
     const agent = agentList.find(u => u.id === selectedAgentId);
     if (!agent) return <div>Agent not found</div>;
 
-    const agentProspects = groupProspects.filter(p => p.uid === selectedAgentId);
-    const successfulSales = agentProspects.filter(p => p.salesOutcome === 'successful');
+    const agentProspects = groupProspects.filter(p => p.agent_id === selectedAgentId);
+    const successfulSales = agentProspects.filter(p => p.sales_outcome === 'successful');
 
     // Updated Logic for Funnel
     const appointmentsSet = agentProspects.filter(p =>
-      p.appointmentStatus === 'scheduled' ||
-      p.appointmentStatus === 'rescheduled'
+      p.appointment_status === 'scheduled' ||
+      p.appointment_status === 'rescheduled'
     ).length;
-    const completedAppointments = agentProspects.filter(p => p.appointmentStatus === 'completed').length;
+    const completedAppointments = agentProspects.filter(p => p.appointment_status === 'done').length;
 
     const chartData = [
       { name: 'Prospects', value: agentProspects.length },
@@ -396,29 +318,29 @@ const Group: React.FC = () => {
 
     // YTD Calculations for the specific agent
     const aAppointmentsYTD = agentProspects.filter(p =>
-      (p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled') &&
-      isWithinDateRange(p.appointmentDate, startYTD, endYTD)
+      (p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled') &&
+      isWithinDateRange(p.appointment_date, startYTD, endYTD)
     ).length;
 
     const aSalesMeetingsYTD = agentProspects.filter(p =>
-      p.appointmentStatus === 'completed' &&
-      isWithinDateRange(p.appointmentCompletedAt || p.appointmentDate, startYTD, endYTD)
+      p.appointment_status === 'done' &&
+      isWithinDateRange(p.appointment_completed_at || p.appointment_date, startYTD, endYTD)
     ).length;
 
     const aSalesYTD = agentProspects.filter(p =>
-      p.salesOutcome === 'successful' &&
-      isWithinDateRange(p.salesCompletedAt || p.updatedAt, startYTD, endYTD)
+      p.sales_outcome === 'successful' &&
+      isWithinDateRange(p.sales_completed_at || p.updated_at, startYTD, endYTD)
     );
     const aSalesNOC_YTD = aSalesYTD.length;
-    const aSalesACE_YTD = aSalesYTD.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+    const aSalesACE_YTD = aSalesYTD.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
 
     const aAcsYTD = aSalesNOC_YTD > 0 ? (aSalesACE_YTD / aSalesNOC_YTD) : 0;
     
     const aYtdActive = agentProspects.some(p => 
-         isWithinDateRange(p.createdAt, startYTD, endYTD) ||
-         isWithinDateRange(p.updatedAt, startYTD, endYTD) ||
-         isWithinDateRange(p.appointmentDate, startYTD, endYTD) ||
-         isWithinDateRange(p.salesCompletedAt, startYTD, endYTD)
+         isWithinDateRange(p.created_at, startYTD, endYTD) ||
+         isWithinDateRange(p.updated_at, startYTD, endYTD) ||
+         isWithinDateRange(p.appointment_date, startYTD, endYTD) ||
+         isWithinDateRange(p.sales_completed_at, startYTD, endYTD)
     );
     const aNoOfAgentsYTD = aYtdActive ? 1 : 0;
 

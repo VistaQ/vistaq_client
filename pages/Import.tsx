@@ -70,7 +70,7 @@ const Import: React.FC = () => {
                 // Infer Stage based on outcome for logic consistency
                 let stage = ProspectStage.PROSPECT;
                 if (outcome === 'SUCCESSFUL' || outcome === 'UNSUCCESSFUL' || outcome === 'KIV') {
-                    stage = ProspectStage.SALES_OUTCOME;
+                    stage = ProspectStage.SALES;
                 } else if (outcome) {
                     stage = ProspectStage.APPOINTMENT;
                 }
@@ -83,17 +83,17 @@ const Import: React.FC = () => {
                 if (id && uid && name) {
                     parsedData.push({
                         id,
-                        uid,
-                        prospectName: name,
-                        prospectPhone: phone,
-                        currentStage: stage,
-                        salesOutcome: normalizedOutcome as any,
-                        unsuccessfulReason: reason,
-                        productsSold: product ? [{ id: '1', productName: product, aceAmount: amount }] : [],
-                        appointmentStatus: 'completed',
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString()
-                    } as Prospect);
+                        agent_id: uid,
+                        prospect_name: name,
+                        prospect_phone: phone,
+                        current_stage: stage,
+                        sales_outcome: normalizedOutcome as any,
+                        unsuccessful_reason: reason,
+                        products_sold: product ? [{ id: '1', productName: product, amount: amount }] : [],
+                        appointment_status: 'done',
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    } as unknown as Prospect);
                     successCount++;
                 }
             }

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../services/apiClient';
 import { Group } from '../types';
-import { Lock, Mail, User, Users, AlertCircle, Loader2, IdCard } from 'lucide-react';
+import { Lock, Mail, User, Users, AlertCircle, Loader2, IdCard, MapPin } from 'lucide-react';
 
 interface SignupProps {
   onSwitchToLogin: () => void;
@@ -21,6 +21,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
   const [agentCode, setAgentCode] = useState('');
   const [password, setPassword] = useState('');
   const [groupId, setGroupId] = useState('');
+  const [location, setLocation] = useState('');
   const [isAgreed, setIsAgreed] = useState(false);
 
   // Field-level errors
@@ -29,14 +30,15 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [groupError, setGroupError] = useState('');
+  const [locationError, setLocationError] = useState('');
   const [generalError, setGeneralError] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
 
   const fetchPublicGroups = () => {
-    apiCall('/groups/public').then((data: any) => {
-      const items: Group[] = Array.isArray(data) ? data : (data.groups || []);
+    apiCall('/groups').then((res: any) => {
+      const items: Group[] = Array.isArray(res.data) ? res.data : [];
       setPublicGroups(items);
     }).catch(() => { });
   };
@@ -51,6 +53,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
     setEmailError('');
     setPasswordError('');
     setGroupError('');
+    setLocationError('');
     setGeneralError('');
   };
 
@@ -76,6 +79,10 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
       setGroupError('Please select a group.');
       valid = false;
     }
+    if (!location.trim()) {
+      setLocationError('Location is required.');
+      valid = false;
+    }
     return valid;
   };
 
@@ -87,9 +94,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
 
     setLoading(true);
     try {
-      // register() in AuthContext calls firebase.ts which saves token/user and
-      // triggers onAuthStateChanged → sets currentUser → app auto-redirects to dashboard
-      await register(name, email, password, groupId, agentCode);
+      await register(name, email, password, groupId, agentCode, location);
     } catch (err: any) {
       const msg: string = err?.message || 'An error occurred. Please try again.';
       const status: number = err?.status;
@@ -231,6 +236,22 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
                 ? <p className="text-xs text-red-500 mt-1">{groupError}</p>
                 : <p className="text-xs text-gray-500 mt-1">Select the group assigned by your trainer.</p>
               }
+            </div>
+
+            {/* Location */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Location</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => { setLocation(e.target.value); setLocationError(''); }}
+                  className={fieldClass(!!locationError)}
+                  placeholder="e.g. Kuala Lumpur"
+                />
+              </div>
+              {locationError && <p className="text-xs text-red-500 mt-1">{locationError}</p>}
             </div>
 
             {/* Compliance Checkbox */}

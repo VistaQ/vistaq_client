@@ -23,15 +23,15 @@ const Profile: React.FC = () => {
           setFormData({
               name: currentUser.name,
               email: currentUser.email,
-              agentCode: currentUser.agentCode || '',
+              agent_code: currentUser.agent_code || '',
           });
       }
   }, [currentUser]);
 
   if (!currentUser) return null;
 
-  const currentGroup = groups.find(g => g.id === currentUser.groupId);
-  const groupName = currentUser.groupName || currentGroup?.name || 'Unassigned';
+  const currentGroup = groups.find(g => g.id === currentUser.group_id);
+  const groupName = currentGroup?.name || 'Unassigned';
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -131,7 +131,7 @@ const Profile: React.FC = () => {
                            <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                            <input
                                type="text"
-                               value={formData.agentCode || ''}
+                               value={formData.agent_code || ''}
                                readOnly
                                className="block w-full pl-10 bg-gray-100 border-gray-200 text-gray-500 rounded-lg border p-2.5 cursor-not-allowed"
                            />

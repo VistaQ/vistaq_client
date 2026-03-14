@@ -1,6 +1,18 @@
-import { clearAllCache } from './cache';
-
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+/**
+ * Derive the tenant slug from the subdomain (e.g. acme.vistaq.co → acme),
+ * falling back to the VITE_TENANT_SLUG env var for local dev / staging.
+ */
+export function getTenantSlug(): string {
+  const hostname = window.location.hostname;
+  const parts = hostname.split('.');
+  // subdomain exists when there are 3+ parts (e.g. acme.vistaq.co)
+  if (parts.length >= 3) {
+    return parts[0];
+  }
+  return import.meta.env.VITE_TENANT_SLUG || '';
+}
 
 export interface ApiError {
   status: number;
@@ -10,7 +22,7 @@ export interface ApiError {
 export const apiCall = async (endpoint: string, options: any = {}): Promise<any> => {
   const token = localStorage.getItem('authToken');
 
-  const headers = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers
@@ -37,7 +49,6 @@ export const apiCall = async (endpoint: string, options: any = {}): Promise<any>
   if (response.status === 401) {
     localStorage.removeItem('authToken');
     localStorage.removeItem('authUser');
-    clearAllCache();
     window.location.href = '/login';
     throw { status: 401, message: 'Session expired. Please log in again.' } as ApiError;
   }
@@ -54,7 +65,7 @@ export const apiCall = async (endpoint: string, options: any = {}): Promise<any>
   }
 
   if (!response.ok) {
-    const apiMessage = data.error || '';
+    const apiMessage = data.message || '';
     let message: string;
     switch (response.status) {
       case 403: message = "You don't have permission to do that."; break;
@@ -66,24 +77,4 @@ export const apiCall = async (endpoint: string, options: any = {}): Promise<any>
   }
 
   return data;
-};
-
-export const debugConnection = async () => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/health`);
-    const text = await response.text();
-    return {
-      status: response.ok ? 'success' : 'error',
-      message: response.ok ? 'Connected to API' : `HTTP Error: ${response.status}`,
-      details: text.substring(0, 100),
-      curl: `curl -v ${API_BASE_URL}/health`
-    };
-  } catch (e: any) {
-    return {
-      status: 'error',
-      message: 'Connection Failed',
-      details: e.message,
-      curl: `curl -v ${API_BASE_URL}/health`
-    };
-  }
 };

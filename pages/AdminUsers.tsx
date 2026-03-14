@@ -49,8 +49,8 @@ const AdminUsers: React.FC = () => {
         email: '',
         role: UserRole.AGENT,
         password: '', 
-        groupId: '',
-        agentCode: '',
+        group_id: '',
+        agent_code: '',
         managedGroupIds: []
       });
     }
@@ -161,7 +161,7 @@ const AdminUsers: React.FC = () => {
                        </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                       {user.agentCode || '-'}
+                       {user.agent_code || '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                        {user.role === UserRole.TRAINER ? (
@@ -169,7 +169,7 @@ const AdminUsers: React.FC = () => {
                              ? <span className="text-purple-600">Manages {user.managedGroupIds.length} Groups</span>
                              : <span className="text-gray-400">No Groups Assigned</span>
                        ) : (
-                          groups.find(g => g.id === user.groupId)?.name || '-'
+                          groups.find(g => g.id === user.group_id)?.name || '-'
                        )}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
@@ -256,8 +256,8 @@ const AdminUsers: React.FC = () => {
                               <input 
                                  type="text" 
                                  className="w-full pl-9 bg-gray-50 border border-gray-300 text-gray-900 p-2 rounded" 
-                                 value={editingUser.agentCode || ''}
-                                 onChange={e => setEditingUser({...editingUser, agentCode: e.target.value})}
+                                 value={editingUser.agent_code || ''}
+                                 onChange={e => setEditingUser({...editingUser, agent_code: e.target.value})}
                                  placeholder="e.g. AGT-12345"
                               />
                           </div>

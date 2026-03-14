@@ -29,51 +29,51 @@ export function computeUserPoints(
   const breakdown: PointEntry[] = [];
 
   // --- Prospect points ---
-  const myProspects = prospects.filter(p => p.uid === userId);
+  const myProspects = prospects.filter(p => p.agent_id === userId);
 
   for (const p of myProspects) {
     // 1. Basic info added (every prospect earns this)
     breakdown.push({
       id: `${p.id}_basic`,
-      date: p.createdAt,
+      date: p.created_at,
       category: 'prospect',
       action: 'Added Prospect',
-      subject: p.prospectName,
+      subject: p.prospect_name,
       points: config.prospectBasicInfo,
     });
 
     // 2. Appointment completed
-    if (p.appointmentStatus === 'completed') {
+    if (p.appointment_status === 'done') {
       breakdown.push({
         id: `${p.id}_appt`,
-        date: p.appointmentCompletedAt || p.updatedAt,
+        date: p.appointment_completed_at || p.updated_at,
         category: 'prospect',
         action: 'Appointment Completed',
-        subject: p.prospectName,
+        subject: p.prospect_name,
         points: config.appointmentCompleted,
       });
     }
 
     // 3. Sales meeting completed (any sales outcome entered)
-    if (p.salesOutcome) {
+    if (p.sales_outcome) {
       breakdown.push({
         id: `${p.id}_meeting`,
-        date: p.salesCompletedAt || p.updatedAt,
+        date: p.sales_completed_at || p.updated_at,
         category: 'prospect',
         action: 'Sales Meeting Completed',
-        subject: p.prospectName,
+        subject: p.prospect_name,
         points: config.salesMeetingCompleted,
       });
     }
 
     // 4. Successful sale
-    if (p.salesOutcome === 'successful') {
+    if (p.sales_outcome === 'successful') {
       breakdown.push({
         id: `${p.id}_sale`,
-        date: p.salesCompletedAt || p.updatedAt,
+        date: p.sales_completed_at || p.updated_at,
         category: 'prospect',
         action: 'Sale: Successful',
-        subject: p.prospectName,
+        subject: p.prospect_name,
         points: config.salesSuccessful,
       });
     }

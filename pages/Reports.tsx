@@ -20,55 +20,55 @@ const Reports: React.FC = () => {
   if (selectedGroupId !== 'all' && (currentUser?.role === UserRole.TRAINER || currentUser?.role === UserRole.ADMIN)) {
       // If a specific group is selected, fetch that group's prospects specifically
       // or filter the 'allProspects' if it already contains everything.
-      allProspects = allProspects.filter(p => p.groupId === selectedGroupId);
+      allProspects = allProspects.filter(p => p.group_id === selectedGroupId);
   }
 
   // 3. Filter for Closed Sales (Success or Unsuccessful or KIV) for report basis
-  let closedSales = allProspects.filter(p => p.salesOutcome === 'successful' || p.salesOutcome === 'unsuccessful' || p.salesOutcome === 'kiv');
+  let closedSales = allProspects.filter(p => p.sales_outcome === 'successful' || p.sales_outcome === 'unsuccessful' || p.sales_outcome === 'kiv');
 
   // 4. Apply Outcome Filter
   if (selectedOutcome !== 'all') {
-      closedSales = closedSales.filter(p => p.salesOutcome === selectedOutcome);
+      closedSales = closedSales.filter(p => p.sales_outcome === selectedOutcome);
   }
 
   // Calculate Metrics based on FILTERED data
-  const successfulSales = closedSales.filter(p => p.salesOutcome === 'successful');
+  const successfulSales = closedSales.filter(p => p.sales_outcome === 'successful');
   const totalClosed = closedSales.length;
   const totalSuccessful = successfulSales.length;
 
   // Re-calculate context metrics (Ignoring outcome filter for the top cards to show context)
   const contextClosedSales = selectedGroupId !== 'all'
-      ? allProspects.filter(p => p.salesOutcome === 'successful' || p.salesOutcome === 'unsuccessful')
-      : (selectedOutcome === 'all' ? closedSales : allProspects.filter(p => p.salesOutcome === 'successful' || p.salesOutcome === 'unsuccessful'));
+      ? allProspects.filter(p => p.sales_outcome === 'successful' || p.sales_outcome === 'unsuccessful')
+      : (selectedOutcome === 'all' ? closedSales : allProspects.filter(p => p.sales_outcome === 'successful' || p.sales_outcome === 'unsuccessful'));
 
-  const contextSuccessful = contextClosedSales.filter(p => p.salesOutcome === 'successful');
+  const contextSuccessful = contextClosedSales.filter(p => p.sales_outcome === 'successful');
   const contextTotalClosed = contextClosedSales.length;
   const conversionRate = contextTotalClosed > 0 ? (contextSuccessful.length / contextTotalClosed) * 100 : 0;
 
   // Revenue is based on the actually displayed successful rows
-  const totalRevenue = successfulSales.reduce((sum, p) => (p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), sum), 0);
+  const totalRevenue = successfulSales.reduce((sum, p) => (p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), sum), 0);
 
   const handleExportCSV = () => {
     const headers = ['ID', 'Name', 'Phone', 'Group/Agent', 'Outcome', 'Reason (If Lost)', 'Product', 'Amount (MYR)', 'Date'];
     const rows = closedSales.map(p => {
       let outcomeLabel = '';
-      if (p.salesOutcome === 'successful') outcomeLabel = 'Won';
-      else if (p.salesOutcome === 'unsuccessful') outcomeLabel = 'Lose';
-      else if (p.salesOutcome === 'kiv') outcomeLabel = 'KIV';
+      if (p.sales_outcome === 'successful') outcomeLabel = 'Won';
+      else if (p.sales_outcome === 'unsuccessful') outcomeLabel = 'Lose';
+      else if (p.sales_outcome === 'kiv') outcomeLabel = 'KIV';
 
-      const totalAce = (p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0);
-      const productNames = (p.productsSold || []).map(prod => prod.productName).filter(Boolean).join('; ');
+      const totalAce = (p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0);
+      const productNames = (p.products_sold || []).map(prod => prod.productName).filter(Boolean).join('; ');
 
       return [
         p.id,
-        p.prospectName,
-        p.prospectPhone || '',
-        p.uid,
+        p.prospect_name,
+        p.prospect_phone || '',
+        p.agent_id,
         outcomeLabel,
-        p.unsuccessfulReason || 'N/A',
+        p.unsuccessful_reason || 'N/A',
         productNames || 'N/A',
         totalAce,
-        p.updatedAt
+        p.updated_at
       ]
     });
     
@@ -216,41 +216,41 @@ const Reports: React.FC = () => {
                  {closedSales.map((sale) => (
                     <tr key={sale.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 text-sm text-gray-600">
-                            {formatDate(sale.updatedAt)}
+                            {formatDate(sale.updated_at)}
                         </td>
                         <td className="px-6 py-4 font-medium text-gray-900">
-                            {sale.prospectName}
+                            {sale.prospect_name}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
-                            {(sale.productsSold || []).map(p => p.productName).filter(Boolean).join(', ') || '-'}
+                            {(sale.products_sold || []).map(p => p.productName).filter(Boolean).join(', ') || '-'}
                         </td>
                         <td className="px-6 py-4 text-center">
-                            {sale.salesOutcome === 'successful' && (
+                            {sale.sales_outcome === 'successful' && (
                                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
                                     <CheckCircle className="w-3 h-3 mr-1" /> Won
                                 </span>
                             )}
-                            {sale.salesOutcome === 'unsuccessful' && (
+                            {sale.sales_outcome === 'unsuccessful' && (
                                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
                                     <XCircle className="w-3 h-3 mr-1" /> Lose
                                 </span>
                             )}
-                            {sale.salesOutcome === 'kiv' && (
+                            {sale.sales_outcome === 'kiv' && (
                                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
                                     <PauseCircle className="w-3 h-3 mr-1" /> KIV
                                 </span>
                             )}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500 italic">
-                            {sale.salesOutcome === 'unsuccessful' ? (
-                                sale.unsuccessfulReason
+                            {sale.sales_outcome === 'unsuccessful' ? (
+                                sale.unsuccessful_reason
                             ) : (
-                                sale.salesOutcome === 'successful' ? 'Completed' : 'Pending'
+                                sale.sales_outcome === 'successful' ? 'Completed' : 'Pending'
                             )}
                         </td>
                         <td className="px-6 py-4 text-right font-mono text-gray-900">
-                            {sale.salesOutcome === 'successful'
-                                ? (sale.productsSold || []).reduce((s, p) => s + (p.aceAmount || 0), 0).toLocaleString()
+                            {sale.sales_outcome === 'successful'
+                                ? (sale.products_sold || []).reduce((s, p) => s + (p.amount || 0), 0).toLocaleString()
                                 : <span className="text-gray-300">-</span>}
                         </td>
                     </tr>

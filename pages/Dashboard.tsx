@@ -68,32 +68,32 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       // If Trainer: Filter by relevant groups
       const relevantAgents = isAdmin
          ? users.filter(u => u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
-         : users.filter(u => (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) && relevantGroups.some(g => g.id === u.groupId));
+         : users.filter(u => (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) && relevantGroups.some(g => g.id === u.group_id));
 
       const totalAgents = relevantAgents.length;
 
       // --- 3. PERFORMANCE METRICS (AGGREGATE) ---
-      const successfulScopeProspects = scopeProspects.filter(p => p.salesOutcome === 'successful');
-      const totalFYC = successfulScopeProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
-      const totalSales = scopeProspects.filter(p => p.salesOutcome === 'successful').length;
-      const totalClosed = scopeProspects.filter(p => p.salesOutcome === 'successful' || p.salesOutcome === 'unsuccessful').length;
+      const successfulScopeProspects = scopeProspects.filter(p => p.sales_outcome === 'successful');
+      const totalFYC = successfulScopeProspects.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
+      const totalSales = scopeProspects.filter(p => p.sales_outcome === 'successful').length;
+      const totalClosed = scopeProspects.filter(p => p.sales_outcome === 'successful' || p.sales_outcome === 'unsuccessful').length;
       const conversionRate = totalClosed > 0 ? (totalSales / totalClosed) * 100 : 0;
 
       // --- 4. GROUP RANKINGS (Only relevant if > 1 group) ---
       const groupRankings = relevantGroups.map(group => {
          const gProspects = getGroupProspects(group.id);
-         const gFYC = gProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
-         const gSales = gProspects.filter(p => p.salesOutcome === 'successful').length;
+         const gFYC = gProspects.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
+         const gSales = gProspects.filter(p => p.sales_outcome === 'successful').length;
          return { id: group.id, name: group.name, fyc: gFYC, sales: gSales };
       }).sort((a, b) => b.fyc - a.fyc);
 
       // --- 5. CHART DATA ---
       const totalAppointmentsSet = scopeProspects.filter(p =>
-         p.appointmentStatus === 'scheduled' ||
-         p.appointmentStatus === 'rescheduled'
+         p.appointment_status === 'scheduled' ||
+         p.appointment_status === 'rescheduled'
       ).length;
 
-      const totalSalesMeetings = scopeProspects.filter(p => p.appointmentStatus === 'completed').length;
+      const totalSalesMeetings = scopeProspects.filter(p => p.appointment_status === 'done').length;
 
       const funnelData = [
          { name: 'Prospects', value: scopeProspects.length },
@@ -120,22 +120,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
       // YTD Metrics Filtered
       const ytdAppointments_Mgmt = scopeProspects.filter(p =>
-         (p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled') &&
-         isWithinDateRange(p.appointmentDate, startYTD, endYTD)
+         (p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled') &&
+         isWithinDateRange(p.appointment_date, startYTD, endYTD)
       ).length;
 
       const ytdSalesMeetings_Mgmt = scopeProspects.filter(p =>
-         p.appointmentStatus === 'completed' &&
-         isWithinDateRange(p.appointmentCompletedAt || p.appointmentDate, startYTD, endYTD)
+         p.appointment_status === 'done' &&
+         isWithinDateRange(p.appointment_completed_at || p.appointment_date, startYTD, endYTD)
       ).length;
 
       const ytdSales_Mgmt = scopeProspects.filter(p =>
-         p.salesOutcome === 'successful' &&
-         isWithinDateRange(p.salesCompletedAt || p.updatedAt, startYTD, endYTD)
+         p.sales_outcome === 'successful' &&
+         isWithinDateRange(p.sales_completed_at || p.updated_at, startYTD, endYTD)
       );
 
       const totalSalesNOC_YTD_Mgmt = ytdSales_Mgmt.length;
-      const totalSalesACE_YTD_Mgmt = ytdSales_Mgmt.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+      const totalSalesACE_YTD_Mgmt = ytdSales_Mgmt.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
 
       // Total agents in scope — counts ALL registered members regardless of activity
       const noOfAgentsYTD = relevantAgents.length;
@@ -155,9 +155,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
          ...mgmtEvents
             .filter(e => e.status !== 'cancelled')
             .map(e => ({
-               id: `evt_${e.id}`, title: e.eventTitle, date: e.date,
-               type: 'event' as const, meta: e.venue, link: e.meetingLink || undefined,
-               isOwned: e.createdBy === currentUser?.id
+               id: `evt_${e.id}`, title: e.event_title, date: e.date,
+               type: 'event' as const, meta: e.venue, link: e.meeting_link || undefined,
+               isOwned: e.created_by === currentUser?.id
             })),
          ...mgmtSessions
             .filter(s => s.status !== 'cancelled')
@@ -443,7 +443,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
    // --- STRICTLY PERSONAL DATA ---
-   const myProspects = prospects.filter(p => p.uid === currentUser?.id);
+   const myProspects = prospects.filter(p => p.agent_id === currentUser?.id);
    const myEvents = currentUser ? getEventsForUser(currentUser) : []; // This gets Admin/Trainer/Group events
 
    // Helper to check if a date string falls within a date range
@@ -456,54 +456,54 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
    // --- YTD Calculations ---
    // Prospects entered YTD
-   const ytdProspects = myProspects.filter(p => isWithinDateRange(p.createdAt, startYTD, endYTD));
+   const ytdProspects = myProspects.filter(p => isWithinDateRange(p.created_at, startYTD, endYTD));
    const totalProspectsYTD = ytdProspects.length;
 
    // Appointments Scheduled YTD (including rescheduled)
    const ytdAppointments = myProspects.filter(p =>
-      (p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled') &&
-      isWithinDateRange(p.appointmentDate, startYTD, endYTD)
+      (p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled') &&
+      isWithinDateRange(p.appointment_date, startYTD, endYTD)
    );
    const totalAppointmentsYTD = ytdAppointments.length;
 
    // Sales Meetings Completed YTD
    const ytdSalesMeetings = myProspects.filter(p =>
-      p.appointmentStatus === 'completed' &&
-      isWithinDateRange(p.appointmentCompletedAt || p.appointmentDate, startYTD, endYTD)
+      p.appointment_status === 'done' &&
+      isWithinDateRange(p.appointment_completed_at || p.appointment_date, startYTD, endYTD)
    );
    const totalSalesMeetingsYTD = ytdSalesMeetings.length;
 
    // Sales (Successful) YTD
    const ytdSales = myProspects.filter(p =>
-      p.salesOutcome === 'successful' &&
-      isWithinDateRange(p.salesCompletedAt || p.updatedAt, startYTD, endYTD)
+      p.sales_outcome === 'successful' &&
+      isWithinDateRange(p.sales_completed_at || p.updated_at, startYTD, endYTD)
    );
    const totalSalesNOC_YTD = ytdSales.length;
-   const totalSalesACE_YTD = ytdSales.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+   const totalSalesACE_YTD = ytdSales.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
 
    // ACS (ACE / NOC) YTD
    const acsYTD = totalSalesNOC_YTD > 0 ? (totalSalesACE_YTD / totalSalesNOC_YTD) : 0;
 
    // --- MTD Calculations ---
    // Prospects entered MTD
-   const mtdProspectsCount = myProspects.filter(p => isWithinDateRange(p.createdAt, startMTD, endMTD)).length;
+   const mtdProspectsCount = myProspects.filter(p => isWithinDateRange(p.created_at, startMTD, endMTD)).length;
    // Appointments Scheduled MTD — counts when the appointment was SET this month (by updatedAt)
    const mtdAppointmentsCount = myProspects.filter(p =>
-      (p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled') &&
-      isWithinDateRange(p.updatedAt, startMTD, endMTD)
+      (p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled') &&
+      isWithinDateRange(p.updated_at, startMTD, endMTD)
    ).length;
    // Sales Meetings Completed MTD
    const mtdSalesMeetingsCount = myProspects.filter(p =>
-      p.appointmentStatus === 'completed' &&
-      isWithinDateRange(p.appointmentCompletedAt || p.appointmentDate, startMTD, endMTD)
+      p.appointment_status === 'done' &&
+      isWithinDateRange(p.appointment_completed_at || p.appointment_date, startMTD, endMTD)
    ).length;
    // Sales (Successful) MTD
    const mtdSales = myProspects.filter(p =>
-      p.salesOutcome === 'successful' &&
-      isWithinDateRange(p.salesCompletedAt || p.updatedAt, startMTD, endMTD)
+      p.sales_outcome === 'successful' &&
+      isWithinDateRange(p.sales_completed_at || p.updated_at, startMTD, endMTD)
    );
    const mtdSalesNOC = mtdSales.length;
-   const mtdSalesACE = mtdSales.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+   const mtdSalesACE = mtdSales.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
 
 
    // --- UPCOMING SCHEDULE LOGIC — Next 5 items (all types combined) ---
@@ -511,29 +511,29 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
    const upcomingAppointments: ScheduleItem[] = myProspects
       .filter(p => {
-         if (!p.appointmentDate) return false;
-         const isActive = p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled' || p.appointmentStatus === 'not_done';
-         const d = new Date(p.appointmentDate);
+         if (!p.appointment_date) return false;
+         const isActive = p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled' || p.appointment_status === 'not_done';
+         const d = new Date(p.appointment_date);
          return isActive && d >= now && d <= sevenDaysFromNow;
       })
       .map(p => {
-         let finalDate = new Date(p.appointmentDate!);
-         if (p.appointmentStartTime) {
-            const [hours, minutes] = p.appointmentStartTime.split(':');
+         let finalDate = new Date(p.appointment_date!);
+         if (p.appointment_start_time) {
+            const [hours, minutes] = p.appointment_start_time.split(':');
             finalDate.setHours(parseInt(hours, 10));
             finalDate.setMinutes(parseInt(minutes, 10));
          }
          return {
-            id: p.id, title: `Appt: ${p.prospectName}`, date: finalDate.toISOString(),
-            type: 'meeting' as const, meta: p.appointmentLocation || undefined, link: undefined, isOwned: true
+            id: p.id, title: `Appt: ${p.prospect_name}`, date: finalDate.toISOString(),
+            type: 'meeting' as const, meta: p.appointment_location || undefined, link: undefined, isOwned: true
          };
       });
 
    const upcomingEvents: ScheduleItem[] = myEvents
       .filter(e => { const d = new Date(e.date); return e.status !== 'cancelled' && d >= now && d <= sevenDaysFromNow; })
       .map(e => ({
-         id: e.id, title: e.eventTitle, date: e.date, type: 'event' as const,
-         meta: e.venue, link: e.meetingLink || undefined, isOwned: e.createdBy === currentUser?.id
+         id: e.id, title: e.event_title, date: e.date, type: 'event' as const,
+         meta: e.venue, link: e.meeting_link || undefined, isOwned: e.created_by === currentUser?.id
       }));
 
    const myCoachingSessions = currentUser ? getCoachingSessionsForUser(currentUser) : [];

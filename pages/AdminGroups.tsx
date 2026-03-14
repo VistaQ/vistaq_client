@@ -45,7 +45,7 @@ const AdminGroups: React.FC = () => {
     if (group) {
       setEditingGroup(group);
       setFormName(group.name);
-      setFormLeaderId(group.leaderId);
+      setFormLeaderId(group.leader_id);
       
       // Find current trainer(s) for this group
       const assignedTrainers = users.filter(u => u.role === UserRole.TRAINER && u.managedGroupIds?.includes(group.id)).map(u => u.id);
@@ -160,7 +160,7 @@ const AdminGroups: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
          {filteredGroups.map(group => {
              const members = getGroupMembers(group.id);
-             const leader = users.find(u => u.id === group.leaderId);
+             const leader = users.find(u => u.id === group.leader_id);
              const trainers = users.filter(u => u.role === UserRole.TRAINER && u.managedGroupIds?.includes(group.id));
 
              return (
@@ -254,7 +254,7 @@ const AdminGroups: React.FC = () => {
                                       <option value="">Select Leader (Optional)...</option>
                                       {potentialLeaders.map(l => (
                                           <option key={l.id} value={l.id}>
-                                              {l.name} {l.groupId && l.groupId !== editingGroup?.id ? `(In ${groups.find(g=>g.id===l.groupId)?.name})` : ''}
+                                              {l.name} {l.group_id && l.group_id !== editingGroup?.id ? `(In ${groups.find(g=>g.id===l.group_id)?.name})` : ''}
                                           </option>
                                       ))}
                                   </select>
@@ -318,7 +318,7 @@ const AdminGroups: React.FC = () => {
                               <div className="flex-1 overflow-y-auto p-2 bg-gray-50/50 space-y-1">
                                   {filteredAgentsList.map(agent => {
                                       const isSelected = formMemberIds.includes(agent.id);
-                                      const isAssignedElsewhere = agent.groupId && agent.groupId !== editingGroup?.id;
+                                      const isAssignedElsewhere = agent.group_id && agent.group_id !== editingGroup?.id;
                                       
                                       return (
                                           <div 
@@ -334,7 +334,7 @@ const AdminGroups: React.FC = () => {
                                                   <p className="text-xs text-gray-500 truncate">{agent.email}</p>
                                                   {isAssignedElsewhere && !isSelected && (
                                                       <p className="text-[10px] text-orange-600">
-                                                          Currently in: {groups.find(g => g.id === agent.groupId)?.name}
+                                                          Currently in: {groups.find(g => g.id === agent.group_id)?.name}
                                                       </p>
                                                   )}
                                                   {isAssignedElsewhere && isSelected && (

@@ -60,31 +60,31 @@ const buildOccupiedSlots = (
                 if (isNaN(start.getTime())) return;
                 // Events are treated as 1-hour blocks for overlap detection
                 const end = new Date(start.getTime() + 60 * 60 * 1000);
-                slots.push({ start, end, label: e.eventTitle, type: 'event' });
+                slots.push({ start, end, label: e.event_title, type: 'event' });
             } catch { }
         });
 
     // --- 3. Prospect Appointments ---
     userProspects.forEach(p => {
-        if (!p.appointmentDate) return;
+        if (!p.appointment_date) return;
         // Only block times that are actively scheduled/rescheduled
-        if (p.appointmentStatus !== 'scheduled' && p.appointmentStatus !== 'rescheduled' && p.appointmentStatus !== 'not_done') return;
+        if (p.appointment_status !== 'scheduled' && p.appointment_status !== 'rescheduled' && p.appointment_status !== 'not_done') return;
         try {
-            const base = new Date(p.appointmentDate);
+            const base = new Date(p.appointment_date);
             if (isNaN(base.getTime())) return;
-            if (p.appointmentStartTime) {
-                const [h, m] = p.appointmentStartTime.split(':').map(Number);
+            if (p.appointment_start_time) {
+                const [h, m] = p.appointment_start_time.split(':').map(Number);
                 base.setHours(h, m, 0, 0);
             }
-            const endTime = p.appointmentEndTime
+            const endTime = p.appointment_end_time
                 ? (() => {
-                    const [h, m] = p.appointmentEndTime.split(':').map(Number);
+                    const [h, m] = p.appointment_end_time.split(':').map(Number);
                     const d = new Date(base);
                     d.setHours(h, m, 0, 0);
                     return d;
                 })()
                 : new Date(base.getTime() + 60 * 60 * 1000);
-            slots.push({ start: base, end: endTime, label: `Appt: ${p.prospectName}`, type: 'appointment' });
+            slots.push({ start: base, end: endTime, label: `Appt: ${p.prospect_name}`, type: 'appointment' });
         } catch { }
     });
 
@@ -157,7 +157,7 @@ export const useCalendarConflicts = () => {
     const occupiedSlots = useMemo(() => {
         if (!currentUser) return [];
         const myEvents = getEventsForUser(currentUser);
-        const myProspects = prospects.filter(p => p.uid === currentUser.id);
+        const myProspects = prospects.filter(p => p.agent_id === currentUser.id);
         const slots = buildOccupiedSlots(currentUser, coachingSessions, myEvents, myProspects);
         return slots;
     }, [currentUser, coachingSessions, prospects, getEventsForUser]);

@@ -49,7 +49,7 @@ const EventDetailPopup: React.FC<EventDetailPopupProps> = ({ event, onClose, onE
                                 </div>
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold leading-tight">{event.eventTitle}</h2>
+                                <h2 className="text-lg font-bold leading-tight">{event.event_title}</h2>
                                 {event.status && event.status !== 'upcoming' && (
                                     <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${event.status === 'completed' ? 'bg-green-400/30 text-green-100' : 'bg-red-400/30 text-red-100'
                                         }`}>
@@ -86,10 +86,10 @@ const EventDetailPopup: React.FC<EventDetailPopupProps> = ({ event, onClose, onE
                         </div>
                     )}
 
-                    {event.createdByName && (
+                    {event.created_by_name && (
                         <div className="flex items-start gap-3 text-sm text-gray-700">
                             <User className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                            <span>Organizer: <span className="font-medium">{event.createdByName}</span></span>
+                            <span>Organizer: <span className="font-medium">{event.created_by_name}</span></span>
                         </div>
                     )}
 
@@ -107,9 +107,9 @@ const EventDetailPopup: React.FC<EventDetailPopupProps> = ({ event, onClose, onE
                         }
                     </div>
 
-                    {event.meetingLink && (
+                    {event.meeting_link && (
                         <a
-                            href={event.meetingLink}
+                            href={event.meeting_link}
                             target="_blank"
                             rel="noreferrer"
                             className="flex items-center justify-center gap-2 w-full bg-blue-600 text-white px-4 py-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors shadow-md"
@@ -184,7 +184,7 @@ const DayPopup: React.FC<DayPopupProps> = ({ date, events, onClose, onSelectEven
                         >
                             <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 group-hover:scale-125 transition-transform" />
                             <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-gray-900 text-sm truncate">{evt.eventTitle}</div>
+                                <div className="font-semibold text-gray-900 text-sm truncate">{evt.event_title}</div>
                                 <div className="text-xs text-gray-500">
                                     {validDate ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Time TBD'}
                                     {evt.venue ? ` · ${evt.venue}` : ''}
@@ -346,9 +346,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
                                                 className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded truncate font-medium
                                                     ${isPastEvt ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}
                                                 `}
-                                                title={evt.eventTitle}
+                                                title={evt.event_title}
                                             >
-                                                {evt.eventTitle}
+                                                {evt.event_title}
                                             </div>
                                         );
                                     })}
@@ -423,7 +423,7 @@ const Events: React.FC = () => {
     if (currentUser.role === UserRole.TRAINER) {
         targetableGroups = groups.filter(g => currentUser.managedGroupIds?.includes(g.id));
     } else if (currentUser.role === UserRole.GROUP_LEADER) {
-        targetableGroups = groups.filter(g => g.id === currentUser.groupId);
+        targetableGroups = groups.filter(g => g.id === currentUser.group_id);
     } else if (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.MASTER_TRAINER) {
         targetableGroups = [];
     }
@@ -433,27 +433,27 @@ const Events: React.FC = () => {
             const d = new Date(event.date);
             let dateStr = '', timeStr = '';
             if (!isNaN(d.getTime())) {
-                dateStr = d.toISOString().split('T')[0];
-                timeStr = d.toTimeString().slice(0, 5);
+                dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
             } else {
                 const now = new Date();
-                dateStr = now.toISOString().split('T')[0];
+                dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 timeStr = '09:00';
             }
             setEditingEventId(event.id);
             setFormData({
-                eventTitle: event.eventTitle,
+                eventTitle: event.event_title,
                 description: event.description,
                 date: dateStr,
                 time: timeStr,
                 venue: event.venue,
-                meetingLink: event.meetingLink || '',
-                groupIds: event.groupIds,
-                status: event.status || 'upcoming'
+                meetingLink: event.meeting_link || '',
+                groupIds: event.groupIds || [],
+                status: (event.status || 'upcoming') as 'upcoming' | 'completed' | 'cancelled'
             });
         } else {
             setEditingEventId(null);
-            const initialGroups = (currentUser.role === UserRole.GROUP_LEADER && currentUser.groupId) ? [currentUser.groupId] : [];
+            const initialGroups = (currentUser.role === UserRole.GROUP_LEADER && currentUser.group_id) ? [currentUser.group_id] : [];
             setFormData({ eventTitle: '', description: '', date: '', time: '', venue: '', meetingLink: '', groupIds: initialGroups, status: 'upcoming' });
         }
         setIsModalOpen(true);
@@ -465,21 +465,20 @@ const Events: React.FC = () => {
             alert('Please fill in all required fields (Title, Date, Time, Venue, Description, Groups).');
             return;
         }
-        const dateTime = new Date(`${formData.date}T${formData.time}`);
-        if (isNaN(dateTime.getTime())) { alert('Invalid date or time selected.'); return; }
-        const eventData: Partial<Event> = {
-            eventTitle: formData.eventTitle,
+        const eventData = {
+            event_title: formData.eventTitle,
             description: formData.description,
             venue: formData.venue,
-            meetingLink: formData.meetingLink || undefined,
-            date: dateTime.toISOString(),
+            meeting_link: formData.meetingLink || undefined,
+            date: formData.date,    // YYYY-MM-DD
+            time: formData.time,    // HH:MM
             groupIds: formData.groupIds,
             status: formData.status
         };
         if (editingEventId) {
             await updateEvent(editingEventId, eventData);
         } else {
-            await addEvent({ ...eventData, createdBy: currentUser.id, createdByName: currentUser.name });
+            await addEvent({ ...eventData, created_by: currentUser.id, created_by_name: currentUser.name });
         }
         setIsModalOpen(false);
         setEditingEventId(null);
@@ -585,7 +584,7 @@ const Events: React.FC = () => {
             {viewMode === 'card' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {sortedEvents.length > 0 ? sortedEvents.map(evt => {
-                        const isCreator = evt.createdBy === currentUser.id;
+                        const isCreator = evt.created_by === currentUser.id;
                         const canEditEvent = isAdmin || isCreator;
                         const evtDate = new Date(evt.date);
                         const validDate = !isNaN(evtDate.getTime());
@@ -610,7 +609,7 @@ const Events: React.FC = () => {
                                             </span>
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-gray-900">{evt.eventTitle}</h3>
+                                            <h3 className="text-lg font-bold text-gray-900">{evt.event_title}</h3>
                                             <div className="flex items-center text-sm text-gray-500 mt-1">
                                                 <Clock className="w-3 h-3 mr-1" />
                                                 {validDate
@@ -640,12 +639,12 @@ const Events: React.FC = () => {
                                     </div>
                                     <div className="flex items-center text-sm text-gray-600">
                                         <User className="w-4 h-4 mr-2 text-gray-400" />
-                                        <span className="truncate">Organizer: {evt.createdByName}</span>
+                                        <span className="truncate">Organizer: {evt.created_by_name}</span>
                                     </div>
-                                    {evt.meetingLink && (
+                                    {evt.meeting_link && (
                                         <div className="pt-2" onClick={e => e.stopPropagation()}>
                                             <a
-                                                href={evt.meetingLink}
+                                                href={evt.meeting_link}
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 className="inline-flex items-center justify-center w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-bold text-sm shadow-md transition-colors"
@@ -700,8 +699,8 @@ const Events: React.FC = () => {
                     event={detailEvent}
                     groups={groups}
                     onClose={() => setDetailEvent(null)}
-                    onEdit={(isAdmin || detailEvent.createdBy === currentUser.id) ? () => { handleOpenModal(detailEvent); } : undefined}
-                    onDelete={(isAdmin || detailEvent.createdBy === currentUser.id) ? () => handleDelete(detailEvent.id) : undefined}
+                    onEdit={(isAdmin || detailEvent.created_by === currentUser.id) ? () => { handleOpenModal(detailEvent); } : undefined}
+                    onDelete={(isAdmin || detailEvent.created_by === currentUser.id) ? () => handleDelete(detailEvent.id) : undefined}
                 />
             )}
 

@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Prospect, ProspectStage, User, UserRole, BadgeTier, Event, CoachingSession, PointConfig } from '../types';
+import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, PointConfig } from '../types';
 import { apiCall } from '../services/apiClient';
 import { DEFAULT_POINT_CONFIG } from '../services/points';
 
@@ -73,58 +73,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return null;
   };
 
-  const getProspectsEndpoint = () => {
-    try {
-      const stored = localStorage.getItem('authUser');
-      if (stored) {
-        const user = JSON.parse(stored);
-        if (user.role === 'admin' || user.role === 'master_trainer') {
-          return '/admin/all-prospects';
-        }
-        if (user.role === 'trainer') {
-          return '/prospects/managed-groups';
-        }
-      }
-    } catch (_e) { }
-    return '/prospects/my-prospects';
-  };
-
-  const toISO = (ts: any): string | undefined => {
-    if (!ts) return undefined;
-    if (ts._seconds) return new Date(ts._seconds * 1000).toISOString();
-    if (typeof ts === 'string' || typeof ts === 'number') return new Date(ts).toISOString();
-    return undefined;
-  };
-
-  const normalizeProspect = (p: any): Prospect => ({
-    ...p,
-    id: p.id || p.prospectId,
-    prospectName: p.prospectName || '',
-    appointmentDate: toISO(p.appointmentDate),
-    appointmentCompletedAt: toISO(p.appointmentCompletedAt),
-    salesCompletedAt: toISO(p.salesCompletedAt),
-    createdAt: toISO(p.createdAt),
-    updatedAt: toISO(p.updatedAt),
-    productsSold: (p.productsSold || []).map((prod: any, i: number) => ({
-      ...prod,
-      id: prod.id || `prod_${i}`,
-    })),
-  });
-
   const fetchProspects = async () => {
     if (!localStorage.getItem('authToken')) return;
 
     const userId = getCurrentUserId();
     if (!userId) return;
 
-    const endpoint = getProspectsEndpoint();
-
     setIsLoadingProspects(true);
     try {
-      const data = await apiCall(endpoint);
-      const raw: any[] = Array.isArray(data) ? data : (data.prospects || []);
-      const normalized = raw.map(normalizeProspect);
-      setProspects(normalized);
+      const res = await apiCall('/prospects');
+      const raw: any[] = Array.isArray(res.data) ? res.data : [];
+      setProspects(raw);
     } catch (_e) { } finally {
       setIsLoadingProspects(false);
     }
@@ -136,23 +95,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    const userId = getCurrentUserId();
-    if (!userId) {
-      setEvents([]);
-      return;
-    }
-
     setIsLoadingEvents(true);
     try {
-      const data = await apiCall('/events/my-events');
-      const raw: any[] = Array.isArray(data) ? data : (data.events || []);
-      const items: Event[] = raw.map(e => ({
-        ...e,
-        date: toISO(e.date) || e.date,
-        createdAt: toISO(e.createdAt) || e.createdAt,
-        updatedAt: toISO(e.updatedAt) || e.updatedAt,
-      }));
-      setEvents(items);
+      const res = await apiCall('/events');
+      const raw: any[] = Array.isArray(res.data) ? res.data : [];
+      setEvents(raw);
     } catch (_e) {
       setEvents([]);
     } finally {
@@ -185,9 +132,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       coachingType: s.coachingType || 'Individual Coaching',
       durationStart: s.durationStart || '09:00',
       durationEnd: s.durationEnd || '10:00',
-      date: toISO(s.date) || s.date,
-      createdAt: toISO(s.createdAt) || s.createdAt,
-      updatedAt: toISO(s.updatedAt) || s.updatedAt,
       attendance: s.attendance || [],
       targetGroupIds: s.targetGroupIds || [],
       targetAgentIds: s.targetAgentIds || []
@@ -261,18 +205,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const addProspect = async (data: Partial<Prospect>) => {
     const payload: Record<string, any> = {
-      prospectName: data.prospectName || '',
+      fullName: data.prospect_name || '',
     };
-    if (data.prospectEmail) payload.prospectEmail = data.prospectEmail;
-    if (data.prospectPhone) payload.prospectPhone = data.prospectPhone;
+    if (data.prospect_email) payload.email = data.prospect_email;
+    if (data.prospect_phone) payload.phoneNum = data.prospect_phone;
 
     try {
-      const response = await apiCall('/prospects', { method: 'POST', data: payload });
-      const prospectId = response.prospectId || response.id;
-
-      const detail = await apiCall(`/prospects/${prospectId}`);
-      const created: Prospect = normalizeProspect(detail.prospect || detail);
-
+      const res = await apiCall('/prospects', { method: 'POST', data: payload });
+      const created: Prospect = res.data;
       await fetchProspects();
       return created;
     } catch (e) {
@@ -284,7 +224,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       await apiCall(`/prospects/${id}`, {
         method: 'PUT',
-        data: { ...updates, updatedAt: new Date().toISOString() }
+        data: updates
       });
 
       await fetchProspects();
@@ -296,15 +236,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const importProspects = async (importedData: Prospect[]) => {
     try {
       for (const p of importedData) {
-        const payload = {
-          ...p,
-          updatedAt: new Date().toISOString(),
-          createdAt: p.createdAt || new Date().toISOString()
-        };
         if (p.id) {
-          await apiCall(`/prospects/${p.id}`, { method: 'PUT', data: payload });
+          await apiCall(`/prospects/${p.id}`, { method: 'PUT', data: p });
         } else {
-          await apiCall('/prospects', { method: 'POST', data: payload });
+          await apiCall('/prospects', { method: 'POST', data: {
+            fullName: p.prospect_name || '',
+            email: p.prospect_email,
+            phoneNum: p.prospect_phone,
+          }});
         }
       }
 
@@ -347,7 +286,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- SCOPING HELPER ---
   const getGroupProspects = (groupId: string): Prospect[] => {
-    return prospects.filter(p => p.groupId === groupId);
+    return prospects.filter(p => p.group_id === groupId);
   };
 
   // --- MAIN SCOPE FUNCTION ---
@@ -357,31 +296,57 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return prospects;
     }
 
-    // 2. Trainer (Managed Groups)
+    // 2. Trainer (View All — managed groups handled server-side)
     if (user.role === UserRole.TRAINER) {
-      if (user.managedGroupIds && user.managedGroupIds.length > 0) {
-        return prospects.filter(p => user.managedGroupIds!.includes(p.groupId || ''));
-      }
       return prospects;
     }
 
     // 3. Group Leader & Agent (Own Only)
-    return prospects.filter(p => p.uid === user.id);
+    return prospects.filter(p => p.agent_id === user.id);
   };
 
   // --- EVENTS ---
-  const addEvent = async (evt: Partial<Event>) => {
-    const payload = {
-      ...evt,
-      eventTitle: evt.eventTitle || 'New Event',
-      date: evt.date || new Date().toISOString()
+  // Convert local date+time to UTC date+time before sending to the backend.
+  // new Date('YYYY-MM-DDTHH:MM') is parsed as local time by JS, so toISOString() gives UTC.
+  const toUtcDateTime = (date: string, time?: string): { date: string; time?: string } => {
+    if (!date) return { date };
+    const local = new Date(time ? `${date}T${time}` : `${date}T00:00`);
+    if (isNaN(local.getTime())) return { date, time };
+    const iso = local.toISOString();
+    return {
+      date: iso.slice(0, 10),            // YYYY-MM-DD in UTC
+      time: time ? iso.slice(11, 16) : undefined, // HH:MM in UTC
     };
+  };
+
+  const addEvent = async (evt: any) => {
+    const { date, time } = toUtcDateTime(evt.date, evt.time);
+    const payload: Record<string, any> = {
+      title: evt.event_title || 'New Event',
+      date,
+      description: evt.description || '',
+      groupIds: evt.groupIds || [],
+    };
+    if (time) payload.time = time;
+    if (evt.meeting_link) payload.link = evt.meeting_link;
+    if (evt.venue) payload.venue = evt.venue;
     await apiCall('/events', { method: 'POST', data: payload });
     await fetchEvents();
   };
 
-  const updateEvent = async (id: string, evt: Partial<Event>) => {
-    await apiCall(`/events/${id}`, { method: 'PUT', data: evt });
+  const updateEvent = async (id: string, evt: any) => {
+    const payload: Record<string, any> = {};
+    if (evt.event_title) payload.title = evt.event_title;
+    if (evt.date) {
+      const { date, time } = toUtcDateTime(evt.date, evt.time);
+      payload.date = date;
+      if (time) payload.time = time;
+    }
+    if (evt.description) payload.description = evt.description;
+    if (evt.meeting_link) payload.link = evt.meeting_link;
+    if (evt.venue) payload.venue = evt.venue;
+    if (evt.groupIds) payload.groupIds = evt.groupIds;
+    await apiCall(`/events/${id}`, { method: 'PUT', data: payload });
     await fetchEvents();
   };
 
@@ -404,16 +369,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const targetGroups = e.groupIds || [];
 
       // 1. Created by me?
-      if (e.createdBy === user.id) return true;
+      if (e.created_by === user.id) return true;
 
       // 2. For Agent: Is my group in target?
-      if (user.role === UserRole.AGENT && user.groupId) {
-        return targetGroups.includes(user.groupId);
+      if (user.role === UserRole.AGENT && user.group_id) {
+        return targetGroups.includes(user.group_id);
       }
 
       // 3. For Leader: Is my group in target?
-      if (user.role === UserRole.GROUP_LEADER && user.groupId) {
-        return targetGroups.includes(user.groupId);
+      if (user.role === UserRole.GROUP_LEADER && user.group_id) {
+        return targetGroups.includes(user.group_id);
       }
 
       return false;
@@ -501,7 +466,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         agentId: user.id,
         agentName: user.name || user.email,
         agentEmail: user.email,
-        groupId: user.groupId,
+        groupId: user.group_id,
         status: 'joined',
         joinedAt: new Date().toISOString(),
       });
@@ -529,7 +494,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (s.targetAgentIds?.includes(user.id)) return true;
 
       // 4. Is my group targeted?
-      if (user.groupId && s.targetGroupIds?.includes(user.groupId)) return true;
+      if (user.group_id && s.targetGroupIds?.includes(user.group_id)) return true;
 
       // 5. Admin or Master Trainer sees all
       if (user.role === UserRole.ADMIN || user.role === UserRole.MASTER_TRAINER) {

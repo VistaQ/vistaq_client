@@ -75,15 +75,15 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
         if (!currentUser) return [];
         if (isAdmin || isMasterTrainer) return groups;
         if (isTrainer) return groups.filter(g => currentUser.managedGroupIds?.includes(g.id));
-        if (isGroupLeader) return groups.filter(g => g.id === currentUser.groupId);
+        if (isGroupLeader) return groups.filter(g => g.id === currentUser.group_id);
         return [];
     }, [currentUser, groups, isAdmin, isMasterTrainer, isTrainer, isGroupLeader]);
 
     const availableAgents = React.useMemo(() => {
         if (!currentUser) return [];
         if (isAdmin || isMasterTrainer) return users.filter(u => u.role === UserRole.AGENT);
-        if (isTrainer) return users.filter(u => u.role === UserRole.AGENT && currentUser.managedGroupIds?.includes(u.groupId || ''));
-        if (isGroupLeader) return users.filter(u => u.role === UserRole.AGENT && u.groupId === currentUser.groupId);
+        if (isTrainer) return users.filter(u => u.role === UserRole.AGENT && currentUser.managedGroupIds?.includes(u.group_id || ''));
+        if (isGroupLeader) return users.filter(u => u.role === UserRole.AGENT && u.group_id === currentUser.group_id);
         return [];
     }, [currentUser, users, isAdmin, isMasterTrainer, isTrainer, isGroupLeader]);
 
@@ -173,9 +173,9 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                 durationEnd,
                 venue,
                 link: link || undefined,
-                createdBy: currentUser?.id,
-                createdByName: currentUser?.name,
-                createdByRole: currentUser?.role,
+                created_by: currentUser?.id,
+                created_by_name: currentUser?.name,
+                created_by_role: currentUser?.role,
                 targetGroupIds: tGroups,
                 targetAgentIds: tAgents,
             };

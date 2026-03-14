@@ -32,17 +32,17 @@ const Prospects: React.FC = () => {
   const prospects = currentUser ? getProspectsByScope(currentUser) : [];
   
   const filteredProspects = prospects.filter(p =>
-    (p.prospectName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.prospectPhone || '').includes(searchTerm)
+    (p.prospect_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.prospect_phone || '').includes(searchTerm)
   );
 
   const handleCreateNew = () => {
     if (!currentUser) return;
     // Open modal with a skeleton prospect object
     setSelectedProspect({
-      uid: currentUser.id,
-      prospectName: '',
-      currentStage: ProspectStage.PROSPECT
+      agent_id: currentUser.id,
+      prospect_name: '',
+      current_stage: ProspectStage.PROSPECT
     });
     setIsModalOpen(true);
   };
@@ -50,15 +50,11 @@ const Prospects: React.FC = () => {
   const handleViewProspect = async (prospect: Prospect) => {
     setLoadingProspect(true);
     try {
-      const data = await apiCall(`/prospects/${prospect.id}`);
-      const raw = data.prospect || data;
-      const toISO = (ts: any) => ts?._seconds ? new Date(ts._seconds * 1000).toISOString() : (ts || undefined);
+      const res = await apiCall(`/prospects/${prospect.id}`);
+      const raw = res.data || prospect;
       const normalized: Prospect = {
         ...raw,
-        id: raw.id || raw.prospectId,
-        prospectName: raw.prospectName || '',
-        appointmentDate: toISO(raw.appointmentDate),
-        productsSold: (raw.productsSold || []).map((p: any, i: number) => ({ ...p, id: p.id || `prod_${i}` })),
+        products_sold: (raw.products_sold || []).map((p: any, i: number) => ({ ...p, id: p.id || `prod_${i}` })),
       };
       setSelectedProspect(normalized);
       setIsModalOpen(true);
@@ -80,24 +76,24 @@ const Prospects: React.FC = () => {
     const headers = ['ID', 'Name', 'Phone', 'Group/Agent', 'Stage', 'Outcome', 'Reason (If Lost)', 'Product', 'Amount (MYR)', 'Date'];
     const rows = filteredProspects.map(p => {
       let outcomeLabel = 'Ongoing';
-      if (p.salesOutcome === 'successful') outcomeLabel = 'Won';
-      else if (p.salesOutcome === 'unsuccessful') outcomeLabel = 'Lose';
-      else if (p.salesOutcome === 'kiv') outcomeLabel = 'KIV';
+      if (p.sales_outcome === 'successful') outcomeLabel = 'Won';
+      else if (p.sales_outcome === 'unsuccessful') outcomeLabel = 'Lose';
+      else if (p.sales_outcome === 'kiv') outcomeLabel = 'KIV';
 
-      const totalAce = p.salesOutcome === 'successful' ? (p.productsSold || []).reduce((sum, prod) => sum + (prod.aceAmount || 0), 0) : 0;
-      const productNames = (p.productsSold || []).map(prod => prod.productName).filter(Boolean).join(', ');
+      const totalAce = p.sales_outcome === 'successful' ? (p.products_sold || []).reduce((sum, prod) => sum + (prod.amount || 0), 0) : 0;
+      const productNames = (p.products_sold || []).map(prod => prod.productName).filter(Boolean).join(', ');
 
       return [
         p.id,
-        p.prospectName,
-        p.prospectPhone || '',
-        p.uid,
-        p.currentStage,
+        p.prospect_name,
+        p.prospect_phone || '',
+        p.agent_id,
+        p.current_stage,
         outcomeLabel,
-        p.unsuccessfulReason || 'N/A',
+        p.unsuccessful_reason || 'N/A',
         productNames || 'N/A',
         totalAce,
-        p.updatedAt
+        p.updated_at
       ]
     });
     
@@ -116,30 +112,30 @@ const Prospects: React.FC = () => {
   };
 
   const getStageBadge = (prospect: Prospect) => {
-    const { currentStage, appointmentStatus, salesOutcome } = prospect;
+    const { current_stage, appointment_status, sales_outcome } = prospect;
 
     // Priority 1: Sales outcome overrides everything
-    if (salesOutcome === 'successful')
+    if (sales_outcome === 'successful')
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Successful</span>;
-    if (salesOutcome === 'unsuccessful')
+    if (sales_outcome === 'unsuccessful')
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Non-Successful</span>;
-    if (salesOutcome === 'kiv')
+    if (sales_outcome === 'kiv')
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">KIV</span>;
 
     // Priority 2: Appointment completed → entered Sales Meeting
-    if (appointmentStatus === 'completed')
+    if (appointment_status === 'done')
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-cyan-100 text-cyan-700">Appointment Completed</span>;
 
     // Priority 3: Appointment sub-states
-    if (appointmentStatus === 'declined')
+    if (appointment_status === 'declined')
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Declined</span>;
-    if (appointmentStatus === 'scheduled')
+    if (appointment_status === 'scheduled')
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">Scheduled</span>;
-    if (appointmentStatus === 'rescheduled')
+    if (appointment_status === 'rescheduled')
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Rescheduled</span>;
-    if (appointmentStatus === 'kiv')
+    if (appointment_status === 'kiv')
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">KIV</span>;
-    if (appointmentStatus === 'not_done' || currentStage === ProspectStage.APPOINTMENT)
+    if (appointment_status === 'not_done' || current_stage === ProspectStage.APPOINTMENT)
       return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-700">Not Scheduled</span>;
 
     // Priority 4: Basic info stage
@@ -153,10 +149,11 @@ const Prospects: React.FC = () => {
   // Trainer -> View Only (Cannot Add)
   const canAddProspect = currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
+  const isViewOnly = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.MASTER_TRAINER;
 
   const formatDate = (val: any) => {
     if (!val) return 'N/A';
-    const d = val._seconds ? new Date(val._seconds * 1000) : new Date(val);
+    const d = new Date(val);
     return !isNaN(d.getTime()) ? d.toLocaleDateString() : 'N/A';
   };
 
@@ -234,30 +231,30 @@ const Prospects: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                     {filteredProspects.map((prospect) => {
-                        const isOwner = prospect.uid === currentUser?.id;
-                        const canEdit = isAdmin || isOwner;
-                        
+                        const isOwner = prospect.agent_id === currentUser?.id;
+                        const canEdit = !isViewOnly && isOwner;
+
                         return (
                         <tr key={prospect.id} className="hover:bg-gray-50 transition-colors">
                             <td className="px-6 py-4">
                             <div className="flex items-center">
                                 <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mr-3 font-bold text-xs">
-                                {prospect.prospectName.charAt(0)}
+                                {prospect.prospect_name.charAt(0)}
                                 </div>
-                                <span className="font-medium text-gray-900">{prospect.prospectName}</span>
+                                <span className="font-medium text-gray-900">{prospect.prospect_name}</span>
                             </div>
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-600">
-                            {prospect.prospectPhone}
+                            {prospect.prospect_phone}
                             </td>
                             <td className="px-6 py-4">
                             {getStageBadge(prospect)}
                             </td>
                             <td className="px-6 py-4 text-sm text-gray-500">
-                            {formatDate(prospect.updatedAt)}
+                            {formatDate(prospect.updated_at)}
                             </td>
                             <td className="px-6 py-4 text-right">
-                            <button 
+                            <button
                                 onClick={() => handleViewProspect(prospect)}
                                 className={`${canEdit ? 'text-blue-600 hover:text-blue-800' : 'text-gray-500 hover:text-gray-700'} font-medium text-sm flex items-center justify-end w-full`}
                             >
@@ -288,8 +285,8 @@ const Prospects: React.FC = () => {
       {viewMode === 'card' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredProspects.map(prospect => {
-                const isOwner = prospect.uid === currentUser?.id;
-                const canEdit = isAdmin || isOwner;
+                const isOwner = prospect.agent_id === currentUser?.id;
+                const canEdit = !isViewOnly && isOwner;
 
                 return (
                     <div key={prospect.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:border-blue-200 hover:shadow-md transition-all flex flex-col justify-between h-full">
@@ -297,12 +294,12 @@ const Prospects: React.FC = () => {
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center">
                                     <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
-                                        {prospect.prospectName.charAt(0)}
+                                        {prospect.prospect_name.charAt(0)}
                                     </div>
                                     <div className="overflow-hidden">
-                                        <h3 className="font-bold text-gray-900 truncate pr-2" title={prospect.prospectName}>{prospect.prospectName}</h3>
+                                        <h3 className="font-bold text-gray-900 truncate pr-2" title={prospect.prospect_name}>{prospect.prospect_name}</h3>
                                         <div className="text-xs text-gray-500 flex items-center mt-0.5">
-                                            <Phone className="w-3 h-3 mr-1" /> {prospect.prospectPhone}
+                                            <Phone className="w-3 h-3 mr-1" /> {prospect.prospect_phone}
                                         </div>
                                     </div>
                                 </div>
@@ -316,7 +313,7 @@ const Prospects: React.FC = () => {
                         <div className="border-t border-gray-50 pt-3 flex items-center justify-between mt-auto">
                             <div className="text-xs text-gray-400 flex items-center" title="Last Updated">
                                 <Calendar className="w-3 h-3 mr-1" />
-                                {formatDate(prospect.updatedAt)}
+                                {formatDate(prospect.updated_at)}
                             </div>
                             <button 
                                 onClick={() => handleViewProspect(prospect)}

@@ -503,11 +503,11 @@ const MyCalendar: React.FC = () => {
         myEvents.forEach(e => {
             result.push({
                 id: `evt_${e.id}`,
-                title: e.eventTitle,
+                title: e.event_title,
                 date: e.date,
                 type: 'event',
                 subType: e.venue,
-                link: e.meetingLink,
+                link: e.meeting_link,
                 cancelled: e.status === 'cancelled',
                 raw: e,
             });
@@ -541,34 +541,34 @@ const MyCalendar: React.FC = () => {
 
         // 3. Prospect Appointments (Agents & Group Leaders only)
         if (!isManagementOnly) {
-            const myProspects = prospects.filter(p => p.uid === currentUser.id);
+            const myProspects = prospects.filter(p => p.agent_id === currentUser.id);
             myProspects.forEach(p => {
-                if (!p.appointmentDate) return;
+                if (!p.appointment_date) return;
                 // Show all non-declined/non-completed appointments on the calendar
                 if (
-                    p.appointmentStatus === 'declined' ||
-                    p.appointmentStatus === 'completed' ||
-                    p.appointmentStatus === 'kiv'
+                    p.appointment_status === 'declined' ||
+                    p.appointment_status === 'done' ||
+                    p.appointment_status === 'kiv'
                 ) return;
-                const apptDate = new Date(p.appointmentDate);
+                const apptDate = new Date(p.appointment_date);
                 if (isNaN(apptDate.getTime())) return;
 
                 // Apply time part so the card shows correct time
-                if (p.appointmentStartTime) {
-                    const [h, m] = p.appointmentStartTime.split(':').map(Number);
+                if (p.appointment_start_time) {
+                    const [h, m] = p.appointment_start_time.split(':').map(Number);
                     apptDate.setHours(h, m, 0, 0);
                 }
 
                 // Build a readable time subType
-                const timeDisplay = p.appointmentStartTime
-                    ? `${p.appointmentStartTime}${p.appointmentEndTime ? ` – ${p.appointmentEndTime}` : ''}`
+                const timeDisplay = p.appointment_start_time
+                    ? `${p.appointment_start_time}${p.appointment_end_time ? ` – ${p.appointment_end_time}` : ''}`
                     : '';
-                const locationDisplay = p.appointmentLocation || '';
+                const locationDisplay = p.appointment_location || '';
                 const subType = [timeDisplay, locationDisplay].filter(Boolean).join(' · ');
 
                 result.push({
                     id: `appt_${p.id}`,
-                    title: `Appt: ${p.prospectName}`,
+                    title: `Appt: ${p.prospect_name}`,
                     date: apptDate.toISOString(),
                     type: 'appointment',
                     subType: subType || undefined,
@@ -587,7 +587,7 @@ const MyCalendar: React.FC = () => {
     if (currentUser.role === UserRole.TRAINER) {
         targetableGroups = groups.filter(g => currentUser.managedGroupIds?.includes(g.id));
     } else if (currentUser.role === UserRole.GROUP_LEADER) {
-        targetableGroups = groups.filter(g => g.id === currentUser.groupId);
+        targetableGroups = groups.filter(g => g.id === currentUser.group_id);
     } else if (!isAdmin && currentUser.role !== UserRole.MASTER_TRAINER) {
         targetableGroups = [];
     }
@@ -597,13 +597,13 @@ const MyCalendar: React.FC = () => {
         if (item && item.type === 'event') {
             const evt = item.raw as Event;
             const d = new Date(evt.date);
-            const dateStr = !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '';
-            const timeStr = !isNaN(d.getTime()) ? d.toTimeString().slice(0, 5) : '';
+            const dateStr = !isNaN(d.getTime()) ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
+            const timeStr = !isNaN(d.getTime()) ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : '';
             setEditingEventId(evt.id);
-            setFormData({ eventTitle: evt.eventTitle, description: evt.description, date: dateStr, time: timeStr, venue: evt.venue, meetingLink: evt.meetingLink || '', groupIds: evt.groupIds, status: evt.status || 'upcoming' });
+            setFormData({ eventTitle: evt.event_title, description: evt.description, date: dateStr, time: timeStr, venue: evt.venue, meetingLink: evt.meeting_link || '', groupIds: evt.groupIds || [], status: (evt.status || 'upcoming') as 'upcoming' | 'completed' | 'cancelled' });
         } else {
             setEditingEventId(null);
-            const initialGroups = (currentUser.role === UserRole.GROUP_LEADER && currentUser.groupId) ? [currentUser.groupId] : [];
+            const initialGroups = (currentUser.role === UserRole.GROUP_LEADER && currentUser.group_id) ? [currentUser.group_id] : [];
             setFormData({ eventTitle: '', description: '', date: '', time: '', venue: '', meetingLink: '', groupIds: initialGroups, status: 'upcoming' });
         }
         setIsEventModalOpen(true);
@@ -615,9 +615,6 @@ const MyCalendar: React.FC = () => {
             alert('Please fill in all required fields (Title, Date, Time, Venue, Description, Groups).');
             return;
         }
-        const dateTime = new Date(`${formData.date}T${formData.time}`);
-        if (isNaN(dateTime.getTime())) { alert('Invalid date or time.'); return; }
-
         // ── Double Booking Check ──────────────────────────────────
         const { hasConflict, conflictWith } = checkConflict(
             occupiedSlots,
@@ -633,19 +630,20 @@ const MyCalendar: React.FC = () => {
         setEventError('');
         // ─────────────────────────────────────────────────────────
 
-        const eventData: Partial<Event> = {
-            eventTitle: formData.eventTitle,
+        const eventData = {
+            event_title: formData.eventTitle,
             description: formData.description,
             venue: formData.venue,
-            meetingLink: formData.meetingLink || undefined,
-            date: dateTime.toISOString(),
+            meeting_link: formData.meetingLink || undefined,
+            date: formData.date,    // YYYY-MM-DD
+            time: formData.time,    // HH:MM
             groupIds: formData.groupIds,
             status: formData.status
         };
         if (editingEventId) {
             await updateEvent(editingEventId, eventData);
         } else {
-            await addEvent({ ...eventData, createdBy: currentUser.id, createdByName: currentUser.name });
+            await addEvent({ ...eventData, created_by: currentUser.id, created_by_name: currentUser.name });
         }
         setIsEventModalOpen(false);
     };
@@ -669,7 +667,7 @@ const MyCalendar: React.FC = () => {
     const isAdminOrCreatorOfItem = (item: CalItem) => {
         if (item.type !== 'event') return false;
         const evt = item.raw as Event;
-        return isAdmin || evt.createdBy === currentUser.id;
+        return isAdmin || evt.created_by === currentUser.id;
     };
 
     const inputClass = 'block w-full bg-gray-50 border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2.5 text-sm';
