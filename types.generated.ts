@@ -1521,6 +1521,22 @@ export interface paths {
                          * @example Client budget constraints
                          */
                         unsuccessfulReason?: string;
+                        /**
+                         * @description Full name of the prospect. Maps to `prospect_name`.
+                         * @example Jane Doe
+                         */
+                        fullName?: string;
+                        /**
+                         * @description Phone number of the prospect. Maps to `prospect_phone`.
+                         * @example +6591234567
+                         */
+                        phoneNum?: string;
+                        /**
+                         * Format: email
+                         * @description Email address of the prospect. Maps to `prospect_email`.
+                         * @example jane.doe@example.com
+                         */
+                        email?: string;
                     };
                 };
             };

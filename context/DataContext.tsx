@@ -355,34 +355,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await fetchEvents();
   };
 
-  const getEventsForUser = (user: User): Event[] => {
-    if (!user) return [];
-
-    // Admin, Master Trainer, and Trainer see all events
-    if (user.role === UserRole.ADMIN ||
-      user.role === UserRole.MASTER_TRAINER ||
-      user.role === UserRole.TRAINER) {
-      return events;
-    }
-
-    return events.filter(e => {
-      const targetGroups = e.groupIds || [];
-
-      // 1. Created by me?
-      if (e.created_by === user.id) return true;
-
-      // 2. For Agent: Is my group in target?
-      if (user.role === UserRole.AGENT && user.group_id) {
-        return targetGroups.includes(user.group_id);
-      }
-
-      // 3. For Leader: Is my group in target?
-      if (user.role === UserRole.GROUP_LEADER && user.group_id) {
-        return targetGroups.includes(user.group_id);
-      }
-
-      return false;
-    });
+  const getEventsForUser = (_user: User): Event[] => {
+    // Backend RLS already scopes events to what the user is allowed to see.
+    return events;
   };
 
   // --- COACHING SESSIONS (Mocked) ---

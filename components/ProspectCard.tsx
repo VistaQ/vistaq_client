@@ -196,6 +196,10 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
         products: productRows.map(({ id: _id, ...rest }) => rest),
       };
 
+      if (formData.prospect_name) payload.fullName = formData.prospect_name;
+      if (phoneSuffix) payload.phoneNum = `+60${phoneSuffix}`;
+      if (formData.prospect_email) payload.email = formData.prospect_email;
+
       if (formData.sales_outcome) payload.salesOutcome = formData.sales_outcome;
       if (formData.unsuccessful_reason) payload.unsuccessfulReason = formData.unsuccessful_reason;
 
@@ -521,7 +525,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                     <option value="not_done">Not done (Default)</option>
                     <option value="scheduled">Scheduled</option>
                     <option value="rescheduled">Rescheduled</option>
-                    <option value="completed">Completed</option>
+                    <option value="done">Completed</option>
                     <option value="kiv">KIV</option>
                     <option value="declined">Declined</option>
                   </select>

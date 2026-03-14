@@ -126,7 +126,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
       const ytdSalesMeetings_Mgmt = scopeProspects.filter(p =>
          p.appointment_status === 'done' &&
-         isWithinDateRange(p.appointment_completed_at || p.appointment_date, startYTD, endYTD)
+         isWithinDateRange(p.appointment_completed_at || p.updated_at, startYTD, endYTD)
       ).length;
 
       const ytdSales_Mgmt = scopeProspects.filter(p =>
@@ -469,7 +469,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    // Sales Meetings Completed YTD
    const ytdSalesMeetings = myProspects.filter(p =>
       p.appointment_status === 'done' &&
-      isWithinDateRange(p.appointment_completed_at || p.appointment_date, startYTD, endYTD)
+      isWithinDateRange(p.appointment_completed_at || p.updated_at, startYTD, endYTD)
    );
    const totalSalesMeetingsYTD = ytdSalesMeetings.length;
 
@@ -487,15 +487,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    // --- MTD Calculations ---
    // Prospects entered MTD
    const mtdProspectsCount = myProspects.filter(p => isWithinDateRange(p.created_at, startMTD, endMTD)).length;
-   // Appointments Scheduled MTD — counts when the appointment was SET this month (by updatedAt)
+   // Appointments Set MTD — any prospect that moved into an appointment status this month
    const mtdAppointmentsCount = myProspects.filter(p =>
-      (p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled') &&
+      p.appointment_status !== 'not_done' && p.appointment_status != null &&
       isWithinDateRange(p.updated_at, startMTD, endMTD)
    ).length;
-   // Sales Meetings Completed MTD
+   // Sales Meetings Completed MTD — anchor on updated_at since appointment_completed_at is often null
    const mtdSalesMeetingsCount = myProspects.filter(p =>
       p.appointment_status === 'done' &&
-      isWithinDateRange(p.appointment_completed_at || p.appointment_date, startMTD, endMTD)
+      isWithinDateRange(p.appointment_completed_at || p.updated_at, startMTD, endMTD)
    ).length;
    // Sales (Successful) MTD
    const mtdSales = myProspects.filter(p =>
