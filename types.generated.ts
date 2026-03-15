@@ -393,6 +393,190 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/forgot-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a password reset email
+         * @description Sends a password reset email to the supplied address within the tenant identified by the `X-Tenant-Slug` header. This endpoint is unauthenticated. If the email address does not exist within the tenant, the response is still `200 OK` — this is intentional to prevent user enumeration.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Slug that identifies the tenant the user belongs to. Returns 400 if the header is absent or not a string value, and 404 if no tenant matches the supplied slug. */
+                    "X-Tenant-Slug": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: email
+                         * @example jane.smith@example.com
+                         */
+                        email: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Password reset email sent (or email not found — response is identical to prevent enumeration) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            /** @example Password reset email sent */
+                            message: string;
+                        };
+                    };
+                };
+                /** @description Bad request. Returned when the `X-Tenant-Slug` header is missing or not a string, or the request body fails validation. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"] | components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Tenant not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Tenant not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset a user's password
+         * @description Resets the password for the account identified by the supplied reset token. The token is extracted from the Supabase password reset email link sent by `POST /auth/forgot-password`. This endpoint is unauthenticated. An invalid or expired token results in a `500` response.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description The JWT access token extracted from the Supabase password reset email link. The frontend parses this from the URL hash or query params after the user clicks the reset link. The backend verifies it directly via `adminClient.auth.getUser(token)`.
+                         * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                         */
+                        token: string;
+                        /**
+                         * @description New password. Must be at least 6 characters and contain at least one uppercase letter, one number, and one special character.
+                         * @example NewSecret@1
+                         */
+                        newPassword: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Password reset successful */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            /** @example Password reset successful */
+                            message: string;
+                        };
+                    };
+                };
+                /** @description Bad request. Returned when the request body fails validation (missing fields, password too short, or password does not meet complexity requirements). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Validation failed",
+                         *       "errors": [
+                         *         {
+                         *           "code": "too_small",
+                         *           "minimum": 6,
+                         *           "type": "string",
+                         *           "inclusive": true,
+                         *           "exact": false,
+                         *           "message": "Password must be at least 6 characters",
+                         *           "path": [
+                         *             "newPassword"
+                         *           ]
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Internal server error. Also returned when the supplied token is invalid or has expired. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users": {
         parameters: {
             query?: never;

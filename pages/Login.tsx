@@ -1,14 +1,15 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Lock, Mail, AlertCircle, Loader2, X } from 'lucide-react';
+import { Lock, Mail, AlertCircle, Loader2 } from 'lucide-react';
 
 interface LoginProps {
   onSwitchToSignup: () => void;
+  onSwitchToForgotPassword: () => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
-  const { login, resetPassword } = useAuth();
+const Login: React.FC<LoginProps> = ({ onSwitchToSignup, onSwitchToForgotPassword }) => {
+  const { login } = useAuth();
   
   // Login State
   const [identifier, setIdentifier] = useState('');
@@ -17,11 +18,6 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
   const [loading, setLoading] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
 
-  // Forgot Password State
-  const [showForgot, setShowForgot] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetStatus, setResetStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
-  const [resetError, setResetError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,30 +38,9 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
     }
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!resetEmail) return;
-      
-      setResetStatus('sending');
-      setResetError('');
-      try {
-          await resetPassword(resetEmail);
-          setResetStatus('sent');
-          setTimeout(() => {
-              setShowForgot(false);
-              setResetStatus('idle');
-              setResetEmail('');
-              setResetError('');
-          }, 3000);
-      } catch (err: any) {
-          setResetStatus('error');
-          setResetError(err?.message || 'Failed to send email. Please try again.');
-      }
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 relative z-10">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
         <div className="bg-blue-600 p-10 text-center">
           <div className="flex justify-center mb-4">
             <img src="/vistaq-logo.png" alt="VistaQ" className="h-16 w-auto" />
@@ -111,12 +86,12 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
                 />
               </div>
               <div className="flex justify-end mt-2">
-                  <button 
-                    type="button" 
-                    onClick={() => setShowForgot(true)}
+                  <button
+                    type="button"
+                    onClick={onSwitchToForgotPassword}
                     className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
                   >
-                      Forgot Password?
+                    Forgot Password?
                   </button>
               </div>
             </div>
@@ -142,52 +117,6 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup }) => {
         </div>
       </div>
 
-      {/* Forgot Password Modal */}
-      {showForgot && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in duration-200">
-                  <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-bold text-gray-900">Reset Password</h3>
-                      <button onClick={() => setShowForgot(false)} className="text-gray-400 hover:text-gray-600">
-                          <X className="w-5 h-5" />
-                      </button>
-                  </div>
-                  
-                  {resetStatus === 'sent' ? (
-                      <div className="text-center py-4">
-                          <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                              <Loader2 className="w-6 h-6" /> 
-                          </div>
-                          <p className="text-green-700 font-medium">Recovery email sent!</p>
-                          <p className="text-sm text-gray-500 mt-1">Check your inbox for instructions.</p>
-                      </div>
-                  ) : (
-                      <form onSubmit={handleForgotPassword} className="space-y-4">
-                          <p className="text-sm text-gray-500">Enter your email address and we'll send you a link to reset your password.</p>
-                          <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Email Address</label>
-                            <input
-                                type="email"
-                                required
-                                value={resetEmail}
-                                onChange={(e) => setResetEmail(e.target.value)}
-                                className="block w-full px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                placeholder="you@company.com"
-                            />
-                          </div>
-                          {resetStatus === 'error' && <p className="text-xs text-red-500">{resetError}</p>}
-                          <button
-                            type="submit"
-                            disabled={resetStatus === 'sending'}
-                            className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-bold hover:bg-blue-700 flex items-center justify-center disabled:opacity-70"
-                          >
-                            {resetStatus === 'sending' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Reset Link'}
-                          </button>
-                      </form>
-                  )}
-              </div>
-          </div>
-      )}
     </div>
   );
 };

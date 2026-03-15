@@ -23,6 +23,8 @@ const Profile = React.lazy(() => import('./pages/Profile'));
 const Login = React.lazy(() => import('./pages/Login'));
 const Signup = React.lazy(() => import('./pages/Signup'));
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
+const ForgotPasswordPage = React.lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = React.lazy(() => import('./pages/ResetPasswordPage'));
 const Support = React.lazy(() => import('./pages/Support'));
 const Tutorials = React.lazy(() => import('./pages/Tutorials'));
 const Coaching = React.lazy(() => import('./pages/Coaching'));
@@ -73,11 +75,13 @@ const AuthenticatedApp: React.FC = () => {
   );
 };
 
-type AuthView = 'login' | 'signup' | 'privacy';
+type AuthView = 'login' | 'signup' | 'privacy' | 'forgot-password' | 'reset-password';
 
 const AuthFlow: React.FC = () => {
   const { isAuthenticated } = useAuth();
-  const [view, setView] = useState<AuthView>('login');
+  const [view, setView] = useState<AuthView>(
+    window.location.pathname === '/reset-password' ? 'reset-password' : 'login'
+  );
 
   if (isAuthenticated) {
     if (window.location.pathname !== '/') {
@@ -86,19 +90,33 @@ const AuthFlow: React.FC = () => {
     return <AuthenticatedApp />;
   }
 
+  const switchToLogin = () => {
+    window.history.replaceState(null, '', '/');
+    setView('login');
+  };
+
   return (
     <Suspense fallback={<PageSpinner />}>
       {view === 'login' && (
-        <Login onSwitchToSignup={() => setView('signup')} />
+        <Login
+          onSwitchToSignup={() => setView('signup')}
+          onSwitchToForgotPassword={() => setView('forgot-password')}
+        />
       )}
       {view === 'signup' && (
         <Signup
-          onSwitchToLogin={() => setView('login')}
+          onSwitchToLogin={switchToLogin}
           onNavigateToPolicy={(page) => setView(page)}
         />
       )}
       {view === 'privacy' && (
         <PrivacyPolicy onBack={() => setView('signup')} />
+      )}
+      {view === 'forgot-password' && (
+        <ForgotPasswordPage onSwitchToLogin={switchToLogin} />
+      )}
+      {view === 'reset-password' && (
+        <ResetPasswordPage onSwitchToLogin={switchToLogin} />
       )}
     </Suspense>
   );
