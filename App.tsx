@@ -26,6 +26,7 @@ const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
 const Support = React.lazy(() => import('./pages/Support'));
 const Tutorials = React.lazy(() => import('./pages/Tutorials'));
 const Coaching = React.lazy(() => import('./pages/Coaching'));
+const AddToHomeScreen = React.lazy(() => import('./pages/AddToHomeScreen'));
 
 const PageSpinner: React.FC = () => (
   <div className="flex h-full min-h-[60vh] items-center justify-center">
@@ -56,7 +57,8 @@ const AuthenticatedApp: React.FC = () => {
       case 'coaching': return <Coaching />;
       case 'import': return <Import />;
       case 'support': return <Support />;
-      case 'tutorials': return <Tutorials />;
+      case 'tutorials': return <Tutorials onNavigate={setActivePage} />;
+      case 'add-to-home-screen': return <AddToHomeScreen onBack={() => setActivePage('tutorials')} />;
       case 'privacy-policy': return <PrivacyPolicy />;
 
       default: return <Dashboard />;
