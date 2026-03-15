@@ -1,8 +1,12 @@
 
 import React from 'react';
-import { BookOpen, ExternalLink } from 'lucide-react';
+import { BookOpen, ExternalLink, ChevronRight } from 'lucide-react';
 
-const TUTORIALS = [
+interface Props {
+    onNavigate: (page: string) => void;
+}
+
+const TUTORIALS: { number: string; title: string; description: string; url?: string; page?: string }[] = [
     {
         number: '01',
         title: 'First Time Registration',
@@ -45,9 +49,15 @@ const TUTORIALS = [
         description: 'Keep your pipeline up to date by recording sales outcomes and updating prospect statuses.',
         url: 'https://app.tango.us/app/workflow/7--Update-Prospect-Status-and-Sales-Outcome-in-VistaQ-fdaebb056e2041639ce9b8c872036255',
     },
+    {
+        number: '08',
+        title: 'Add to Home Screen',
+        description: 'Install VistaQ on your iPhone, iPad, or Android device for instant one-tap access — no App Store required.',
+        page: 'add-to-home-screen',
+    },
 ];
 
-const Tutorials: React.FC = () => {
+const Tutorials: React.FC<Props> = ({ onNavigate }) => {
     return (
         <div className="max-w-5xl mx-auto space-y-8">
             {/* Page Header */}
@@ -88,15 +98,25 @@ const Tutorials: React.FC = () => {
                             </p>
 
                             {/* Button */}
-                            <a
-                                href={tutorial.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mt-5 inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-lg hover:from-violet-700 hover:to-indigo-700 transition-all shadow-sm shadow-indigo-200 active:scale-95"
-                            >
-                                <ExternalLink className="w-4 h-4" />
-                                View Tutorial
-                            </a>
+                            {tutorial.url ? (
+                                <a
+                                    href={tutorial.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-5 inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-lg hover:from-violet-700 hover:to-indigo-700 transition-all shadow-sm shadow-indigo-200 active:scale-95"
+                                >
+                                    <ExternalLink className="w-4 h-4" />
+                                    View Tutorial
+                                </a>
+                            ) : (
+                                <button
+                                    onClick={() => onNavigate(tutorial.page!)}
+                                    className="mt-5 inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-lg hover:from-violet-700 hover:to-indigo-700 transition-all shadow-sm shadow-indigo-200 active:scale-95"
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                    View Tutorial
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))}

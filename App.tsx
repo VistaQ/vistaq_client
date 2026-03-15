@@ -20,8 +20,8 @@ import Signup from './pages/Signup';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Support from './pages/Support';
 import Tutorials from './pages/Tutorials';
+import AddToHomeScreen from './pages/AddToHomeScreen';
 import GlobalNotification from './components/GlobalNotification';
-
 const AuthenticatedApp: React.FC = () => {
   // Default to dashboard
   const [activePage, setActivePage] = useState('dashboard');
@@ -45,7 +45,8 @@ const AuthenticatedApp: React.FC = () => {
       case 'events': return <Events />;
       case 'import': return <Import />;
       case 'support': return <Support />;
-      case 'tutorials': return <Tutorials />;
+      case 'tutorials': return <Tutorials onNavigate={setActivePage} />;
+      case 'add-to-home-screen': return <AddToHomeScreen onBack={() => setActivePage('tutorials')} />;
       case 'privacy-policy': return <PrivacyPolicy />;
 
       default: return <Dashboard />;
