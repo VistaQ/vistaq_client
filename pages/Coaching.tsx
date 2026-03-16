@@ -319,11 +319,11 @@ const Coaching: React.FC = () => {
                                     );
                                 }
 
-                                // Get the full list of agents invited
+                                // Get the full list of agents invited (agents + group leaders who participate)
                                 const invitedAgents = Array.from(
                                     new Map(
                                         users.filter(u =>
-                                            u.role === UserRole.AGENT &&
+                                            (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) &&
                                             (
                                                 (sel.targetAgentIds && sel.targetAgentIds.includes(u.id)) ||
                                                 (u.groupId && sel.targetGroupIds && sel.targetGroupIds.includes(u.groupId)) ||
