@@ -42,6 +42,41 @@ export interface Notification {
   type: 'success' | 'error' | 'info';
 }
 
+export interface NotificationPrefs {
+  emailEnabled: boolean;
+  whatsappEnabled: boolean;
+  whatsappPhone: string;    // e.g. "60123456789" (no + prefix, CallMeBot format)
+  whatsappApiKey: string;   // Personal CallMeBot API key
+  triggers: {
+    salesAndAppointments: boolean;
+    coachingReminder: boolean;
+    staleProspects: boolean;
+  };
+}
+
+export type StoredNotificationType = 'sale' | 'appointment' | 'coaching_reminder' | 'stale_prospects' | 'test';
+
+export interface StoredNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: StoredNotificationType;
+  timestamp: string; // ISO string
+  read: boolean;
+}
+
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
+  emailEnabled: false,
+  whatsappEnabled: false,
+  whatsappPhone: '',
+  whatsappApiKey: '',
+  triggers: {
+    salesAndAppointments: true,
+    coachingReminder: true,
+    staleProspects: true,
+  },
+};
+
 export interface BadgeTier {
   id: string;
   name: string;
@@ -192,9 +227,8 @@ export interface CoachingAttendance {
   agentEmail?: string;
   groupId?: string; // Group the agent belongs to
   groupName?: string;
-  status: 'pending' | 'joined' | 'completed';
-  joinedAt?: string; // ISO String when agent clicks "Join"
-  confirmedAt?: string; // ISO String when trainer clicks "Confirm"
+  status: 'pending' | 'joined';
+  joinedAt?: string; // ISO String when agent clicks "Join" — this is the attendance log timestamp
 }
 
 export type CoachingType =
