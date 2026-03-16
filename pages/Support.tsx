@@ -14,9 +14,11 @@ import {
     Loader2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { sendEmail } from '../services/emailService';
 
-// ─── Web3Forms access key (set VITE_WEB3FORMS_KEY in .env) ─────────────────
-const WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY as string;
+// ─── EmailJS template IDs (set in .env) ──────────────────────────────────────
+const EMAILJS_ADMIN_TEMPLATE = import.meta.env.VITE_EMAILJS_TEMPLATE_SUPPORT_ADMIN_ID as string;
+const EMAILJS_REPLY_TEMPLATE = import.meta.env.VITE_EMAILJS_TEMPLATE_SUPPORT_REPLY_ID as string;
 const SUPPORT_EMAIL = 'vistaqtech@gmail.com';
 
 const FAQS = [
@@ -111,71 +113,6 @@ const FAQItem: React.FC<FAQItemProps> = ({ question, answer, isOpen, onToggle })
     </div>
 );
 
-// ─── Helper: send via Web3Forms ──────────────────────────────────────────────
-async function sendEnquiry(params: {
-    name: string;
-    email: string;
-    phone: string;
-    problemType: string;
-    message: string;
-}) {
-    const { name, email, phone, problemType, message } = params;
-
-    const htmlMessage = `
-<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-  <div style="background:linear-gradient(135deg,#1e3a8a,#3b82f6);padding:28px 36px;border-radius:12px 12px 0 0;">
-    <h1 style="color:#fff;margin:0;font-size:22px;font-weight:700;">VistaQ Support</h1>
-    <p style="color:#bfdbfe;margin:4px 0 0;font-size:13px;">New Support Enquiry Received</p>
-  </div>
-  <div style="background:#fff;padding:32px 36px;border:1px solid #e2e8f0;border-top:none;">
-    <table style="width:100%;border-collapse:collapse;font-size:14px;">
-      <tr><td style="padding:8px 0;color:#64748b;width:34%;">Full Name</td>
-          <td style="padding:8px 0;color:#0f172a;font-weight:600;">${name}</td></tr>
-      <tr><td style="padding:8px 0;color:#64748b;">Email</td>
-          <td style="padding:8px 0;color:#0f172a;font-weight:600;">${email}</td></tr>
-      <tr><td style="padding:8px 0;color:#64748b;">Phone</td>
-          <td style="padding:8px 0;color:#0f172a;font-weight:600;">${phone}</td></tr>
-      <tr><td style="padding:8px 0;color:#64748b;">Type of Issue</td>
-          <td style="padding:8px 0;color:#0f172a;font-weight:600;">${problemType}</td></tr>
-    </table>
-    <div style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px;border-left:4px solid #3b82f6;">
-      <p style="margin:0 0 6px;font-size:12px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.05em;">Message</p>
-      <p style="margin:0;font-size:14px;color:#334155;line-height:1.7;">${message.replace(/\n/g, '<br/>')}</p>
-    </div>
-  </div>
-  <div style="background:#f1f5f9;padding:16px 36px;border-radius:0 0 12px 12px;text-align:center;">
-    <p style="margin:0;font-size:11px;color:#94a3b8;">Sent via VistaQ Support Centre &mdash; reply directly to ${email}</p>
-  </div>
-</div>`;
-
-    const res = await fetch('https://api.web3forms.com/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-            access_key: WEB3FORMS_KEY,
-            subject: `[VistaQ Support] ${problemType} — from ${name}`,
-            from_name: name,
-            // Web3Forms sends notification to the registered address (vistaqtech@gmail.com)
-            // and auto-replies to the 'email' field if set.
-            email,           // triggers auto-reply to user
-            replyto: email,
-            message: `Name: ${name}\nEmail: ${email}\nPhone: ${phone}\nType: ${problemType}\n\n${message}`,
-            // HTML version for clients that support it
-            html: htmlMessage,
-            // Copy to support inbox (already the registered address, stated for clarity)
-            redirect: false,
-            // Auto-reply settings
-            autoresponse: true,
-            autoresponse_subject: 'We have received your enquiry — VistaQ Support',
-            autoresponse_message: `Hi ${name},\n\nThank you for reaching out to the VistaQ Support team.\n\nWe have received your enquiry about "${problemType}" and our team will review it shortly. You can expect a response within 1–2 business days.\n\nIf you have any urgent concerns, please email us at ${SUPPORT_EMAIL}.\n\nBest regards,\nVistaQ Support Team`,
-        }),
-    });
-
-    const data = await res.json();
-    if (!data.success) throw new Error(data.message || 'Submission failed');
-    return data;
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 
 const Support: React.FC = () => {
@@ -203,13 +140,26 @@ const Support: React.FC = () => {
 
         setLoading(true);
         try {
-            await sendEnquiry({
-                name: name.trim(),
-                email: email.trim(),
-                phone: phone.trim(),
-                problemType,
-                message: message.trim(),
-            });
+            const trimmedName = name.trim();
+            const trimmedEmail = email.trim();
+            const trimmedPhone = phone.trim();
+            const trimmedMessage = message.trim();
+
+            await Promise.all([
+                // Admin notification — full details, Reply-To set to submitter's email
+                sendEmail(SUPPORT_EMAIL, EMAILJS_ADMIN_TEMPLATE, {
+                    from_name: trimmedName,
+                    reply_to: trimmedEmail,
+                    phone: trimmedPhone,
+                    problem_type: problemType,
+                    message: trimmedMessage,
+                }),
+                // User auto-reply — confirmation email to submitter
+                sendEmail(trimmedEmail, EMAILJS_REPLY_TEMPLATE, {
+                    from_name: trimmedName,
+                    problem_type: problemType,
+                }),
+            ]);
             setSubmitted(true);
         } catch (err: any) {
             console.error('Submission error:', err);
