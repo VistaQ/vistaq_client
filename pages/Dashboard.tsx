@@ -298,44 +298,44 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Calendar className="w-5 h-5" /></div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Appointments</p>
-                  <h3 className="text-2xl font-bold text-gray-900">{ytdAppointments_Mgmt}</h3>
-                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Total Appointments</p>
+                  <h3 className="text-3xl font-bold text-gray-900">{ytdAppointments_Mgmt}</h3>
+                  <p className="text-xs text-gray-400 mt-1">Year to Date</p>
                </div>
 
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg mb-3"><Target className="w-5 h-5" /></div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Sales Meetings</p>
-                  <h3 className="text-2xl font-bold text-gray-900">{ytdSalesMeetings_Mgmt}</h3>
-                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Total Sales Meetings</p>
+                  <h3 className="text-3xl font-bold text-gray-900">{ytdSalesMeetings_Mgmt}</h3>
+                  <p className="text-xs text-gray-400 mt-1">Year to Date</p>
                </div>
 
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (NOC & ACE)</p>
                   <div className="flex items-baseline gap-2">
-                     <h3 className="text-2xl font-bold text-gray-900">{totalSalesNOC_YTD_Mgmt}</h3>
+                     <h3 className="text-3xl font-bold text-gray-900">{totalSalesNOC_YTD_Mgmt}</h3>
                      <span className="text-xs text-gray-400">NOC</span>
                   </div>
                   <div className="flex items-baseline gap-1 mt-1">
-                     <p className="text-xl font-bold text-green-600">RM {totalSalesACE_YTD_Mgmt.toLocaleString()}</p>
+                     <p className="text-2xl font-bold text-green-600">RM {totalSalesACE_YTD_Mgmt.toLocaleString()}</p>
                      <span className="text-xs text-gray-400">ACE</span>
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+                  <p className="text-xs text-gray-400 mt-1">Year to Date</p>
                </div>
 
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">No. of Agents</p>
-                  <h3 className="text-2xl font-bold text-gray-900">{noOfAgentsYTD}</h3>
-                  <p className="text-[10px] text-gray-400 mt-1">Total in Scope</p>
+                  <p className="text-sm font-medium text-gray-500 mb-1">No. of Agents</p>
+                  <h3 className="text-3xl font-bold text-gray-900">{noOfAgentsYTD}</h3>
+                  <p className="text-xs text-gray-400 mt-1">Total in Scope</p>
                </div>
 
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg mb-3"><BarChart2 className="w-5 h-5" /></div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">ACS (ACE/NOC)</p>
-                  <h3 className="text-xl font-bold text-yellow-600 mt-1">RM {acsYTD_Mgmt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
-                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+                  <p className="text-sm font-medium text-gray-500 mb-1">ACS (ACE/NOC)</p>
+                  <h3 className="text-3xl font-bold text-yellow-600 mt-1">RM {acsYTD_Mgmt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
+                  <p className="text-xs text-gray-400 mt-1">Year to Date</p>
                </div>
             </div>
 
@@ -653,30 +653,30 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
                <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects (YTD)</p>
-               <h3 className="text-2xl font-bold text-gray-900">{totalProspectsYTD}</h3>
+               <h3 className="text-3xl font-bold text-gray-900">{totalProspectsYTD}</h3>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Calendar className="w-5 h-5" /></div>
                <p className="text-sm font-medium text-gray-500 mb-1">Total Appointments (YTD)</p>
-               <h3 className="text-2xl font-bold text-gray-900">{totalAppointmentsYTD}</h3>
+               <h3 className="text-3xl font-bold text-gray-900">{totalAppointmentsYTD}</h3>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg mb-3"><Target className="w-5 h-5" /></div>
                <p className="text-sm font-medium text-gray-500 mb-1">Sales Meetings (YTD)</p>
-               <h3 className="text-2xl font-bold text-gray-900">{totalSalesMeetingsYTD}</h3>
+               <h3 className="text-3xl font-bold text-gray-900">{totalSalesMeetingsYTD}</h3>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
                <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (YTD)</p>
                <div className="flex items-baseline gap-2">
-                  <h3 className="text-2xl font-bold text-gray-900">{totalSalesNOC_YTD}</h3>
+                  <h3 className="text-3xl font-bold text-gray-900">{totalSalesNOC_YTD}</h3>
                   <span className="text-xs text-gray-400">NOC</span>
                </div>
                <div className="flex items-baseline gap-1 mt-1">
-                  <p className="text-xl font-bold text-green-600">RM {totalSalesACE_YTD.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-green-600">RM {totalSalesACE_YTD.toLocaleString()}</p>
                   <span className="text-xs text-gray-400">ACE</span>
                </div>
             </div>
@@ -684,7 +684,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg mb-3"><BarChart2 className="w-5 h-5" /></div>
                <p className="text-sm font-medium text-gray-500 mb-1">ACS (ACE/NOC) (YTD)</p>
-               <h3 className="text-xl font-bold text-yellow-600 mt-1">RM {acsYTD.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
+               <h3 className="text-3xl font-bold text-yellow-600 mt-1">RM {acsYTD.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
             </div>
          </div>
 
