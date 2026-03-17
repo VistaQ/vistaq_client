@@ -3,6 +3,18 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { UserRole, Prospect, ProspectStage, CoachingSession } from '../types';
 import {
+  checkAndSendCoachingReminders,
+  checkAndSendStaleProspectAlert,
+  requestBrowserPermission,
+  getStoredNotifications,
+} from '../services/notificationService';
+import { StoredNotification } from '../types';
+import {
+   Bell,
+   ShoppingBag,
+   CalendarCheck,
+   AlertCircle,
+   Info,
    Calendar,
    Target,
    Trophy,
@@ -20,13 +32,96 @@ import {
    DollarSign,
    TrendingUp
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, Label } from 'recharts';
 
 const MDRT_TARGET_FYC = 100000;
 const MDRT_TARGET_PROSPECTS = 100;
 
 // Zurich Palette for Charts
-const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC'];
+const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC', '#10B981'];
+
+// ---------------------------------------------------------------------------
+// Notification Widget — shared between personal and management dashboards
+// ---------------------------------------------------------------------------
+
+const notifIcon: Record<string, React.ReactNode> = {
+   sale:              <ShoppingBag className="w-4 h-4" />,
+   appointment:       <CalendarCheck className="w-4 h-4" />,
+   coaching_reminder: <GraduationCap className="w-4 h-4" />,
+   stale_prospects:   <AlertCircle className="w-4 h-4" />,
+   test:              <Info className="w-4 h-4" />,
+};
+const notifColor: Record<string, string> = {
+   sale: 'text-green-600 bg-green-100',
+   appointment: 'text-blue-600 bg-blue-100',
+   coaching_reminder: 'text-purple-600 bg-purple-100',
+   stale_prospects: 'text-orange-500 bg-orange-100',
+   test: 'text-gray-500 bg-gray-100',
+};
+const relativeTime = (iso: string): string => {
+   try {
+      const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+      if (mins < 1) return 'Just now';
+      if (mins < 60) return `${mins}m ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs}h ago`;
+      return `${Math.floor(hrs / 24)}d ago`;
+   } catch { return ''; }
+};
+
+const NotifWidget: React.FC<{ notifs: StoredNotification[]; onNavigate?: (p: string) => void }> = ({ notifs, onNavigate }) => (
+   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+      <div className="flex items-center justify-between mb-4">
+         <h3 className="font-bold text-gray-800 flex items-center gap-2">
+            <Bell className="w-5 h-5 text-blue-500" />
+            Recent Notifications
+            {notifs.some(n => !n.read) && (
+               <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-500 text-white rounded-full">
+                  {notifs.filter(n => !n.read).length} new
+               </span>
+            )}
+         </h3>
+         {onNavigate && (
+            <button
+               onClick={() => onNavigate('notifications')}
+               className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+            >
+               View all
+            </button>
+         )}
+      </div>
+
+      {notifs.length === 0 ? (
+         <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+            <Bell className="w-8 h-8 mb-2 opacity-20" />
+            <p className="text-sm text-gray-500">No notifications yet</p>
+         </div>
+      ) : (
+         <div className="space-y-2">
+            {notifs.map(n => {
+               const colorClass = notifColor[n.type] || notifColor.test;
+               return (
+                  <div key={n.id} className={`flex items-start gap-3 p-3 rounded-lg ${!n.read ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}>
+                     <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${colorClass}`}>
+                        {notifIcon[n.type] || notifIcon.test}
+                     </div>
+                     <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                           <p className="text-sm font-semibold text-gray-800 truncate">{n.title}</p>
+                           <span className="text-[10px] text-gray-400 flex-shrink-0">{relativeTime(n.timestamp)}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 line-clamp-1">{n.message}</p>
+                     </div>
+                     {!n.read && <div className="flex-shrink-0 w-1.5 h-1.5 mt-1.5 rounded-full bg-blue-500" />}
+                  </div>
+               );
+            })}
+         </div>
+      )}
+   </div>
+);
+
+// ---------------------------------------------------------------------------
 
 interface DashboardProps {
    onNavigate?: (page: string) => void;
@@ -34,13 +129,39 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    const { currentUser, groups, users } = useAuth();
-   const { prospects, getProspectsByScope, getGroupProspects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions } = useData();
+   const { prospects, getProspectsByScope, getGroupProspects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions, isLoadingCoaching } = useData();
+
+   // Notification widget state
+   const [recentNotifs, setRecentNotifs] = useState<StoredNotification[]>([]);
+
+   const loadNotifs = () => {
+      if (currentUser?.id) {
+         setRecentNotifs(getStoredNotifications(currentUser.id).slice(0, 5));
+      }
+   };
 
    // Fetch events and coaching sessions on mount (deferred fetch — not loaded on app start)
    useEffect(() => {
       refetchEvents();
       refetchCoachingSessions();
+      requestBrowserPermission();
    }, []);
+
+   // Keep notification widget in sync
+   useEffect(() => {
+      loadNotifs();
+      window.addEventListener('vistaq-notification', loadNotifs);
+      return () => window.removeEventListener('vistaq-notification', loadNotifs);
+   }, [currentUser?.id]);
+
+   // Run notification checks once after coaching sessions finish loading
+   useEffect(() => {
+      if (!currentUser || isLoadingCoaching) return;
+      const sessions = getCoachingSessionsForUser(currentUser);
+      const ownProspects = prospects.filter(p => p.uid === currentUser.id);
+      checkAndSendCoachingReminders(currentUser, sessions);
+      checkAndSendStaleProspectAlert(currentUser, ownProspects);
+   }, [isLoadingCoaching, currentUser?.id]);
 
    // --- MANAGEMENT DASHBOARD (Admin, Master Trainer & Trainer ONLY) ---
    // Group Leaders now see Personal Dashboard by default, and access Group stats via "Group" page.
@@ -51,6 +172,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    if (isManagementRole) {
       const isAdmin = currentUser?.role === UserRole.ADMIN;
       const isTrainer = currentUser?.role === UserRole.TRAINER;
+      const isMasterTrainer = currentUser?.role === UserRole.MASTER_TRAINER;
 
       // Use the robust scope filter from DataContext which now handles Leaders correctly
       const scopeProspects = getProspectsByScope(currentUser!);
@@ -79,29 +201,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       const totalClosed = scopeProspects.filter(p => p.salesOutcome === 'successful' || p.salesOutcome === 'unsuccessful').length;
       const conversionRate = totalClosed > 0 ? (totalSales / totalClosed) * 100 : 0;
 
-      // --- 4. GROUP RANKINGS (Only relevant if > 1 group) ---
-      const groupRankings = relevantGroups.map(group => {
-         const gProspects = getGroupProspects(group.id);
-         const gFYC = gProspects.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
-         const gSales = gProspects.filter(p => p.salesOutcome === 'successful').length;
-         return { id: group.id, name: group.name, fyc: gFYC, sales: gSales };
-      }).sort((a, b) => b.fyc - a.fyc);
-
-      // --- 5. CHART DATA ---
-      const totalAppointmentsSet = scopeProspects.filter(p =>
-         p.appointmentStatus === 'scheduled' ||
-         p.appointmentStatus === 'rescheduled'
-      ).length;
-
-      const totalSalesMeetings = scopeProspects.filter(p => p.appointmentStatus === 'completed').length;
-
-      const funnelData = [
-         { name: 'Prospects', value: scopeProspects.length },
-         { name: 'Appointments', value: totalAppointmentsSet },
-         { name: 'Sales Meeting', value: totalSalesMeetings },
-         { name: 'Sales', value: totalSales },
-      ];
-
       // --- MTD Calculations for Management ---
       const now = new Date();
       const currentYear = now.getFullYear();
@@ -117,6 +216,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
          if (isNaN(d.getTime())) return false;
          return d >= start && d <= end;
       };
+
+      // --- 4. GROUP RANKINGS (YTD, to match Group Performance Dashboard) ---
+      const groupRankings = relevantGroups.map(group => {
+         const gProspects = getGroupProspects(group.id);
+         const gSalesYTD = gProspects.filter(p =>
+            p.salesOutcome === 'successful' &&
+            isWithinDateRange(p.salesCompletedAt || p.updatedAt, startYTD, endYTD)
+         );
+         const gFYC = gSalesYTD.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+         const gSales = gSalesYTD.length;
+         return { id: group.id, name: group.name, fyc: gFYC, sales: gSales };
+      }).sort((a, b) => b.fyc - a.fyc);
 
       // YTD Metrics Filtered
       const ytdAppointments_Mgmt = scopeProspects.filter(p =>
@@ -142,6 +253,55 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
       const acsYTD_Mgmt = totalSalesNOC_YTD_Mgmt > 0 ? (totalSalesACE_YTD_Mgmt / totalSalesNOC_YTD_Mgmt) : 0;
 
+      // --- 5. MTD CHART DATA ---
+      const currentMonth_Mgmt = now.getMonth();
+      const startMTD_Mgmt = new Date(currentYear, currentMonth_Mgmt, 1);
+      const endMTD_Mgmt = new Date(currentYear, currentMonth_Mgmt + 1, 0, 23, 59, 59);
+
+      const mtdProspects_Mgmt = scopeProspects.filter(p =>
+         isWithinDateRange(p.createdAt, startMTD_Mgmt, endMTD_Mgmt)
+      ).length;
+      const mtdAppointments_Mgmt = scopeProspects.filter(p =>
+         (p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled') &&
+         isWithinDateRange(p.appointmentDate, startMTD_Mgmt, endMTD_Mgmt)
+      ).length;
+      const mtdSalesMeetings_Mgmt = scopeProspects.filter(p =>
+         p.appointmentStatus === 'completed' &&
+         isWithinDateRange(p.appointmentCompletedAt || p.appointmentDate, startMTD_Mgmt, endMTD_Mgmt)
+      ).length;
+      const mtdSalesArr_Mgmt = scopeProspects.filter(p =>
+         p.salesOutcome === 'successful' &&
+         isWithinDateRange(p.salesCompletedAt || p.updatedAt, startMTD_Mgmt, endMTD_Mgmt)
+      );
+      const mtdSalesNOC_Mgmt = mtdSalesArr_Mgmt.length;
+      const mtdSalesACE_Mgmt = mtdSalesArr_Mgmt.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
+
+      const mgmtChartDataMTD = [
+         { name: 'Prospects',       value: mtdProspects_Mgmt,     barType: 'count' },
+         { name: 'Appointments Set', value: mtdAppointments_Mgmt,  barType: 'count' },
+         { name: 'Sales Meetings',   value: mtdSalesMeetings_Mgmt, barType: 'count' },
+         { name: 'Sales',           value: mtdSalesNOC_Mgmt,      barType: 'sales', ace: mtdSalesACE_Mgmt },
+      ];
+
+      const MgmtCustomTooltip = ({ active, payload, label }: any) => {
+         if (active && payload && payload.length) {
+            const data = payload[0].payload;
+            return (
+               <div className="bg-white p-3 border border-gray-100 shadow-lg rounded-lg">
+                  <p className="font-bold text-gray-900 mb-1">{label}</p>
+                  {data.barType === 'sales' ? (
+                     <>
+                        <p className="text-blue-600 text-sm font-medium">NOC {data.value}</p>
+                        <p className="text-green-600 text-sm font-medium">ACE RM {data.ace.toLocaleString()}</p>
+                     </>
+                  ) : (
+                     <p className="text-blue-600 text-sm font-medium">{data.value}</p>
+                  )}
+               </div>
+            );
+         }
+         return null;
+      };
 
       // --- Upcoming Schedule for Management ---
       const mgmtNow = new Date();
@@ -189,13 +349,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   <p className="text-sm text-gray-500">
                      {isAdmin
                         ? 'System-wide statistics and performance monitoring.'
-                        : `High-level analytics for ${relevantGroups.length} managed group(s).`}
+                        : isMasterTrainer
+                           ? `High-level analytics for ${relevantGroups.length} managed group(s).`
+                           : ''}
                   </p>
                </div>
             </div>
 
-            {/* ADMIN & TRAINER: System Stats Row */}
-            {(isAdmin || isTrainer) && (
+            {/* ADMIN & MASTER TRAINER: System Stats Row */}
+            {(isAdmin || isMasterTrainer) && (
                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-in fade-in slide-in-from-top-4">
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
                      <div>
@@ -269,12 +431,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Sales (NOC & ACE)</p>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (NOC & ACE)</p>
                   <div className="flex items-baseline gap-2">
                      <h3 className="text-2xl font-bold text-gray-900">{totalSalesNOC_YTD_Mgmt}</h3>
                      <span className="text-xs text-gray-400">NOC</span>
                   </div>
-                  <p className="text-sm font-bold text-green-600 mt-1">RM {totalSalesACE_YTD_Mgmt.toLocaleString()}</p>
+                  <div className="flex items-baseline gap-1 mt-1">
+                     <p className="text-xl font-bold text-green-600">RM {totalSalesACE_YTD_Mgmt.toLocaleString()}</p>
+                     <span className="text-xs text-gray-400">ACE</span>
+                  </div>
                   <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
                </div>
 
@@ -294,21 +459,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-               {/* Company Funnel */}
+               {/* MTD Pipeline */}
                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <h3 className="font-bold text-gray-800 mb-4 flex items-center">
-                     <BarChart2 className="w-5 h-5 mr-2 text-blue-600" />
-                     Sales Funnel Aggregate
-                  </h3>
+                  <div className="flex justify-between items-center mb-6">
+                     <h3 className="text-lg font-bold text-gray-800">Month-To-Date Pipeline</h3>
+                     <span className="text-xs font-medium px-2 py-1 bg-gray-100 text-gray-600 rounded">{now.toLocaleString('default', { month: 'long', year: 'numeric' })} MTD</span>
+                  </div>
                   <div className="h-64">
                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={funnelData} layout="vertical">
-                           <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                           <XAxis type="number" hide />
-                           <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
-                           <Tooltip />
-                           <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={40}>
-                              {funnelData.map((entry, index) => (
+                        <BarChart data={mgmtChartDataMTD} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                           <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                           <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                           <YAxis allowDecimals={false} tickFormatter={(v) => v.toLocaleString()}>
+                              <Label value="No. / RM'000" angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: '#6B7280' }} />
+                           </YAxis>
+                           <Tooltip content={<MgmtCustomTooltip />} />
+                           <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                              {mgmtChartDataMTD.map((entry, index) => (
                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                               ))}
                            </Bar>
@@ -421,7 +588,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   )}
                </div>
             </div>
-         </div>
+
+         {/* Notification Widget */}
+         <NotifWidget notifs={recentNotifs} onNavigate={onNavigate} />
+      </div>
       );
    }
 
@@ -563,22 +733,26 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    // We use separate bars conceptually if possible. Recharts allows Custom Tooltips or multi-bar if needed.
    // We will display Quantity (NOC) and Quality (ACE) in the chart tooltip for Sales.
    const chartDataMTD = [
-      { name: 'Prospects', Quantity: mtdProspectsCount },
-      { name: 'Appt Set', Quantity: mtdAppointmentsCount },
-      { name: 'Appt Done', Quantity: mtdSalesMeetingsCount },
-      { name: 'Sales', Quantity: mtdSalesNOC, ACE: mtdSalesACE },
+      { name: 'Prospects',       value: mtdProspectsCount,     barType: 'count' },
+      { name: 'Appointments Set', value: mtdAppointmentsCount,  barType: 'count' },
+      { name: 'Sales Meetings',   value: mtdSalesMeetingsCount, barType: 'count' },
+      { name: 'Sales',           value: mtdSalesNOC,           barType: 'sales', ace: mtdSalesACE },
    ];
 
-   // Custom Tooltip for the MTD Bar Chart to show ACE appropriately
+   // Custom Tooltip for the MTD Bar Chart
    const CustomTooltip = ({ active, payload, label }: any) => {
       if (active && payload && payload.length) {
          const data = payload[0].payload;
          return (
             <div className="bg-white p-3 border border-gray-100 shadow-lg rounded-lg">
                <p className="font-bold text-gray-900 mb-1">{label}</p>
-               <p className="text-blue-600 text-sm font-medium">Quantity (NOC): {data.Quantity}</p>
-               {data.ACE !== undefined && (
-                  <p className="text-green-600 text-sm font-medium">Quality (ACE): RM {data.ACE.toLocaleString()}</p>
+               {data.barType === 'sales' ? (
+                  <>
+                     <p className="text-blue-600 text-sm font-medium">NOC {data.value}</p>
+                     <p className="text-green-600 text-sm font-medium">ACE RM {data.ace.toLocaleString()}</p>
+                  </>
+               ) : (
+                  <p className="text-blue-600 text-sm font-medium">{data.value}</p>
                )}
             </div>
          );
@@ -599,35 +773,38 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
-               <p className="text-xs font-medium text-gray-500 mb-1">Total Prospects (YTD)</p>
+               <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects (YTD)</p>
                <h3 className="text-2xl font-bold text-gray-900">{totalProspectsYTD}</h3>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Calendar className="w-5 h-5" /></div>
-               <p className="text-xs font-medium text-gray-500 mb-1">Total Apptm (YTD)</p>
+               <p className="text-sm font-medium text-gray-500 mb-1">Total Appointments (YTD)</p>
                <h3 className="text-2xl font-bold text-gray-900">{totalAppointmentsYTD}</h3>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg mb-3"><Target className="w-5 h-5" /></div>
-               <p className="text-xs font-medium text-gray-500 mb-1">Sales Meeting (YTD)</p>
+               <p className="text-sm font-medium text-gray-500 mb-1">Sales Meetings (YTD)</p>
                <h3 className="text-2xl font-bold text-gray-900">{totalSalesMeetingsYTD}</h3>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
-               <p className="text-xs font-medium text-gray-500 mb-1">Total Sales (YTD)</p>
+               <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (YTD)</p>
                <div className="flex items-baseline gap-2">
                   <h3 className="text-2xl font-bold text-gray-900">{totalSalesNOC_YTD}</h3>
                   <span className="text-xs text-gray-400">NOC</span>
                </div>
-               <p className="text-sm font-bold text-green-600 mt-1">RM {totalSalesACE_YTD.toLocaleString()}</p>
+               <div className="flex items-baseline gap-1 mt-1">
+                  <p className="text-xl font-bold text-green-600">RM {totalSalesACE_YTD.toLocaleString()}</p>
+                  <span className="text-xs text-gray-400">ACE</span>
+               </div>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg mb-3"><BarChart2 className="w-5 h-5" /></div>
-               <p className="text-xs font-medium text-gray-500 mb-1">ACS (ACE/NOC) (YTD)</p>
+               <p className="text-sm font-medium text-gray-500 mb-1">ACS (ACE/NOC) (YTD)</p>
                <h3 className="text-xl font-bold text-yellow-600 mt-1">RM {acsYTD.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
             </div>
          </div>
@@ -641,12 +818,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                </div>
                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                     <BarChart data={chartDataMTD} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                     <BarChart data={chartDataMTD} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="name" />
-                        <YAxis />
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <YAxis allowDecimals={false} tickFormatter={(v) => v.toLocaleString()}>
+                           <Label value="No. / RM'000" angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: '#6B7280' }} />
+                        </YAxis>
                         <Tooltip content={<CustomTooltip />} />
-                        <Bar dataKey="Quantity" radius={[4, 4, 0, 0]}>
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                            {chartDataMTD.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                            ))}
@@ -751,6 +930,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                </div>
             </div>
          </div>
+
+         {/* Notification Widget */}
+         <NotifWidget notifs={recentNotifs} onNavigate={onNavigate} />
       </div>
    );
 };

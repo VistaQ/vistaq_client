@@ -19,12 +19,14 @@ import {
   Briefcase,
   Grid,
   Layers,
-  Search
+  Search,
+  BarChart2,
+  Calendar
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Label } from 'recharts';
 
 // Zurich Palette
-const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC'];
+const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC', '#10B981'];
 
 const Group: React.FC = () => {
   const { currentUser, getGroupMembers, groups, getUserById, users } = useAuth();
@@ -200,6 +202,7 @@ const Group: React.FC = () => {
                 isWithinDateRange(p.salesCompletedAt || p.updatedAt, startYTD, endYTD)
               );
               
+              const gProspectsYTD = gProspects.filter(p => isWithinDateRange(p.createdAt, startYTD, endYTD)).length;
               const gSalesNOC_YTD = gSalesYTD.length;
               const gSalesACE_YTD = gSalesYTD.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
 
@@ -225,6 +228,10 @@ const Group: React.FC = () => {
 
                   <div className="space-y-3 flex-1">
                     <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Prospects (YTD)</span>
+                      <span className="font-bold text-gray-900">{gProspectsYTD}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Appointments (YTD)</span>
                       <span className="font-bold text-gray-900">{gAppointmentsYTD}</span>
                     </div>
@@ -236,7 +243,7 @@ const Group: React.FC = () => {
                       <span className="text-gray-500">Sales (YTD)</span>
                       <div className="text-right">
                           <span className="font-bold text-gray-900 block">{gSalesNOC_YTD} NOC</span>
-                          <span className="font-bold text-green-600 text-xs text-right block">RM {gSalesACE_YTD.toLocaleString()}</span>
+                          <span className="font-bold text-green-600 text-xs text-right block">RM {gSalesACE_YTD.toLocaleString()} ACE</span>
                       </div>
                     </div>
                     <div className="flex justify-between text-sm">
@@ -302,12 +309,12 @@ const Group: React.FC = () => {
     return d >= start && d <= end;
   };
 
-  // Group Aggregates - only count successful sales (Total overall for the top right corner)
-  const totalGroupFYC = groupProspects
-    .filter(p => p.salesOutcome === 'successful')
-    .reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
-
   // --- YTD Calculations ---
+  // Total Prospects YTD
+  const totalProspectsYTD_Grp = groupProspects.filter(p =>
+    isWithinDateRange(p.createdAt, startYTD, endYTD)
+  ).length;
+
   // Appointments Scheduled YTD
   const ytdAppointments_Grp = groupProspects.filter(p =>
     (p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled') &&
@@ -380,21 +387,53 @@ const Group: React.FC = () => {
     const agentProspects = groupProspects.filter(p => p.uid === selectedAgentId);
     const successfulSales = agentProspects.filter(p => p.salesOutcome === 'successful');
 
-    // Updated Logic for Funnel
-    const appointmentsSet = agentProspects.filter(p =>
-      p.appointmentStatus === 'scheduled' ||
-      p.appointmentStatus === 'rescheduled'
+    // MTD calculations for bar chart
+    const aMtdProspects = agentProspects.filter(p => isWithinDateRange(p.createdAt, startMTD, endMTD)).length;
+    const aMtdAppointments = agentProspects.filter(p =>
+      (p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled') &&
+      isWithinDateRange(p.appointmentDate, startMTD, endMTD)
     ).length;
-    const completedAppointments = agentProspects.filter(p => p.appointmentStatus === 'completed').length;
+    const aMtdSalesMeetings = agentProspects.filter(p =>
+      p.appointmentStatus === 'completed' &&
+      isWithinDateRange(p.appointmentCompletedAt || p.appointmentDate, startMTD, endMTD)
+    ).length;
+    const aMtdSalesArr = agentProspects.filter(p =>
+      p.salesOutcome === 'successful' &&
+      isWithinDateRange(p.salesCompletedAt || p.updatedAt, startMTD, endMTD)
+    );
+    const aMtdSalesNOC = aMtdSalesArr.length;
+    const aMtdSalesACE = aMtdSalesArr.reduce((sum, p) => sum + ((p.productsSold || []).reduce((s, prod) => s + (prod.aceAmount || 0), 0)), 0);
 
     const chartData = [
-      { name: 'Prospects', value: agentProspects.length },
-      { name: 'Appointments', value: appointmentsSet },
-      { name: 'Sales Meeting', value: completedAppointments },
-      { name: 'Sales', value: successfulSales.length },
+      { name: 'Prospects',       value: aMtdProspects,     barType: 'count' },
+      { name: 'Appointments Set', value: aMtdAppointments,  barType: 'count' },
+      { name: 'Sales Meetings',   value: aMtdSalesMeetings, barType: 'count' },
+      { name: 'Sales',           value: aMtdSalesNOC,      barType: 'sales', ace: aMtdSalesACE },
     ];
 
+    const AgentCustomTooltip = ({ active, payload, label }: any) => {
+      if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        return (
+          <div className="bg-white p-3 border border-gray-100 shadow-lg rounded-lg">
+            <p className="font-bold text-gray-900 mb-1">{label}</p>
+            {data.barType === 'sales' ? (
+              <>
+                <p className="text-blue-600 text-sm font-medium">NOC {data.value}</p>
+                <p className="text-green-600 text-sm font-medium">ACE RM {data.ace.toLocaleString()}</p>
+              </>
+            ) : (
+              <p className="text-blue-600 text-sm font-medium">{data.value}</p>
+            )}
+          </div>
+        );
+      }
+      return null;
+    };
+
     // YTD Calculations for the specific agent
+    const aProspectsYTD = agentProspects.filter(p => isWithinDateRange(p.createdAt, startYTD, endYTD)).length;
+
     const aAppointmentsYTD = agentProspects.filter(p =>
       (p.appointmentStatus === 'scheduled' || p.appointmentStatus === 'rescheduled') &&
       isWithinDateRange(p.appointmentDate, startYTD, endYTD)
@@ -414,14 +453,6 @@ const Group: React.FC = () => {
 
     const aAcsYTD = aSalesNOC_YTD > 0 ? (aSalesACE_YTD / aSalesNOC_YTD) : 0;
     
-    const aYtdActive = agentProspects.some(p => 
-         isWithinDateRange(p.createdAt, startYTD, endYTD) ||
-         isWithinDateRange(p.updatedAt, startYTD, endYTD) ||
-         isWithinDateRange(p.appointmentDate, startYTD, endYTD) ||
-         isWithinDateRange(p.salesCompletedAt, startYTD, endYTD)
-    );
-    const aNoOfAgentsYTD = aYtdActive ? 1 : 0;
-
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
         <div className="flex items-center space-x-4">
@@ -440,54 +471,57 @@ const Group: React.FC = () => {
         {/* Dashboard Widgets for Individual Agent */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
-             <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Clock className="w-5 h-5" /></div>
-             <p className="text-xs font-medium text-gray-500 mb-1">Total Appointments</p>
+             <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
+             <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects (YTD)</p>
+             <h3 className="text-2xl font-bold text-gray-900">{aProspectsYTD}</h3>
+          </div>
+
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
+             <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Calendar className="w-5 h-5" /></div>
+             <p className="text-sm font-medium text-gray-500 mb-1">Total Appointments (YTD)</p>
              <h3 className="text-2xl font-bold text-gray-900">{aAppointmentsYTD}</h3>
-             <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
           </div>
 
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg mb-3"><Target className="w-5 h-5" /></div>
-             <p className="text-xs font-medium text-gray-500 mb-1">Total Sales Meetings</p>
+             <p className="text-sm font-medium text-gray-500 mb-1">Sales Meetings (YTD)</p>
              <h3 className="text-2xl font-bold text-gray-900">{aSalesMeetingsYTD}</h3>
-             <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
           </div>
 
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
              <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
-             <p className="text-xs font-medium text-gray-500 mb-1">Total Sales (NOC & ACE)</p>
+             <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (YTD)</p>
              <div className="flex items-baseline gap-2">
                 <h3 className="text-2xl font-bold text-gray-900">{aSalesNOC_YTD}</h3>
                 <span className="text-xs text-gray-400">NOC</span>
              </div>
-             <p className="text-sm font-bold text-green-600 mt-1">RM {aSalesACE_YTD.toLocaleString()}</p>
-             <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+             <div className="flex items-baseline gap-1 mt-1">
+                <p className="text-xl font-bold text-green-600">RM {aSalesACE_YTD.toLocaleString()}</p>
+                <span className="text-xs text-gray-400">ACE</span>
+             </div>
           </div>
 
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
-             <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
-             <p className="text-xs font-medium text-gray-500 mb-1">No. of Agents</p>
-             <h3 className="text-2xl font-bold text-gray-900">{aNoOfAgentsYTD}</h3>
-             <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
-             <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg mb-3"><Trophy className="w-5 h-5" /></div>
-             <p className="text-xs font-medium text-gray-500 mb-1">ACS (ACE/NOC)</p>
-             <h3 className="text-2xl font-bold text-gray-900">RM {aAcsYTD.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
-             <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+             <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg mb-3"><BarChart2 className="w-5 h-5" /></div>
+             <p className="text-sm font-medium text-gray-500 mb-1">ACS (ACE/NOC) (YTD)</p>
+             <h3 className="text-xl font-bold text-yellow-600 mt-1">RM {aAcsYTD.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-800 mb-4">Sales Funnel</h3>
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold text-gray-800">Month-To-Date Pipeline</h3>
+            <span className="text-xs font-medium px-2 py-1 bg-gray-100 text-gray-600 rounded">{now.toLocaleString('default', { month: 'long', year: 'numeric' })} MTD</span>
+          </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
+              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tickFormatter={(v) => v.toLocaleString()}>
+                  <Label value="No. / RM'000" angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: '#6B7280' }} />
+                </YAxis>
+                <Tooltip content={<AgentCustomTooltip />} />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                   {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -520,10 +554,6 @@ const Group: React.FC = () => {
           </h1>
           <p className="text-sm text-gray-500">Team Performance & Sales Overview</p>
         </div>
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg">
-          <span className="text-xs uppercase font-semibold opacity-80">Total Group ACE</span>
-          <p className="text-2xl font-bold">RM {totalGroupFYC.toLocaleString()}</p>
-        </div>
       </div>
 
       {/* Analytics Cards (YTD) */}
@@ -531,44 +561,49 @@ const Group: React.FC = () => {
          <Target className="w-5 h-5 mr-2 text-gray-500" />
          Performance Metrics (YTD)
       </h3>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
-            <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Clock className="w-5 h-5" /></div>
-            <p className="text-xs font-medium text-gray-500 mb-1">Total Appointments</p>
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
+            <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects (YTD)</p>
+            <h3 className="text-2xl font-bold text-gray-900">{totalProspectsYTD_Grp}</h3>
+         </div>
+
+         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
+            <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Calendar className="w-5 h-5" /></div>
+            <p className="text-sm font-medium text-gray-500 mb-1">Total Appointments (YTD)</p>
             <h3 className="text-2xl font-bold text-gray-900">{ytdAppointments_Grp}</h3>
-            <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
          </div>
 
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg mb-3"><Target className="w-5 h-5" /></div>
-            <p className="text-xs font-medium text-gray-500 mb-1">Total Sales Meetings</p>
+            <p className="text-sm font-medium text-gray-500 mb-1">Sales Meetings (YTD)</p>
             <h3 className="text-2xl font-bold text-gray-900">{ytdSalesMeetings_Grp}</h3>
-            <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
          </div>
 
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
             <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
-            <p className="text-xs font-medium text-gray-500 mb-1">Total Sales (NOC & ACE)</p>
+            <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (YTD)</p>
             <div className="flex items-baseline gap-2">
                <h3 className="text-2xl font-bold text-gray-900">{totalSalesNOC_YTD_Grp}</h3>
                <span className="text-xs text-gray-400">NOC</span>
             </div>
-            <p className="text-sm font-bold text-green-600 mt-1">RM {totalSalesACE_YTD_Grp.toLocaleString()}</p>
-            <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+            <div className="flex items-baseline gap-1 mt-1">
+               <p className="text-xl font-bold text-green-600">RM {totalSalesACE_YTD_Grp.toLocaleString()}</p>
+               <span className="text-xs text-gray-400">ACE</span>
+            </div>
          </div>
 
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
-            <p className="text-xs font-medium text-gray-500 mb-1">No. of Agents</p>
+            <div className="p-2 bg-slate-50 text-slate-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
+            <p className="text-sm font-medium text-gray-500 mb-1">No. of Agents</p>
             <h3 className="text-2xl font-bold text-gray-900">{activeMembersCount}</h3>
             <p className="text-[10px] text-gray-400 mt-1">Total in Group</p>
          </div>
 
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
-            <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg mb-3"><TrendingUp className="w-5 h-5" /></div>
-            <p className="text-xs font-medium text-gray-500 mb-1">ACS (ACE/NOC)</p>
+            <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg mb-3"><BarChart2 className="w-5 h-5" /></div>
+            <p className="text-sm font-medium text-gray-500 mb-1">ACS (ACE/NOC)</p>
             <h3 className="text-xl font-bold text-yellow-600 mt-1">RM {acsYTD_Grp.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
-            <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
          </div>
       </div>
 

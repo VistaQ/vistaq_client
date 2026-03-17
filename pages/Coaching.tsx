@@ -126,9 +126,9 @@ const Coaching: React.FC = () => {
                 {isManagement && (
                     <button
                         onClick={() => setIsCreateModalOpen(true)}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-600/20"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center shadow-sm text-sm font-medium"
                     >
-                        <MessageSquarePlus className="w-5 h-5" />
+                        <MessageSquarePlus className="w-4 h-4 mr-2" />
                         Create Session
                     </button>
                 )}

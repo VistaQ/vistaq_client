@@ -266,64 +266,69 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                         </h3>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Session Title *</label>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Session Title <span className="text-red-500">*</span></label>
                             <input
                                 type="text"
                                 required
                                 value={title}
                                 onChange={e => setTitle(e.target.value)}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2.5 text-sm"
                                 placeholder={`e.g. ${currentTypeInfo?.label} — March 2026`}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Description</label>
                             <textarea
                                 value={description}
                                 onChange={e => setDescription(e.target.value)}
                                 rows={3}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white resize-none"
+                                className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2.5 text-sm resize-none"
                                 placeholder="Describe the objectives or agenda of this coaching session..."
                             />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Date <span className="text-red-500">*</span></label>
                                 <input type="date" required value={date} onChange={e => setDate(e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" />
+                                    className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2.5 text-sm" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1"><Clock className="w-3 h-3" /> Start Time *</label>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Start Time <span className="text-red-500">*</span></label>
                                 <input type="time" required value={durationStart} onChange={handleStartTimeChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" />
+                                    className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2.5 text-sm" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1"><Clock className="w-3 h-3" /> End Time *</label>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">End Time <span className="text-red-500">*</span></label>
                                 <input type="time" required value={durationEnd} onChange={e => setDurationEnd(e.target.value)}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" />
+                                    className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2.5 text-sm" />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Training Mode</label>
-                            <select value={venue} onChange={e => setVenue(e.target.value as 'Online' | 'Face to Face')}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white">
-                                <option value="Online">Online</option>
-                                <option value="Face to Face">Face-to-Face</option>
-                            </select>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Training Mode <span className="text-red-500">*</span></label>
+                            <div className="flex gap-3">
+                                <button type="button"
+                                    onClick={() => setVenue('Online')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${venue === 'Online' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                                    <LinkIcon className="w-4 h-4" /> Online
+                                </button>
+                                <button type="button"
+                                    onClick={() => setVenue('Face to Face')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${venue === 'Face to Face' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                                    <MapPin className="w-4 h-4" /> Face to Face
+                                </button>
+                            </div>
                         </div>
 
                         {venue === 'Online' && (
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Meeting Link</label>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Meeting URL</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <LinkIcon className="h-4 w-4 text-gray-400" />
-                                    </div>
+                                    <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                     <input type="url" value={link} onChange={e => setLink(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                        className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 pl-9 p-2.5 text-sm"
                                         placeholder="https://zoom.us/j/..." />
                                 </div>
                             </div>
@@ -331,14 +336,12 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
 
                         {venue === 'Face to Face' && (
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Venue / Address</label>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Venue / Google Maps or Waze Direction</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <MapPin className="h-4 w-4 text-gray-400" />
-                                    </div>
+                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                     <input type="text" value={link} onChange={e => setLink(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                        placeholder="HQ Office, Meeting Room 1 or Google Maps link" />
+                                        className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 pl-9 p-2.5 text-sm"
+                                        placeholder="e.g. Level 12, Menara XYZ or paste Google Maps / Waze link" />
                                 </div>
                             </div>
                         )}

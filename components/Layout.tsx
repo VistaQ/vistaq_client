@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
 import {
@@ -26,8 +26,10 @@ import {
   HelpCircle,
   FileText,
   BookOpen,
-  Trophy
+  Trophy,
+  Bell
 } from 'lucide-react';
+import { getUnreadCount } from '../services/notificationService';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -38,6 +40,14 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => {
   const { currentUser, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => setUnreadCount(currentUser?.id ? getUnreadCount(currentUser.id) : 0);
+    refresh();
+    window.addEventListener('vistaq-notification', refresh);
+    return () => window.removeEventListener('vistaq-notification', refresh);
+  }, [currentUser?.id]);
 
   const getRoleIcon = (role: UserRole) => {
     switch (role) {
@@ -49,7 +59,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
     }
   };
 
-  const NavItem = ({ id, label, icon: Icon }: any) => (
+  const NavItem = ({ id, label, icon: Icon, badge }: { id: string; label: string; icon: any; badge?: number }) => (
     <button
       onClick={() => { onNavigate(id); setIsMobileMenuOpen(false); }}
       className={`relative flex items-center w-full px-6 py-3.5 text-sm font-medium transition-all duration-200 group ${activePage === id
@@ -63,6 +73,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
       <Icon className={`w-5 h-5 mr-3 transition-colors ${activePage === id ? 'text-blue-400' : 'text-slate-500 group-hover:text-blue-400'
         }`} />
       {label}
+      {badge !== undefined && badge > 0 && (
+        <span className="ml-auto flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold rounded-full bg-blue-500 text-white">
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
     </button>
   );
 
@@ -127,6 +142,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
               <NavItem id="admin-rewards" label="Rewards Config" icon={Gift} />
             </>
           )}
+
+          {/* Notifications — always visible */}
+          <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Account</div>
+          <NavItem id="notifications" label="Notifications" icon={Bell} badge={unreadCount} />
 
           {/* Support & Tutorials — always visible */}
           <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Help</div>
@@ -228,6 +247,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                     <NavItem id="admin-rewards" label="Rewards Config" icon={Gift} />
                   </>
                 )}
+
+                {/* Notifications */}
+                <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Account</div>
+                <NavItem id="notifications" label="Notifications" icon={Bell} badge={unreadCount} />
 
                 {/* Support & Tutorials */}
                 <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Help</div>
