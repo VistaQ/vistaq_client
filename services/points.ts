@@ -79,10 +79,10 @@ export function computeUserPoints(
     }
   }
 
-  // --- Coaching points (only confirmed attendance) ---
+  // --- Coaching points (joined attendance) ---
   for (const session of coachingSessions) {
     const record = session.attendance.find(
-      a => a.agentId === userId && a.status === 'completed'
+      a => a.agentId === userId && a.status === 'joined'
     );
     if (!record) continue;
 
@@ -91,7 +91,7 @@ export function computeUserPoints(
 
     breakdown.push({
       id: `${session.id}_coaching`,
-      date: record.confirmedAt || session.date,
+      date: record.joinedAt || session.date,
       category: 'coaching',
       action: session.coachingType,
       subject: session.title,

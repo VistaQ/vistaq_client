@@ -163,14 +163,17 @@ export interface Prospect {
 export interface Event {
   id: string;
   eventTitle: string;
-  date: string; // ISO String
-  venue: string;
+  date: string; // ISO String (start time)
+  endTime?: string; // e.g. "11:00"
+  eventType?: 'online' | 'face-to-face';
+  venue?: string;
   description: string;
   meetingLink?: string;
 
-  // Groups
+  // Targeting
   groupIds: string[];
   groupNames?: string[];
+  targetAgentIds?: string[]; // specific individual agents invited
 
   // Creator info (auto-filled from auth token on create)
   createdBy: string;

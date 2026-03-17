@@ -6,6 +6,7 @@ import { UserRole, Prospect, ProspectStage } from '../types';
 import { Plus, Search, ChevronRight, User, Download, Eye, LayoutList, LayoutGrid, Phone, Calendar, Loader2 } from 'lucide-react';
 import { apiCall } from '../services/apiClient';
 import ProspectCard from '../components/ProspectCard';
+import * as XLSX from 'xlsx';
 
 const Prospects: React.FC = () => {
   const { currentUser } = useAuth();
@@ -75,44 +76,44 @@ const Prospects: React.FC = () => {
     setSelectedProspect(null);
   };
 
-  const handleExportCSV = () => {
-    // Generate CSV content
-    const headers = ['ID', 'Name', 'Phone', 'Group/Agent', 'Stage', 'Outcome', 'Reason (If Lost)', 'Product', 'Amount (MYR)', 'Date'];
+  const handleExportExcel = () => {
     const rows = filteredProspects.map(p => {
       let outcomeLabel = 'Ongoing';
       if (p.salesOutcome === 'successful') outcomeLabel = 'Won';
-      else if (p.salesOutcome === 'unsuccessful') outcomeLabel = 'Lose';
+      else if (p.salesOutcome === 'unsuccessful') outcomeLabel = 'Lost';
       else if (p.salesOutcome === 'kiv') outcomeLabel = 'KIV';
 
-      const totalAce = p.salesOutcome === 'successful' ? (p.productsSold || []).reduce((sum, prod) => sum + (prod.aceAmount || 0), 0) : 0;
+      const totalAce = p.salesOutcome === 'successful'
+        ? (p.productsSold || []).reduce((sum, prod) => sum + (prod.aceAmount || 0), 0)
+        : 0;
       const productNames = (p.productsSold || []).map(prod => prod.productName).filter(Boolean).join(', ');
+      const formatTS = (val: any) => {
+        if (!val) return '';
+        const d = val._seconds ? new Date(val._seconds * 1000) : new Date(val);
+        return !isNaN(d.getTime()) ? d.toLocaleDateString() : '';
+      };
 
-      return [
-        p.id,
-        p.prospectName,
-        p.prospectPhone || '',
-        p.uid,
-        p.currentStage,
-        outcomeLabel,
-        p.unsuccessfulReason || 'N/A',
-        productNames || 'N/A',
-        totalAce,
-        p.updatedAt
-      ]
+      return {
+        'Prospect ID': p.id,
+        'Name': p.prospectName,
+        'Email': p.prospectEmail || '',
+        'Phone': p.prospectPhone || '',
+        'Stage': p.currentStage || '',
+        'Appointment Status': p.appointmentStatus || '',
+        'Appointment Date': formatTS(p.appointmentDate),
+        'Sales Outcome': outcomeLabel,
+        'Lost Reason': p.unsuccessfulReason || '',
+        'Products': productNames,
+        'ACE Amount (MYR)': totalAce,
+        'Created': formatTS(p.createdAt),
+        'Last Updated': formatTS(p.updatedAt),
+      };
     });
-    
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(r => r.join(','))
-    ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `VistaQ_Prospects_Export_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Prospects');
+    XLSX.writeFile(wb, `VistaQ_Prospects_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const getStageBadge = (prospect: Prospect) => {
@@ -183,13 +184,13 @@ const Prospects: React.FC = () => {
                 </button>
             </div>
 
-            {isAdmin && (
-                <button 
-                onClick={handleExportCSV}
+            {(isAdmin || canAddProspect) && (
+                <button
+                onClick={handleExportExcel}
                 className="bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center shadow-sm transition-colors font-medium text-sm"
                 >
                 <Download className="w-4 h-4 mr-2" />
-                Export
+                Export Excel
                 </button>
             )}
             {canAddProspect && (
