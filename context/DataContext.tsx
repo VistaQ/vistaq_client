@@ -3,7 +3,6 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, PointConfig, Group } from '../types';
 import { apiCall } from '../services/apiClient';
 import { DEFAULT_POINT_CONFIG } from '../services/points';
-import { notifyAppointmentCompleted, notifySaleMade } from '../services/notificationService';
 
 interface DataContextType {
   prospects: Prospect[];
@@ -11,7 +10,7 @@ interface DataContextType {
   pointConfig: PointConfig;
   events: Event[];
   addProspect: (p: Partial<Prospect>) => Promise<Prospect>;
-  updateProspect: (id: string, updates: Partial<Prospect>, notifyCtx?: { users: User[]; groups: Group[] }) => Promise<void>;
+  updateProspect: (id: string, updates: Partial<Prospect>) => Promise<void>;
   importProspects: (newData: Prospect[]) => Promise<void>;
   getProspectsByScope: (user: User) => Prospect[];
   getGroupProspects: (groupId: string) => Prospect[];
@@ -281,7 +280,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const updateProspect = async (id: string, updates: Partial<Prospect>, notifyCtx?: { users: User[]; groups: Group[] }) => {
+  const updateProspect = async (id: string, updates: Partial<Prospect>) => {
     // Snapshot current prospect before the API call for transition detection
     const current = prospects.find(p => p.id === id);
 
@@ -291,21 +290,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         data: { ...updates, updatedAt: new Date().toISOString() }
       });
 
-      // Fire notifications after a successful save — fire-and-forget, never throws
-      if (current && notifyCtx) {
-        try {
-          const agentStr = localStorage.getItem('authUser');
-          if (agentStr) {
-            const agent: User = JSON.parse(agentStr);
-            const updated = { ...current, ...updates };
-            if (updates.salesOutcome === 'successful' && current.salesOutcome !== 'successful') {
-              notifySaleMade(agent, updated, notifyCtx.users, notifyCtx.groups);
-            } else if (updates.appointmentStatus === 'completed' && current.appointmentStatus !== 'completed') {
-              notifyAppointmentCompleted(agent, updated, notifyCtx.users, notifyCtx.groups);
-            }
-          }
-        } catch { /* notification errors must never bubble up */ }
-      }
 
       await fetchProspects();
     } catch (e) {

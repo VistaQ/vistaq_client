@@ -26,10 +26,8 @@ import {
   HelpCircle,
   FileText,
   BookOpen,
-  Trophy,
-  Bell
+  Trophy
 } from 'lucide-react';
-import { getUnreadCount } from '../services/notificationService';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -40,14 +38,6 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => {
   const { currentUser, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    const refresh = () => setUnreadCount(currentUser?.id ? getUnreadCount(currentUser.id) : 0);
-    refresh();
-    window.addEventListener('vistaq-notification', refresh);
-    return () => window.removeEventListener('vistaq-notification', refresh);
-  }, [currentUser?.id]);
 
   const getRoleIcon = (role: UserRole) => {
     switch (role) {
@@ -143,9 +133,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
             </>
           )}
 
-          {/* Notifications — always visible */}
           <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Account</div>
-          <NavItem id="notifications" label="Notifications" icon={Bell} badge={unreadCount} />
 
           {/* Support & Tutorials — always visible */}
           <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Help</div>
@@ -248,9 +236,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                   </>
                 )}
 
-                {/* Notifications */}
                 <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Account</div>
-                <NavItem id="notifications" label="Notifications" icon={Bell} badge={unreadCount} />
 
                 {/* Support & Tutorials */}
                 <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Help</div>

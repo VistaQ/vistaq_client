@@ -3,18 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { UserRole, Prospect, ProspectStage, CoachingSession } from '../types';
 import {
-  checkAndSendCoachingReminders,
-  checkAndSendStaleProspectAlert,
-  requestBrowserPermission,
-  getStoredNotifications,
-} from '../services/notificationService';
-import { StoredNotification } from '../types';
-import {
-   Bell,
-   ShoppingBag,
-   CalendarCheck,
-   AlertCircle,
-   Info,
    Calendar,
    Target,
    Trophy,
@@ -41,87 +29,6 @@ const MDRT_TARGET_PROSPECTS = 100;
 const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC', '#10B981'];
 
 // ---------------------------------------------------------------------------
-// Notification Widget — shared between personal and management dashboards
-// ---------------------------------------------------------------------------
-
-const notifIcon: Record<string, React.ReactNode> = {
-   sale:              <ShoppingBag className="w-4 h-4" />,
-   appointment:       <CalendarCheck className="w-4 h-4" />,
-   coaching_reminder: <GraduationCap className="w-4 h-4" />,
-   stale_prospects:   <AlertCircle className="w-4 h-4" />,
-   test:              <Info className="w-4 h-4" />,
-};
-const notifColor: Record<string, string> = {
-   sale: 'text-green-600 bg-green-100',
-   appointment: 'text-blue-600 bg-blue-100',
-   coaching_reminder: 'text-purple-600 bg-purple-100',
-   stale_prospects: 'text-orange-500 bg-orange-100',
-   test: 'text-gray-500 bg-gray-100',
-};
-const relativeTime = (iso: string): string => {
-   try {
-      const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-      if (mins < 1) return 'Just now';
-      if (mins < 60) return `${mins}m ago`;
-      const hrs = Math.floor(mins / 60);
-      if (hrs < 24) return `${hrs}h ago`;
-      return `${Math.floor(hrs / 24)}d ago`;
-   } catch { return ''; }
-};
-
-const NotifWidget: React.FC<{ notifs: StoredNotification[]; onNavigate?: (p: string) => void }> = ({ notifs, onNavigate }) => (
-   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-      <div className="flex items-center justify-between mb-4">
-         <h3 className="font-bold text-gray-800 flex items-center gap-2">
-            <Bell className="w-5 h-5 text-blue-500" />
-            Recent Notifications
-            {notifs.some(n => !n.read) && (
-               <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-500 text-white rounded-full">
-                  {notifs.filter(n => !n.read).length} new
-               </span>
-            )}
-         </h3>
-         {onNavigate && (
-            <button
-               onClick={() => onNavigate('notifications')}
-               className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
-            >
-               View all
-            </button>
-         )}
-      </div>
-
-      {notifs.length === 0 ? (
-         <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-            <Bell className="w-8 h-8 mb-2 opacity-20" />
-            <p className="text-sm text-gray-500">No notifications yet</p>
-         </div>
-      ) : (
-         <div className="space-y-2">
-            {notifs.map(n => {
-               const colorClass = notifColor[n.type] || notifColor.test;
-               return (
-                  <div key={n.id} className={`flex items-start gap-3 p-3 rounded-lg ${!n.read ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}>
-                     <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${colorClass}`}>
-                        {notifIcon[n.type] || notifIcon.test}
-                     </div>
-                     <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                           <p className="text-sm font-semibold text-gray-800 truncate">{n.title}</p>
-                           <span className="text-[10px] text-gray-400 flex-shrink-0">{relativeTime(n.timestamp)}</span>
-                        </div>
-                        <p className="text-xs text-gray-500 line-clamp-1">{n.message}</p>
-                     </div>
-                     {!n.read && <div className="flex-shrink-0 w-1.5 h-1.5 mt-1.5 rounded-full bg-blue-500" />}
-                  </div>
-               );
-            })}
-         </div>
-      )}
-   </div>
-);
-
-// ---------------------------------------------------------------------------
 
 interface DashboardProps {
    onNavigate?: (page: string) => void;
@@ -129,39 +36,13 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    const { currentUser, groups, users } = useAuth();
-   const { prospects, getProspectsByScope, getGroupProspects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions, isLoadingCoaching } = useData();
-
-   // Notification widget state
-   const [recentNotifs, setRecentNotifs] = useState<StoredNotification[]>([]);
-
-   const loadNotifs = () => {
-      if (currentUser?.id) {
-         setRecentNotifs(getStoredNotifications(currentUser.id).slice(0, 5));
-      }
-   };
+   const { prospects, getProspectsByScope, getGroupProspects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions } = useData();
 
    // Fetch events and coaching sessions on mount (deferred fetch — not loaded on app start)
    useEffect(() => {
       refetchEvents();
       refetchCoachingSessions();
-      requestBrowserPermission();
    }, []);
-
-   // Keep notification widget in sync
-   useEffect(() => {
-      loadNotifs();
-      window.addEventListener('vistaq-notification', loadNotifs);
-      return () => window.removeEventListener('vistaq-notification', loadNotifs);
-   }, [currentUser?.id]);
-
-   // Run notification checks once after coaching sessions finish loading
-   useEffect(() => {
-      if (!currentUser || isLoadingCoaching) return;
-      const sessions = getCoachingSessionsForUser(currentUser);
-      const ownProspects = prospects.filter(p => p.uid === currentUser.id);
-      checkAndSendCoachingReminders(currentUser, sessions);
-      checkAndSendStaleProspectAlert(currentUser, ownProspects);
-   }, [isLoadingCoaching, currentUser?.id]);
 
    // --- MANAGEMENT DASHBOARD (Admin, Master Trainer & Trainer ONLY) ---
    // Group Leaders now see Personal Dashboard by default, and access Group stats via "Group" page.
@@ -589,8 +470,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                </div>
             </div>
 
-         {/* Notification Widget */}
-         <NotifWidget notifs={recentNotifs} onNavigate={onNavigate} />
       </div>
       );
    }
@@ -931,8 +810,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </div>
          </div>
 
-         {/* Notification Widget */}
-         <NotifWidget notifs={recentNotifs} onNavigate={onNavigate} />
       </div>
    );
 };
