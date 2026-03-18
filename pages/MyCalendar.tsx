@@ -3,9 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { UserRole, Event, CoachingSession, Prospect } from '../types';
 import {
-    CalendarDays, Plus, MapPin, User, X, Clock, Link as LinkIcon,
+    CalendarDays, Plus, MapPin, User, Users, X, Clock, Link as LinkIcon,
     Edit2, ExternalLink, LayoutGrid, ChevronLeft, ChevronRight, Archive,
-    BookOpen, Briefcase, ChevronRight as ChevronRightIcon
+    BookOpen, Briefcase, ChevronRight as ChevronRightIcon, Search, Check
 } from 'lucide-react';
 import { useCalendarConflicts, checkConflict } from '../hooks/useCalendarConflicts';
 
@@ -18,6 +18,7 @@ interface CalItem {
     date: string; // ISO
     type: CalItemType;
     subType?: string;   // e.g. venue, coachingType, appointmentLocation
+    endTime?: string;   // end time string for display in DayPopup
     link?: string;
     cancelled?: boolean;
     raw?: Event | CoachingSession | Prospect;
@@ -59,6 +60,32 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
     const valid = !isNaN(d.getTime());
     const evt = item.type === 'event' ? (item.raw as Event) : null;
     const session = item.type === 'coaching' ? (item.raw as CoachingSession) : null;
+    const prospect = item.type === 'appointment' ? (item.raw as Prospect) : null;
+
+    // Standardised time & venue extraction per type
+    const timeDisplay = (() => {
+        if (item.type === 'coaching' && session) {
+            return session.durationStart && session.durationEnd
+                ? `${session.durationStart} – ${session.durationEnd}`
+                : session.durationStart || (valid ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '');
+        }
+        if (item.type === 'appointment' && prospect) {
+            return prospect.appointmentStartTime
+                ? `${prospect.appointmentStartTime}${prospect.appointmentEndTime ? ` – ${prospect.appointmentEndTime}` : ''}`
+                : (valid ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '');
+        }
+        if (item.type === 'event') {
+            const startStr = valid ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
+            return startStr && evt?.endTime ? `${startStr} – ${evt.endTime}` : startStr;
+        }
+        return valid ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
+    })();
+
+    const venueDisplay = (() => {
+        if (item.type === 'coaching' && session) return session.venue || '';
+        if (item.type === 'appointment' && prospect) return prospect.appointmentLocation || '';
+        return evt?.venue || '';
+    })();
 
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
@@ -85,20 +112,40 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
                     </div>
                 </div>
 
-                <div className="p-6 space-y-4">
+                <div className="p-6 space-y-3">
+                    {/* Day */}
                     <div className="flex items-start gap-3 text-sm text-gray-700">
-                        <Clock className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                        <span>
-                            {valid ? d.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Date not set'}
-                            {valid && item.type !== 'appointment' && ` · ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`}
-                            {item.type === 'coaching' && session && ` · ${session.durationStart} – ${session.durationEnd}`}
-                        </span>
+                        <CalendarDays className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <span className="font-medium">{valid ? d.toLocaleDateString([], { weekday: 'long' }) : 'Day not set'}</span>
                     </div>
 
-                    {item.subType && (
+                    {/* Date */}
+                    <div className="flex items-start gap-3 text-sm text-gray-700">
+                        <CalendarDays className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <span>{valid ? d.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' }) : 'Date not set'}</span>
+                    </div>
+
+                    {/* Type */}
+                    <div className="flex items-start gap-3 text-sm text-gray-700">
+                        <div className="w-4 h-4 mt-0.5 flex-shrink-0 flex items-center justify-center">
+                            <span className={`w-2.5 h-2.5 rounded-full ${cfg.dot}`} />
+                        </div>
+                        <span className={`text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded ${cfg.bg} ${cfg.text}`}>{cfg.label}</span>
+                    </div>
+
+                    {/* Time */}
+                    {timeDisplay && (
+                        <div className="flex items-start gap-3 text-sm text-gray-700">
+                            <Clock className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                            <span>{timeDisplay}</span>
+                        </div>
+                    )}
+
+                    {/* Venue */}
+                    {venueDisplay && (
                         <div className="flex items-start gap-3 text-sm text-gray-700">
                             <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                            <span>{item.subType}</span>
+                            <span>{venueDisplay}</span>
                         </div>
                     )}
 
@@ -193,6 +240,9 @@ const DayPopup: React.FC<DayPopupProps> = ({ date, items, onClose, onSelect }) =
                     <p className="text-sm text-gray-400 text-center py-4">Nothing scheduled.</p>
                 ) : items.map(item => {
                     const cfg = getItemStyle(item);
+                    const d = new Date(item.date);
+                    const startStr = !isNaN(d.getTime()) ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
+                    const timeStr = startStr && item.endTime ? `${startStr} – ${item.endTime}` : startStr;
                     return (
                         <button key={item.id} onClick={() => onSelect(item)}
                             className="w-full text-left flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
@@ -201,7 +251,7 @@ const DayPopup: React.FC<DayPopupProps> = ({ date, items, onClose, onSelect }) =
                                 <div className="font-semibold text-gray-900 text-sm truncate">{item.title}</div>
                                 <div className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
                                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${cfg.bg} ${cfg.text}`}>{cfg.label}</span>
-                                    {item.subType && <span className="truncate">{item.subType}</span>}
+                                    {timeStr && <span className="truncate">{timeStr}</span>}
                                 </div>
                             </div>
                             <ChevronRightIcon className="w-4 h-4 text-gray-300 group-hover:text-gray-500 flex-shrink-0" />
@@ -455,7 +505,7 @@ const CardList: React.FC<CardListProps> = ({ items, isAdminOrCreator, onSelect, 
 
 /* ─── Main Page ──────────────────────────────────────────── */
 const MyCalendar: React.FC = () => {
-    const { currentUser, groups } = useAuth();
+    const { currentUser, groups, users } = useAuth();
     const { addEvent, deleteEvent, updateEvent, getEventsForUser, refetchEvents, getCoachingSessionsForUser, refetchCoachingSessions, prospects } = useData();
     const { occupiedSlots } = useCalendarConflicts();
 
@@ -476,13 +526,19 @@ const MyCalendar: React.FC = () => {
         eventTitle: '',
         description: '',
         date: '',
-        time: '',
+        startTime: '',
+        endTime: '',
+        eventType: 'online' as 'online' | 'face-to-face',
         venue: '',
         meetingLink: '',
         groupIds: [] as string[],
+        targetAgentIds: [] as string[],
+        allGroups: false,
+        allAgents: false,
         status: 'upcoming' as 'upcoming' | 'completed' | 'cancelled'
     });
     const [eventError, setEventError] = useState('');
+    const [agentSearch, setAgentSearch] = useState('');
 
     if (!currentUser) return null;
 
@@ -507,6 +563,7 @@ const MyCalendar: React.FC = () => {
                 date: e.date,
                 type: 'event',
                 subType: e.venue,
+                endTime: e.end_time,
                 link: e.meeting_link,
                 cancelled: e.status === 'cancelled',
                 raw: e,
@@ -532,7 +589,8 @@ const MyCalendar: React.FC = () => {
                 title: s.title,
                 date: sessionDate,
                 type: 'coaching',
-                subType: `${s.durationStart || ''}${s.durationStart && s.durationEnd ? ` – ${s.durationEnd}` : ''} · ${s.venue}`,
+                subType: s.venue,
+                endTime: s.durationEnd,
                 link: s.venue === 'Online' ? s.link : undefined,
                 cancelled: s.status === 'cancelled',
                 raw: s,
@@ -571,7 +629,8 @@ const MyCalendar: React.FC = () => {
                     title: `Appt: ${p.prospect_name}`,
                     date: apptDate.toISOString(),
                     type: 'appointment',
-                    subType: subType || undefined,
+                    subType: p.appointment_location || undefined,
+                    endTime: p.appointment_end_time || undefined,
                     raw: p,
                 });
             });
@@ -593,35 +652,72 @@ const MyCalendar: React.FC = () => {
     }
 
     // Event CRUD handlers
+    const handleEventStartTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newStart = e.target.value;
+        if (newStart) {
+            const [h, m] = newStart.split(':').map(Number);
+            const endH = (h + 1) % 24;
+            const autoEnd = `${endH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+            setFormData(prev => ({ ...prev, startTime: newStart, endTime: autoEnd }));
+        } else {
+            setFormData(prev => ({ ...prev, startTime: newStart }));
+        }
+    };
+
     const handleOpenEventModal = (item?: CalItem) => {
         if (item && item.type === 'event') {
             const evt = item.raw as Event;
             const d = new Date(evt.date);
-            const dateStr = !isNaN(d.getTime()) ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
-            const timeStr = !isNaN(d.getTime()) ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : '';
+            const dateStr = !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '';
+            const startTimeStr = !isNaN(d.getTime()) ? d.toTimeString().slice(0, 5) : '';
+            let endTimeStr = '';
+            if (evt.end_time) {
+                endTimeStr = evt.end_time;
+            } else if (!isNaN(d.getTime())) {
+                const endH = (d.getHours() + 1) % 24;
+                endTimeStr = `${endH.toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+            }
             setEditingEventId(evt.id);
-            setFormData({ eventTitle: evt.event_title, description: evt.description, date: dateStr, time: timeStr, venue: evt.venue, meetingLink: evt.meeting_link || '', groupIds: evt.groupIds || [], status: (evt.status || 'upcoming') as 'upcoming' | 'completed' | 'cancelled' });
+            setFormData({ eventTitle: evt.event_title, description: evt.description, date: dateStr, startTime: startTimeStr, endTime: endTimeStr, eventType: evt.event_type || 'online', venue: evt.venue || '', meetingLink: evt.meeting_link || '', groupIds: evt.group_ids || [], targetAgentIds: evt.target_agent_ids || [], allGroups: false, allAgents: false, status: (evt.status || 'upcoming') as 'upcoming' | 'completed' | 'cancelled' });
         } else {
             setEditingEventId(null);
             const initialGroups = (currentUser.role === UserRole.GROUP_LEADER && currentUser.group_id) ? [currentUser.group_id] : [];
-            setFormData({ eventTitle: '', description: '', date: '', time: '', venue: '', meetingLink: '', groupIds: initialGroups, status: 'upcoming' });
+            setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: initialGroups, targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming' });
         }
+        setAgentSearch('');
         setIsEventModalOpen(true);
         setDetailItem(null);
     };
 
     const handleSaveEvent = async () => {
-        if (!formData.eventTitle || !formData.date || !formData.time || !formData.venue || !formData.description || formData.groupIds.length === 0) {
-            alert('Please fill in all required fields (Title, Date, Time, Venue, Description, Groups).');
+        if (!formData.eventTitle || !formData.date || !formData.startTime || !formData.description) {
+            alert('Please fill in all required fields (Title, Date, Start Time, Description).');
             return;
         }
+        if (formData.eventType === 'face-to-face' && !formData.venue) {
+            alert('Please enter a Venue / Location for a Face to Face event.');
+            return;
+        }
+        if (formData.eventType === 'online' && !formData.meetingLink) {
+            alert('Please enter a Meeting URL for an Online event.');
+            return;
+        }
+        const hasGroupTarget = formData.groupIds.length > 0;
+        const hasAgentTarget = formData.targetAgentIds.length > 0;
+        if (!hasGroupTarget && !hasAgentTarget && currentUser.role !== UserRole.GROUP_LEADER) {
+            alert('Please select at least one group or agent to share this event with.');
+            return;
+        }
+        const dateTime = new Date(`${formData.date}T${formData.startTime}`);
+        if (isNaN(dateTime.getTime())) { alert('Invalid date or time.'); return; }
+
         // ── Double Booking Check ──────────────────────────────────
         const { hasConflict, conflictWith } = checkConflict(
             occupiedSlots,
             formData.date,
-            formData.time,
-            formData.time, // Events are single-point; default to 1-hr block in the checker
-            editingEventId ? formData.eventTitle : undefined // skip self when editing
+            formData.startTime,
+            formData.endTime || formData.startTime,
+            editingEventId ? formData.eventTitle : undefined
         );
         if (hasConflict) {
             setEventError(`This time slot conflicts with "${conflictWith}" already in your calendar. Please choose a different date or time.`);
@@ -633,11 +729,13 @@ const MyCalendar: React.FC = () => {
         const eventData = {
             event_title: formData.eventTitle,
             description: formData.description,
-            venue: formData.venue,
-            meeting_link: formData.meetingLink || undefined,
-            date: formData.date,    // YYYY-MM-DD
-            time: formData.time,    // HH:MM
+            event_type: formData.eventType,
+            venue: formData.eventType === 'face-to-face' ? formData.venue : undefined,
+            meeting_link: formData.eventType === 'online' ? formData.meetingLink : undefined,
+            date: dateTime.toISOString(),
+            end_time: formData.endTime || undefined,
             groupIds: formData.groupIds,
+            targetAgentIds: formData.targetAgentIds.length > 0 ? formData.targetAgentIds : undefined,
             status: formData.status
         };
         if (editingEventId) {
@@ -646,6 +744,7 @@ const MyCalendar: React.FC = () => {
             await addEvent({ ...eventData, created_by: currentUser.id, created_by_name: currentUser.name });
         }
         setIsEventModalOpen(false);
+        setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: [], targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming' });
     };
 
     const toggleGroup = (id: string) => {
@@ -764,79 +863,250 @@ const MyCalendar: React.FC = () => {
             {/* Create / Edit Event Modal */}
             {isEventModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[90vh]">
-                        <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
-                            <h3 className="font-bold text-gray-900">{editingEventId ? 'Edit Event' : 'Create New Event'}</h3>
-                            <button onClick={() => setIsEventModalOpen(false)}><X className="w-5 h-5 text-gray-500" /></button>
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-900">{editingEventId ? 'Edit Event' : 'Create New Event'}</h2>
+                                <p className="text-sm text-gray-500 mt-1">{editingEventId ? 'Update the details of this event.' : 'Schedule a new event for your team.'}</p>
+                            </div>
+                            <button onClick={() => setIsEventModalOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
                         </div>
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className={labelClass}>Event Title <span className="text-red-500">*</span></label>
-                                <input type="text" className={inputClass} value={formData.eventTitle} onChange={e => setFormData({ ...formData, eventTitle: e.target.value })} placeholder="e.g. Weekly Huddle" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
+
+                        {/* Body */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+                            {/* ── Section 1: Event Details ── */}
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                                    <CalendarDays className="w-4 h-4 text-blue-500" />
+                                    Event Details
+                                </h3>
                                 <div>
-                                    <label className={labelClass}>Date <span className="text-red-500">*</span></label>
-                                    <input type="date" className={inputClass} value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
+                                    <label className={labelClass}>Event Title <span className="text-red-500">*</span></label>
+                                    <input type="text" className={inputClass} value={formData.eventTitle} onChange={e => setFormData({ ...formData, eventTitle: e.target.value })} placeholder="e.g. Weekly Huddle" />
                                 </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className={labelClass}>Date <span className="text-red-500">*</span></label>
+                                        <input type="date" className={inputClass} value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className={labelClass}>Start Time <span className="text-red-500">*</span></label>
+                                        <input type="time" className={inputClass} value={formData.startTime} onChange={handleEventStartTimeChange} />
+                                    </div>
+                                    <div>
+                                        <label className={labelClass}>End Time</label>
+                                        <input type="time" className={inputClass} value={formData.endTime} onChange={e => setFormData({ ...formData, endTime: e.target.value })} />
+                                    </div>
+                                </div>
+                                {editingEventId && (
+                                    <div>
+                                        <label className={labelClass}>Status</label>
+                                        <select className={inputClass} value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
+                                            <option value="upcoming">Upcoming</option>
+                                            <option value="completed">Completed</option>
+                                            <option value="cancelled">Cancelled</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            <hr className="border-gray-200" />
+
+                            {/* ── Section 2: Event Type & Location ── */}
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                                    <MapPin className="w-4 h-4 text-blue-500" />
+                                    Event Type &amp; Location
+                                </h3>
                                 <div>
-                                    <label className={labelClass}>Time <span className="text-red-500">*</span></label>
-                                    <input type="time" className={inputClass} value={formData.time} onChange={e => setFormData({ ...formData, time: e.target.value })} />
-                                </div>
-                            </div>
-                            <div>
-                                <label className={labelClass}>Venue / Location</label>
-                                <div className="relative">
-                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                    <input type="text" className={`${inputClass} pl-9`} value={formData.venue} onChange={e => setFormData({ ...formData, venue: e.target.value })} placeholder="Meeting Room A" />
-                                </div>
-                            </div>
-                            <div>
-                                <label className={labelClass}>Meeting Link (URL)</label>
-                                <div className="relative">
-                                    <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                    <input type="url" className={`${inputClass} pl-9`} value={formData.meetingLink} onChange={e => setFormData({ ...formData, meetingLink: e.target.value })} placeholder="https://zoom.us/j/..." />
-                                </div>
-                            </div>
-                            <div>
-                                <label className={labelClass}>Description</label>
-                                <textarea className={inputClass} rows={3} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Agenda or details..." />
-                            </div>
-                            {editingEventId && (
-                                <div>
-                                    <label className={labelClass}>Status</label>
-                                    <select className={inputClass} value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value as any })}>
-                                        <option value="upcoming">Upcoming</option>
-                                        <option value="completed">Completed</option>
-                                        <option value="cancelled">Cancelled</option>
+                                    <label className={labelClass}>Event Type <span className="text-red-500">*</span></label>
+                                    <select
+                                        className={inputClass}
+                                        value={formData.eventType}
+                                        onChange={e => {
+                                            const val = e.target.value as 'online' | 'face-to-face';
+                                            setFormData({ ...formData, eventType: val, venue: '', meetingLink: '' });
+                                        }}
+                                    >
+                                        <option value="online">Online</option>
+                                        <option value="face-to-face">Face to Face</option>
                                     </select>
                                 </div>
-                            )}
-                            <div>
-                                <label className={labelClass}>Share with Group(s) <span className="text-red-500">*</span></label>
-                                <div className="bg-gray-50 border border-gray-300 rounded-lg p-3 max-h-32 overflow-y-auto">
-                                    {targetableGroups.length > 0 ? targetableGroups.map(g => (
-                                        <label key={g.id} className="flex items-center space-x-2 mb-2 last:mb-0 cursor-pointer">
-                                            <input type="checkbox" checked={formData.groupIds.includes(g.id)} onChange={() => toggleGroup(g.id)} className="text-blue-600 rounded border-gray-300" />
-                                            <span className="text-sm text-gray-800">{g.name}</span>
+                                {formData.eventType === 'online' && (
+                                    <div>
+                                        <label className={labelClass}>Meeting URL <span className="text-red-500">*</span></label>
+                                        <div className="relative">
+                                            <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                            <input type="url" className={`${inputClass} pl-9`} value={formData.meetingLink} onChange={e => setFormData({ ...formData, meetingLink: e.target.value })} placeholder="https://zoom.us/j/..." />
+                                        </div>
+                                    </div>
+                                )}
+                                {formData.eventType === 'face-to-face' && (
+                                    <div>
+                                        <label className={labelClass}>Venue / Google Maps or Waze Direction <span className="text-red-500">*</span></label>
+                                        <div className="relative">
+                                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                            <input type="text" className={`${inputClass} pl-9`} value={formData.venue} onChange={e => setFormData({ ...formData, venue: e.target.value })} placeholder="e.g. Level 12, Menara XYZ or paste Google Maps / Waze link" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <hr className="border-gray-200" />
+
+                            {/* ── Section 3: Description ── */}
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-blue-500" />
+                                    Description
+                                </h3>
+                                <div>
+                                    <label className={labelClass}>Event Description <span className="text-red-500">*</span></label>
+                                    <textarea className={inputClass} rows={3} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Agenda, objectives, or details about this event..." />
+                                </div>
+                            </div>
+
+                            <hr className="border-gray-200" />
+
+                            {/* ── Section 4: Audience ── */}
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-blue-500" />
+                                    Audience
+                                </h3>
+
+                                {currentUser.role === UserRole.GROUP_LEADER ? (
+                                    <div className="space-y-3">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                checked={formData.allAgents}
+                                                onChange={e => {
+                                                    const checked = e.target.checked;
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        allAgents: checked,
+                                                        groupIds: checked ? (currentUser.groupId ? [currentUser.groupId] : []) : [],
+                                                        targetAgentIds: []
+                                                    }));
+                                                }}
+                                            />
+                                            <span className="text-sm font-medium text-gray-700">All agents in my group</span>
                                         </label>
-                                    )) : (
-                                        <p className="text-xs text-gray-400">No groups available.</p>
-                                    )}
-                                </div>
+                                        {!formData.allAgents && (
+                                            <>
+                                                <div className="relative">
+                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
+                                                    <input type="text" placeholder="Search agents..." className={`${inputClass} pl-8`} value={agentSearch} onChange={e => setAgentSearch(e.target.value)} />
+                                                </div>
+                                                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                                                    {users
+                                                        .filter(u => u.groupId === currentUser.groupId && (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) && u.id !== currentUser.id)
+                                                        .filter(u => u.name?.toLowerCase().includes(agentSearch.toLowerCase()))
+                                                        .map(u => (
+                                                            <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">
+                                                                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                    checked={formData.targetAgentIds.includes(u.id)}
+                                                                    onChange={() => setFormData(prev => ({
+                                                                        ...prev,
+                                                                        targetAgentIds: prev.targetAgentIds.includes(u.id) ? prev.targetAgentIds.filter(id => id !== u.id) : [...prev.targetAgentIds, u.id]
+                                                                    }))}
+                                                                />
+                                                                <span className="text-sm text-gray-800 font-medium truncate">{u.name}</span>
+                                                            </label>
+                                                        ))
+                                                    }
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {/* Groups */}
+                                        <div className="space-y-2">
+                                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Groups</p>
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    checked={formData.allGroups}
+                                                    onChange={e => {
+                                                        const checked = e.target.checked;
+                                                        setFormData(prev => ({ ...prev, allGroups: checked, groupIds: checked ? targetableGroups.map(g => g.id) : [] }));
+                                                    }}
+                                                />
+                                                <span className="text-sm font-medium text-gray-700">All groups</span>
+                                            </label>
+                                            {!formData.allGroups && (
+                                                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                                                    {targetableGroups.length > 0 ? targetableGroups.map(g => (
+                                                        <label key={g.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">
+                                                            <input type="checkbox" checked={formData.groupIds.includes(g.id)} onChange={() => toggleGroup(g.id)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                                            <span className="text-sm text-gray-800 font-medium">{g.name}</span>
+                                                        </label>
+                                                    )) : <p className="text-xs text-gray-400 col-span-2">No groups available.</p>}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Individual Agents */}
+                                        <div className="space-y-2">
+                                            <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Individual Agents (optional)</p>
+                                            <div className="relative">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
+                                                <input type="text" placeholder="Search by name..." className={`${inputClass} pl-8`} value={agentSearch} onChange={e => setAgentSearch(e.target.value)} />
+                                            </div>
+                                            <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                                                {(() => {
+                                                    const pool = users.filter(u =>
+                                                        (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) &&
+                                                        (targetableGroups.length === 0 || targetableGroups.some(g => g.id === u.groupId)) &&
+                                                        u.name?.toLowerCase().includes(agentSearch.toLowerCase())
+                                                    );
+                                                    if (pool.length === 0) return <p className="text-xs text-gray-400 col-span-2">No agents found.</p>;
+                                                    return pool.map(u => (
+                                                        <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">
+                                                            <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                checked={formData.targetAgentIds.includes(u.id)}
+                                                                onChange={() => setFormData(prev => ({
+                                                                    ...prev,
+                                                                    targetAgentIds: prev.targetAgentIds.includes(u.id) ? prev.targetAgentIds.filter(id => id !== u.id) : [...prev.targetAgentIds, u.id]
+                                                                }))}
+                                                            />
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="text-sm text-gray-900 font-medium truncate">{u.name}</span>
+                                                                <span className="text-[10px] text-gray-400 truncate">{groups.find(g => g.id === u.groupId)?.name || ''}</span>
+                                                            </div>
+                                                        </label>
+                                                    ));
+                                                })()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Conflict Error */}
+                                {eventError && (
+                                    <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                                        <span className="font-bold mt-0.5">⚠</span>
+                                        <span>{eventError}</span>
+                                    </div>
+                                )}
                             </div>
-                            {/* Conflict Error */}
-                            {eventError && (
-                                <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                                    <span className="font-bold mt-0.5">⚠</span>
-                                    <span>{eventError}</span>
-                                </div>
-                            )}
-                            <div className="pt-2 flex justify-end">
-                                <button onClick={handleSaveEvent} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 shadow-sm">
-                                    {editingEventId ? 'Update Event' : 'Publish Event'}
-                                </button>
-                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                            <button type="button" onClick={() => setIsEventModalOpen(false)}
+                                className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl transition-all">
+                                Cancel
+                            </button>
+                            <button onClick={handleSaveEvent}
+                                className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-md shadow-blue-500/20">
+                                <Check className="w-4 h-4" />
+                                {editingEventId ? 'Update Event' : 'Publish Event'}
+                            </button>
                         </div>
                     </div>
                 </div>

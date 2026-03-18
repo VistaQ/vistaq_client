@@ -33,13 +33,24 @@ const Sales: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">My Sales Portfolio</h1>
           <p className="text-sm text-gray-500">Track your successful closings and commissionable premiums.</p>
         </div>
-        <div className="bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg flex items-center">
-            <div className="p-2 bg-green-500 rounded-lg mr-4">
-                <DollarSign className="w-6 h-6" />
+        <div className="flex items-center gap-3">
+            <div className="bg-blue-600 text-white px-6 py-3 rounded-xl shadow-lg flex items-center">
+                <div className="p-2 bg-blue-500 rounded-lg mr-4">
+                    <CheckCircle className="w-6 h-6" />
+                </div>
+                <div>
+                    <p className="text-xs font-medium opacity-80 uppercase">Total NOC</p>
+                    <p className="text-2xl font-bold">{mySales.length}</p>
+                </div>
             </div>
-            <div>
-                <p className="text-xs font-medium opacity-80 uppercase">Total Accumulated FYC</p>
-                <p className="text-2xl font-bold">RM {totalFYC.toLocaleString()}</p>
+            <div className="bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg flex items-center">
+                <div className="p-2 bg-green-500 rounded-lg mr-4">
+                    <DollarSign className="w-6 h-6" />
+                </div>
+                <div>
+                    <p className="text-xs font-medium opacity-80 uppercase">Total ACE</p>
+                    <p className="text-2xl font-bold">RM {totalFYC.toLocaleString()}</p>
+                </div>
             </div>
         </div>
       </div>
@@ -49,11 +60,8 @@ const Sales: React.FC = () => {
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
            <h3 className="font-bold text-gray-800 flex items-center">
              <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
-             Successful Certificates
+             Successful Sales
            </h3>
-           <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold">
-             {mySales.length} Certificates
-           </span>
         </div>
         
         {mySales.length > 0 ? (
@@ -63,7 +71,7 @@ const Sales: React.FC = () => {
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Date Closed</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Client Name</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Product</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">FYC Amount (MYR)</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">ACE Amount (MYR)</th>
                   <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Status</th>
                 </tr>
               </thead>

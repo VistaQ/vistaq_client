@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, PointConfig } from '../types';
+import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, PointConfig, Group } from '../types';
 import { apiCall } from '../services/apiClient';
 import { DEFAULT_POINT_CONFIG } from '../services/points';
 
@@ -221,11 +221,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const updateProspect = async (id: string, updates: Partial<Prospect>) => {
+    // Snapshot current prospect before the API call for transition detection
+    const current = prospects.find(p => p.id === id);
+
     try {
       await apiCall(`/prospects/${id}`, {
         method: 'PUT',
         data: updates
       });
+
 
       await fetchProspects();
     } catch (e) {

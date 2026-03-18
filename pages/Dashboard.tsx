@@ -20,13 +20,15 @@ import {
    DollarSign,
    TrendingUp
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, Label } from 'recharts';
 
 const MDRT_TARGET_FYC = 100000;
 const MDRT_TARGET_PROSPECTS = 100;
 
 // Zurich Palette for Charts
-const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC'];
+const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC', '#10B981'];
+
+// ---------------------------------------------------------------------------
 
 interface DashboardProps {
    onNavigate?: (page: string) => void;
@@ -51,6 +53,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    if (isManagementRole) {
       const isAdmin = currentUser?.role === UserRole.ADMIN;
       const isTrainer = currentUser?.role === UserRole.TRAINER;
+      const isMasterTrainer = currentUser?.role === UserRole.MASTER_TRAINER;
 
       // Use the robust scope filter from DataContext which now handles Leaders correctly
       const scopeProspects = getProspectsByScope(currentUser!);
@@ -79,29 +82,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       const totalClosed = scopeProspects.filter(p => p.sales_outcome === 'successful' || p.sales_outcome === 'unsuccessful').length;
       const conversionRate = totalClosed > 0 ? (totalSales / totalClosed) * 100 : 0;
 
-      // --- 4. GROUP RANKINGS (Only relevant if > 1 group) ---
-      const groupRankings = relevantGroups.map(group => {
-         const gProspects = getGroupProspects(group.id);
-         const gFYC = gProspects.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
-         const gSales = gProspects.filter(p => p.sales_outcome === 'successful').length;
-         return { id: group.id, name: group.name, fyc: gFYC, sales: gSales };
-      }).sort((a, b) => b.fyc - a.fyc);
-
-      // --- 5. CHART DATA ---
-      const totalAppointmentsSet = scopeProspects.filter(p =>
-         p.appointment_status === 'scheduled' ||
-         p.appointment_status === 'rescheduled'
-      ).length;
-
-      const totalSalesMeetings = scopeProspects.filter(p => p.appointment_status === 'done').length;
-
-      const funnelData = [
-         { name: 'Prospects', value: scopeProspects.length },
-         { name: 'Appointments', value: totalAppointmentsSet },
-         { name: 'Sales Meeting', value: totalSalesMeetings },
-         { name: 'Sales', value: totalSales },
-      ];
-
       // --- MTD Calculations for Management ---
       const now = new Date();
       const currentYear = now.getFullYear();
@@ -117,6 +97,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
          if (isNaN(d.getTime())) return false;
          return d >= start && d <= end;
       };
+
+      // --- 4. GROUP RANKINGS (YTD, to match Group Performance Dashboard) ---
+      const groupRankings = relevantGroups.map(group => {
+         const gProspects = getGroupProspects(group.id);
+         const gSalesYTD = gProspects.filter(p =>
+            p.sales_outcome === 'successful' &&
+            isWithinDateRange(p.sales_completed_at || p.updated_at, startYTD, endYTD)
+         );
+         const gFYC = gSalesYTD.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
+         const gSales = gSalesYTD.length;
+         return { id: group.id, name: group.name, fyc: gFYC, sales: gSales };
+      }).sort((a, b) => b.fyc - a.fyc);
 
       // YTD Metrics Filtered
       const ytdAppointments_Mgmt = scopeProspects.filter(p =>
@@ -142,6 +134,55 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
       const acsYTD_Mgmt = totalSalesNOC_YTD_Mgmt > 0 ? (totalSalesACE_YTD_Mgmt / totalSalesNOC_YTD_Mgmt) : 0;
 
+      // --- 5. MTD CHART DATA ---
+      const currentMonth_Mgmt = now.getMonth();
+      const startMTD_Mgmt = new Date(currentYear, currentMonth_Mgmt, 1);
+      const endMTD_Mgmt = new Date(currentYear, currentMonth_Mgmt + 1, 0, 23, 59, 59);
+
+      const mtdProspects_Mgmt = scopeProspects.filter(p =>
+         isWithinDateRange(p.created_at, startMTD_Mgmt, endMTD_Mgmt)
+      ).length;
+      const mtdAppointments_Mgmt = scopeProspects.filter(p =>
+         (p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled') &&
+         isWithinDateRange(p.appointment_date, startMTD_Mgmt, endMTD_Mgmt)
+      ).length;
+      const mtdSalesMeetings_Mgmt = scopeProspects.filter(p =>
+         p.appointment_status === 'completed' &&
+         isWithinDateRange(p.appointment_completed_at || p.appointment_date, startMTD_Mgmt, endMTD_Mgmt)
+      ).length;
+      const mtdSalesArr_Mgmt = scopeProspects.filter(p =>
+         p.sales_outcome === 'successful' &&
+         isWithinDateRange(p.sales_completed_at || p.updated_at, startMTD_Mgmt, endMTD_Mgmt)
+      );
+      const mtdSalesNOC_Mgmt = mtdSalesArr_Mgmt.length;
+      const mtdSalesACE_Mgmt = mtdSalesArr_Mgmt.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
+
+      const mgmtChartDataMTD = [
+         { name: 'Prospects',       value: mtdProspects_Mgmt,     barType: 'count' },
+         { name: 'Appointments Set', value: mtdAppointments_Mgmt,  barType: 'count' },
+         { name: 'Sales Meetings',   value: mtdSalesMeetings_Mgmt, barType: 'count' },
+         { name: 'Sales',           value: mtdSalesNOC_Mgmt,      barType: 'sales', ace: mtdSalesACE_Mgmt },
+      ];
+
+      const MgmtCustomTooltip = ({ active, payload, label }: any) => {
+         if (active && payload && payload.length) {
+            const data = payload[0].payload;
+            return (
+               <div className="bg-white p-3 border border-gray-100 shadow-lg rounded-lg">
+                  <p className="font-bold text-gray-900 mb-1">{label}</p>
+                  {data.barType === 'sales' ? (
+                     <>
+                        <p className="text-blue-600 text-sm font-medium">NOC {data.value}</p>
+                        <p className="text-green-600 text-sm font-medium">ACE RM {data.ace.toLocaleString()}</p>
+                     </>
+                  ) : (
+                     <p className="text-blue-600 text-sm font-medium">{data.value}</p>
+                  )}
+               </div>
+            );
+         }
+         return null;
+      };
 
       // --- Upcoming Schedule for Management ---
       const mgmtNow = new Date();
@@ -189,13 +230,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   <p className="text-sm text-gray-500">
                      {isAdmin
                         ? 'System-wide statistics and performance monitoring.'
-                        : `High-level analytics for ${relevantGroups.length} managed group(s).`}
+                        : isMasterTrainer
+                           ? `High-level analytics for ${relevantGroups.length} managed group(s).`
+                           : ''}
                   </p>
                </div>
             </div>
 
-            {/* ADMIN & TRAINER: System Stats Row */}
-            {(isAdmin || isTrainer) && (
+            {/* ADMIN & MASTER TRAINER: System Stats Row */}
+            {(isAdmin || isMasterTrainer) && (
                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-in fade-in slide-in-from-top-4">
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
                      <div>
@@ -255,60 +298,65 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Calendar className="w-5 h-5" /></div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Appointments</p>
-                  <h3 className="text-2xl font-bold text-gray-900">{ytdAppointments_Mgmt}</h3>
-                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Total Appointments</p>
+                  <h3 className="text-3xl font-bold text-gray-900">{ytdAppointments_Mgmt}</h3>
+                  <p className="text-xs text-gray-400 mt-1">Year to Date</p>
                </div>
 
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg mb-3"><Target className="w-5 h-5" /></div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Sales Meetings</p>
-                  <h3 className="text-2xl font-bold text-gray-900">{ytdSalesMeetings_Mgmt}</h3>
-                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Total Sales Meetings</p>
+                  <h3 className="text-3xl font-bold text-gray-900">{ytdSalesMeetings_Mgmt}</h3>
+                  <p className="text-xs text-gray-400 mt-1">Year to Date</p>
                </div>
 
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Sales (NOC & ACE)</p>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (NOC & ACE)</p>
                   <div className="flex items-baseline gap-2">
-                     <h3 className="text-2xl font-bold text-gray-900">{totalSalesNOC_YTD_Mgmt}</h3>
+                     <h3 className="text-3xl font-bold text-gray-900">{totalSalesNOC_YTD_Mgmt}</h3>
                      <span className="text-xs text-gray-400">NOC</span>
                   </div>
-                  <p className="text-sm font-bold text-green-600 mt-1">RM {totalSalesACE_YTD_Mgmt.toLocaleString()}</p>
-                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+                  <div className="flex items-baseline gap-1 mt-1">
+                     <p className="text-2xl font-bold text-green-600">RM {totalSalesACE_YTD_Mgmt.toLocaleString()}</p>
+                     <span className="text-xs text-gray-400">ACE</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Year to Date</p>
                </div>
 
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">No. of Agents</p>
-                  <h3 className="text-2xl font-bold text-gray-900">{noOfAgentsYTD}</h3>
-                  <p className="text-[10px] text-gray-400 mt-1">Total in Scope</p>
+                  <p className="text-sm font-medium text-gray-500 mb-1">No. of Agents</p>
+                  <h3 className="text-3xl font-bold text-gray-900">{noOfAgentsYTD}</h3>
+                  <p className="text-xs text-gray-400 mt-1">Total in Scope</p>
                </div>
 
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg mb-3"><BarChart2 className="w-5 h-5" /></div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">ACS (ACE/NOC)</p>
-                  <h3 className="text-xl font-bold text-yellow-600 mt-1">RM {acsYTD_Mgmt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
-                  <p className="text-[10px] text-gray-400 mt-1">Year to Date</p>
+                  <p className="text-sm font-medium text-gray-500 mb-1">ACS (ACE/NOC)</p>
+                  <h3 className="text-3xl font-bold text-yellow-600 mt-1">RM {acsYTD_Mgmt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
+                  <p className="text-xs text-gray-400 mt-1">Year to Date</p>
                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-               {/* Company Funnel */}
+               {/* MTD Pipeline */}
                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <h3 className="font-bold text-gray-800 mb-4 flex items-center">
-                     <BarChart2 className="w-5 h-5 mr-2 text-blue-600" />
-                     Sales Funnel Aggregate
-                  </h3>
+                  <div className="flex justify-between items-center mb-6">
+                     <h3 className="text-lg font-bold text-gray-800">Month-To-Date Pipeline</h3>
+                     <span className="text-xs font-medium px-2 py-1 bg-gray-100 text-gray-600 rounded">{now.toLocaleString('default', { month: 'long', year: 'numeric' })} MTD</span>
+                  </div>
                   <div className="h-64">
                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={funnelData} layout="vertical">
-                           <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                           <XAxis type="number" hide />
-                           <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
-                           <Tooltip />
-                           <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={40}>
-                              {funnelData.map((entry, index) => (
+                        <BarChart data={mgmtChartDataMTD} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                           <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                           <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                           <YAxis allowDecimals={false} tickFormatter={(v) => v.toLocaleString()}>
+                              <Label value="No. / RM'000" angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: '#6B7280' }} />
+                           </YAxis>
+                           <Tooltip content={<MgmtCustomTooltip />} />
+                           <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                              {mgmtChartDataMTD.map((entry, index) => (
                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                               ))}
                            </Bar>
@@ -421,7 +469,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   )}
                </div>
             </div>
-         </div>
+
+      </div>
       );
    }
 
@@ -563,22 +612,26 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    // We use separate bars conceptually if possible. Recharts allows Custom Tooltips or multi-bar if needed.
    // We will display Quantity (NOC) and Quality (ACE) in the chart tooltip for Sales.
    const chartDataMTD = [
-      { name: 'Prospects', Quantity: mtdProspectsCount },
-      { name: 'Appt Set', Quantity: mtdAppointmentsCount },
-      { name: 'Appt Done', Quantity: mtdSalesMeetingsCount },
-      { name: 'Sales', Quantity: mtdSalesNOC, ACE: mtdSalesACE },
+      { name: 'Prospects',       value: mtdProspectsCount,     barType: 'count' },
+      { name: 'Appointments Set', value: mtdAppointmentsCount,  barType: 'count' },
+      { name: 'Sales Meetings',   value: mtdSalesMeetingsCount, barType: 'count' },
+      { name: 'Sales',           value: mtdSalesNOC,           barType: 'sales', ace: mtdSalesACE },
    ];
 
-   // Custom Tooltip for the MTD Bar Chart to show ACE appropriately
+   // Custom Tooltip for the MTD Bar Chart
    const CustomTooltip = ({ active, payload, label }: any) => {
       if (active && payload && payload.length) {
          const data = payload[0].payload;
          return (
             <div className="bg-white p-3 border border-gray-100 shadow-lg rounded-lg">
                <p className="font-bold text-gray-900 mb-1">{label}</p>
-               <p className="text-blue-600 text-sm font-medium">Quantity (NOC): {data.Quantity}</p>
-               {data.ACE !== undefined && (
-                  <p className="text-green-600 text-sm font-medium">Quality (ACE): RM {data.ACE.toLocaleString()}</p>
+               {data.barType === 'sales' ? (
+                  <>
+                     <p className="text-blue-600 text-sm font-medium">NOC {data.value}</p>
+                     <p className="text-green-600 text-sm font-medium">ACE RM {data.ace.toLocaleString()}</p>
+                  </>
+               ) : (
+                  <p className="text-blue-600 text-sm font-medium">{data.value}</p>
                )}
             </div>
          );
@@ -599,36 +652,39 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
-               <p className="text-xs font-medium text-gray-500 mb-1">Total Prospects (YTD)</p>
-               <h3 className="text-2xl font-bold text-gray-900">{totalProspectsYTD}</h3>
+               <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects (YTD)</p>
+               <h3 className="text-3xl font-bold text-gray-900">{totalProspectsYTD}</h3>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Calendar className="w-5 h-5" /></div>
-               <p className="text-xs font-medium text-gray-500 mb-1">Total Apptm (YTD)</p>
-               <h3 className="text-2xl font-bold text-gray-900">{totalAppointmentsYTD}</h3>
+               <p className="text-sm font-medium text-gray-500 mb-1">Total Appointments (YTD)</p>
+               <h3 className="text-3xl font-bold text-gray-900">{totalAppointmentsYTD}</h3>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg mb-3"><Target className="w-5 h-5" /></div>
-               <p className="text-xs font-medium text-gray-500 mb-1">Sales Meeting (YTD)</p>
-               <h3 className="text-2xl font-bold text-gray-900">{totalSalesMeetingsYTD}</h3>
+               <p className="text-sm font-medium text-gray-500 mb-1">Sales Meetings (YTD)</p>
+               <h3 className="text-3xl font-bold text-gray-900">{totalSalesMeetingsYTD}</h3>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
-               <p className="text-xs font-medium text-gray-500 mb-1">Total Sales (YTD)</p>
+               <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (YTD)</p>
                <div className="flex items-baseline gap-2">
-                  <h3 className="text-2xl font-bold text-gray-900">{totalSalesNOC_YTD}</h3>
+                  <h3 className="text-3xl font-bold text-gray-900">{totalSalesNOC_YTD}</h3>
                   <span className="text-xs text-gray-400">NOC</span>
                </div>
-               <p className="text-sm font-bold text-green-600 mt-1">RM {totalSalesACE_YTD.toLocaleString()}</p>
+               <div className="flex items-baseline gap-1 mt-1">
+                  <p className="text-2xl font-bold text-green-600">RM {totalSalesACE_YTD.toLocaleString()}</p>
+                  <span className="text-xs text-gray-400">ACE</span>
+               </div>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg mb-3"><BarChart2 className="w-5 h-5" /></div>
-               <p className="text-xs font-medium text-gray-500 mb-1">ACS (ACE/NOC) (YTD)</p>
-               <h3 className="text-xl font-bold text-yellow-600 mt-1">RM {acsYTD.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
+               <p className="text-sm font-medium text-gray-500 mb-1">ACS (ACE/NOC) (YTD)</p>
+               <h3 className="text-3xl font-bold text-yellow-600 mt-1">RM {acsYTD.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
             </div>
          </div>
 
@@ -641,12 +697,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                </div>
                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                     <BarChart data={chartDataMTD} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                     <BarChart data={chartDataMTD} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="name" />
-                        <YAxis />
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <YAxis allowDecimals={false} tickFormatter={(v) => v.toLocaleString()}>
+                           <Label value="No. / RM'000" angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: '#6B7280' }} />
+                        </YAxis>
                         <Tooltip content={<CustomTooltip />} />
-                        <Bar dataKey="Quantity" radius={[4, 4, 0, 0]}>
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                            {chartDataMTD.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                            ))}
@@ -751,6 +809,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                </div>
             </div>
          </div>
+
       </div>
    );
 };

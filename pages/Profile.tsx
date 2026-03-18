@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { User, UserRole } from '../types';
+import { User } from '../types';
 import { UserCircle, Mail, IdCard, Users, Lock, Save, AlertCircle, CheckCircle } from 'lucide-react';
 
 const Profile: React.FC = () => {
@@ -203,6 +203,7 @@ const Profile: React.FC = () => {
                </form>
            </div>
        </div>
+
     </div>
   );
 };

@@ -14,12 +14,6 @@ import {
     Loader2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { sendEmail } from '../services/emailService';
-
-// ─── EmailJS template IDs (set in .env) ──────────────────────────────────────
-const EMAILJS_ADMIN_TEMPLATE = import.meta.env.VITE_EMAILJS_TEMPLATE_SUPPORT_ADMIN_ID as string;
-const EMAILJS_REPLY_TEMPLATE = import.meta.env.VITE_EMAILJS_TEMPLATE_SUPPORT_REPLY_ID as string;
-const SUPPORT_EMAIL = 'vistaqtech@gmail.com';
 
 const FAQS = [
     {
@@ -140,32 +134,7 @@ const Support: React.FC = () => {
 
         setLoading(true);
         try {
-            const trimmedName = name.trim();
-            const trimmedEmail = email.trim();
-            const trimmedPhone = phone.trim();
-            const trimmedMessage = message.trim();
-
-            await Promise.all([
-                // Admin notification — full details, Reply-To set to submitter's email
-                sendEmail(SUPPORT_EMAIL, EMAILJS_ADMIN_TEMPLATE, {
-                    from_name: trimmedName,
-                    reply_to: trimmedEmail,
-                    phone: trimmedPhone,
-                    problem_type: problemType,
-                    message: trimmedMessage,
-                }),
-                // User auto-reply — confirmation email to submitter
-                sendEmail(trimmedEmail, EMAILJS_REPLY_TEMPLATE, {
-                    from_name: trimmedName,
-                    problem_type: problemType,
-                }),
-            ]);
             setSubmitted(true);
-        } catch (err: any) {
-            console.error('Submission error:', err);
-            setError(
-                `Sorry, we could not send your enquiry right now. Please try again or email us directly at ${SUPPORT_EMAIL}.`
-            );
         } finally {
             setLoading(false);
         }

@@ -56,7 +56,7 @@ const AddToHomeScreen: React.FC<Props> = ({ onBack }) => {
 
             {/* Intro */}
             <InfoBox>
-                Access VistaQ from any browser by visiting <strong>app.vistaq.com</strong>. Once added to your home screen, it opens instantly like a native app — no App Store required.
+                Access VistaQ from any browser by visiting <strong>app.vistaq.co</strong>. Once added to your home screen, it opens instantly like a native app — no App Store required.
             </InfoBox>
 
             {/* iOS Section */}
@@ -73,8 +73,8 @@ const AddToHomeScreen: React.FC<Props> = ({ onBack }) => {
                         <Step number={1} title="Open Safari">
                             Tap the Safari icon on your iPhone or iPad to launch the browser.
                         </Step>
-                        <Step number={2} title="Go to app.vistaq.com">
-                            Tap the address bar at the top and type <strong>app.vistaq.com</strong>, then tap <strong>Go</strong> on your keyboard. Wait for the page to fully load.
+                        <Step number={2} title="Go to app.vistaq.co">
+                            Tap the address bar at the top and type <strong>app.vistaq.co</strong>, then tap <strong>Go</strong> on your keyboard. Wait for the page to fully load.
                         </Step>
                         <Step number={3} title="Tap the Share button">
                             Tap the <strong>Share icon</strong> at the bottom of the screen. It looks like a square with an arrow pointing upward (⬆).
@@ -117,8 +117,8 @@ const AddToHomeScreen: React.FC<Props> = ({ onBack }) => {
                         <Step number={1} title="Open Chrome">
                             Tap the Google Chrome icon to open the browser on your Android device.
                         </Step>
-                        <Step number={2} title="Go to app.vistaq.com">
-                            Tap the address bar and type <strong>app.vistaq.com</strong>, then tap <strong>Go</strong>. Wait for the page to fully load.
+                        <Step number={2} title="Go to app.vistaq.co">
+                            Tap the address bar and type <strong>app.vistaq.co</strong>, then tap <strong>Go</strong>. Wait for the page to fully load.
                         </Step>
                         <Step number={3} title="Tap the 3-dot menu (⋮)">
                             Tap the three vertical dots in the top-right corner of Chrome to open the browser options menu.
