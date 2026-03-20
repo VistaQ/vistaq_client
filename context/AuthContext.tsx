@@ -30,6 +30,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const normalizeUser = (raw: any): User => ({
+  ...raw,
+  managedGroupIds: raw.managed_group_ids ?? [],
+});
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -56,7 +60,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Validate token is still valid by fetching fresh user data
         apiCall('/auth/me')
           .then(res => {
-            const fresh: User = res.data;
+            const fresh = normalizeUser(res.data);
             setCurrentUser(fresh);
             localStorage.setItem('authUser', JSON.stringify(fresh));
           })
@@ -92,7 +96,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const res = await apiCall('/users');
       const list: any[] = Array.isArray(res.data) ? res.data : [];
-      setUsers(list);
+      setUsers(list.map(normalizeUser));
     } catch (_e) {}
   };
 
@@ -116,7 +120,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
       const { user: rawUser, token } = response.data;
       localStorage.setItem('authToken', token);
-      const user: User = rawUser;
+      const user = normalizeUser(rawUser);
       localStorage.setItem('authUser', JSON.stringify(user));
       setCurrentUser(user);
       return true;
@@ -134,7 +138,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { user: rawUser, token } = response.data;
     if (token) {
       localStorage.setItem('authToken', token);
-      const user: User = rawUser;
+      const user = normalizeUser(rawUser);
       localStorage.setItem('authUser', JSON.stringify(user));
       setCurrentUser(user);
     }
@@ -182,7 +186,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!currentUser) return;
     try {
       const res = await apiCall('/auth/me');
-      const fresh = res.data;
+      const fresh = normalizeUser(res.data);
       setCurrentUser(fresh);
       localStorage.setItem('authUser', JSON.stringify(fresh));
     } catch (_e) {}
@@ -195,7 +199,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const getGroupMembers = (groupId: string) =>
-    users.filter((u: User) => u.group_id === groupId && u.role === UserRole.AGENT);
+    users.filter((u: User) => u.group_id === groupId && (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER));
 
   const getUserById = (id: string) => users.find((u: User) => u.id === id);
 
@@ -243,7 +247,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       data: {
         name,
         leader_id: leaderId,
-        trainer_id: trainerIds?.[0], // API accepts single trainer_id
+        trainer_ids: trainerIds.length > 0 ? trainerIds : undefined,
       }
     });
     showNotification("Group Created", `Group "${name}" has been created.`, "success");
@@ -258,7 +262,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       data: {
         name,
         leader_id: leaderId,
-        trainer_id: trainerIds?.[0], // API accepts single trainer_id
+        trainer_ids: trainerIds.length > 0 ? trainerIds : undefined,
         member_ids: memberIds.length > 0 ? memberIds : undefined,
       }
     });

@@ -1085,7 +1085,7 @@ export interface paths {
         put?: never;
         /**
          * Create a new group (admin only)
-         * @description Creates a new group within the authenticated admin's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin` role. The optional `leader_id` must reference a user with the `agent` role, and the optional `trainer_id` must reference a user with the `trainer` role. Both referenced users must belong to the caller's tenant.
+         * @description Creates a new group within the authenticated admin's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin` role. The optional `leader_id` must reference a user with the `agent` role, and the optional `trainer_ids` must each reference a user with the `trainer` role. Both referenced users must belong to the caller's tenant.
          */
         post: {
             parameters: {
@@ -1106,11 +1106,12 @@ export interface paths {
                          */
                         leader_id?: string;
                         /**
-                         * Format: uuid
-                         * @description UUID of the user to assign as group trainer. Must be a user with the `trainer` role and must belong to the caller's tenant.
-                         * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                         * @description Array of UUIDs of users to assign as group trainers. Each must be a user with the `trainer` role and must belong to the caller's tenant.
+                         * @example [
+                         *       "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                         *     ]
                          */
-                        trainer_id?: string;
+                        trainer_ids?: string[];
                     };
                 };
             };
@@ -1259,7 +1260,7 @@ export interface paths {
         };
         /**
          * Update a group (admin only)
-         * @description Updates the group identified by `groupId`. The caller must supply a valid Bearer token belonging to a user with the `admin` role. All request body fields are optional, but at least one must be provided. When `leader_id` is supplied and differs from the current leader, the new leader is promoted to `group_leader` and the previous leader is demoted back to `agent`. When `trainer_id` is supplied, a new `group_trainers` record is inserted. When `member_ids` is supplied, the `group_id` field on each referenced user is set to this group. All referenced users must exist within the caller's tenant.
+         * @description Updates the group identified by `groupId`. The caller must supply a valid Bearer token belonging to a user with the `admin` role. All request body fields are optional, but at least one must be provided. When `leader_id` is supplied and differs from the current leader, the new leader is promoted to `group_leader` and the previous leader is demoted back to `agent`. When `trainer_ids` is supplied, the existing trainer assignments for the group are replaced with the provided set. When `member_ids` is supplied, the `group_id` field on each referenced user is set to this group. All referenced users must exist within the caller's tenant.
          */
         put: {
             parameters: {
@@ -1288,11 +1289,12 @@ export interface paths {
                          */
                         leader_id?: string;
                         /**
-                         * Format: uuid
-                         * @description UUID of the user to add as a group trainer. Must be a user with the `trainer` role. Inserts a new `group_trainers` record.
-                         * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                         * @description Array of UUIDs of users to set as group trainers. Replaces all existing trainer assignments for the group. Each must be a user with the `trainer` role.
+                         * @example [
+                         *       "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                         *     ]
                          */
-                        trainer_id?: string;
+                        trainer_ids?: string[];
                         /**
                          * @description Array of user UUIDs to assign to this group. Sets the `group_id` field on each referenced user. All provided IDs must exist within the caller's tenant.
                          * @example [
@@ -2473,6 +2475,14 @@ export interface components {
              * @example 2026-03-07T08:00:00.000Z
              */
             updated_at: string;
+            /**
+             * @description IDs of groups managed by this user. Populated for trainers; empty array for all other roles.
+             * @example [
+             *       "abc-123-uuid",
+             *       "def-456-uuid"
+             *     ]
+             */
+            managed_group_ids?: string[];
         };
         GroupObject: {
             /**
