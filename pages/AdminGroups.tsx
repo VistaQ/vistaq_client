@@ -149,7 +149,7 @@ const AdminGroups: React.FC = () => {
             <input 
               type="text" 
               placeholder="Search groups..."
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus:outline-none"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -213,11 +213,11 @@ const AdminGroups: React.FC = () => {
 
       {/* Create/Edit Modal */}
       {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label={editingGroup ? 'Edit Group Assignment' : 'Create New Group'}>
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
-                  <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
-                      <h3 className="font-bold text-gray-900 text-lg">{editingGroup ? 'Edit Group Assignment' : 'Create New Group'}</h3>
-                      <button onClick={() => setIsModalOpen(false)}><X className="w-5 h-5 text-gray-500" /></button>
+                  <div className="px-6 py-4 bg-blue-600 flex justify-between items-center">
+                      <h3 className="font-semibold text-white text-lg">{editingGroup ? 'Edit Group Assignment' : 'Create New Group'}</h3>
+                      <button onClick={() => setIsModalOpen(false)} aria-label="Close" className="text-white/70 hover:text-white p-1 rounded-full hover:bg-white/20 transition-colors"><X className="w-5 h-5" /></button>
                   </div>
                   
                   <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -227,7 +227,7 @@ const AdminGroups: React.FC = () => {
                               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Group Name</label>
                               <input 
                                   type="text" 
-                                  className="w-full bg-gray-50 border border-gray-300 text-gray-900 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500" 
+                                  className="w-full bg-gray-50 border border-gray-300 text-gray-900 p-2.5 rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500" 
                                   value={formName}
                                   onChange={e => setFormName(e.target.value)}
                                   placeholder="e.g. The Avengers"

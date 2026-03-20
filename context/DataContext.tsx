@@ -42,15 +42,9 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Default Milestones (Fallback)
-const DEFAULT_MILESTONES: BadgeTier[] = [
-  { id: 'b1', name: "Rookie", threshold: 0, color: "text-gray-400", bg: "bg-gray-100" },
-  { id: 'b2', name: "Rising Star", threshold: 1000, color: "text-blue-500", bg: "bg-blue-100" },
-  { id: 'b3', name: "Bronze Achiever", threshold: 3000, color: "text-amber-700", bg: "bg-amber-100" },
-  { id: 'b4', name: "Silver Elite", threshold: 8000, color: "text-slate-400", bg: "bg-slate-100" },
-  { id: 'b5', name: "Gold Master", threshold: 15000, color: "text-yellow-500", bg: "bg-yellow-100" },
-  { id: 'b6', name: "Platinum Legend", threshold: 25000, color: "text-indigo-500", bg: "bg-indigo-100" }
-];
+import { DEFAULT_BADGE_TIERS } from '../constants/tokens';
+// Default Milestones (Fallback) — sourced from constants/tokens.ts
+const DEFAULT_MILESTONES: BadgeTier[] = DEFAULT_BADGE_TIERS;
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [prospects, setProspects] = useState<Prospect[]>([]);

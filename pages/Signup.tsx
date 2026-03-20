@@ -118,7 +118,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
   };
 
   const fieldClass = (hasError: boolean) =>
-    `block w-full pl-10 pr-3 py-3 bg-white border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900 ${hasError ? 'border-red-400' : 'border-gray-300'
+    `block w-full pl-10 pr-3 py-3 bg-white border rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900 ${hasError ? 'border-red-400' : 'border-gray-300'
     }`;
 
   return (
