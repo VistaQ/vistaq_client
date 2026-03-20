@@ -21,6 +21,11 @@ import type { components, paths } from './types.generated';
 
 // ─── API response types (source of truth: openapi.yaml → types.generated.ts) ───
 
+export type DashboardStats = components['schemas']['DashboardStatsObject'];
+export type DashboardStatsPeriod = components['schemas']['DashboardStatsPeriod'];
+export type GroupStats = components['schemas']['GroupStatsObject'];
+export type GroupDetailStats = components['schemas']['GroupDetailStatsObject'];
+
 export type User = Omit<components['schemas']['UserObject'], 'role'> & {
   role: UserRole;         // keep enum compatibility across the codebase
   password?: string;      // form-only, used for admin user creation

@@ -36,10 +36,12 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    const { currentUser, groups, users } = useAuth();
-   const { prospects, getProspectsByScope, getGroupProspects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions } = useData();
+   const { prospects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats } = useData();
 
-   // Fetch events and coaching sessions on mount (deferred fetch — not loaded on app start)
+   // Fetch stats, events and coaching sessions on mount (deferred — not loaded on app start)
    useEffect(() => {
+      refetchDashboardStats();
+      refetchGroupStats();
       refetchEvents();
       refetchCoachingSessions();
    }, []);
@@ -52,116 +54,36 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
    if (isManagementRole) {
       const isAdmin = currentUser?.role === UserRole.ADMIN;
-      const isTrainer = currentUser?.role === UserRole.TRAINER;
       const isMasterTrainer = currentUser?.role === UserRole.MASTER_TRAINER;
 
-      // Use the robust scope filter from DataContext which now handles Leaders correctly
-      const scopeProspects = getProspectsByScope(currentUser!);
-
-      // --- 1. IDENTIFY RELEVANT GROUPS ---
-      let relevantGroups = groups;
-      if (isTrainer && currentUser?.managedGroupIds?.length) {
-         relevantGroups = groups.filter(g => currentUser.managedGroupIds?.includes(g.id));
-      }
-
-      const totalGroups = relevantGroups.length;
-
-      // --- 2. IDENTIFY RELEVANT AGENTS (For Count) ---
-      // If Admin: All Agents/Leaders
-      // If Trainer: Filter by relevant groups
-      const relevantAgents = isAdmin
-         ? users.filter(u => u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER)
-         : users.filter(u => (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) && relevantGroups.some(g => g.id === u.group_id));
-
-      const totalAgents = relevantAgents.length;
-
-      // --- 3. PERFORMANCE METRICS (AGGREGATE) ---
-      const successfulScopeProspects = scopeProspects.filter(p => p.sales_outcome === 'successful');
-      const totalFYC = successfulScopeProspects.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
-      const totalSales = scopeProspects.filter(p => p.sales_outcome === 'successful').length;
-      const totalClosed = scopeProspects.filter(p => p.sales_outcome === 'successful' || p.sales_outcome === 'unsuccessful').length;
-      const conversionRate = totalClosed > 0 ? (totalSales / totalClosed) * 100 : 0;
-
-      // --- MTD Calculations for Management ---
+      const totalGroups = groups.length;
       const now = new Date();
-      const currentYear = now.getFullYear();
 
-      // YTD Dates
-      const startYTD = new Date(currentYear, 0, 1);
-      const endYTD = new Date(currentYear, 11, 31, 23, 59, 59);
+      // --- Stats from API ---
+      const ytd = dashboardStats?.ytd;
+      const mtd = dashboardStats?.mtd;
 
-      // Helper for date ranges
-      const isWithinDateRange = (dateStr: string | undefined, start: Date, end: Date) => {
-         if (!dateStr) return false;
-         const d = new Date(dateStr);
-         if (isNaN(d.getTime())) return false;
-         return d >= start && d <= end;
-      };
-
-      // --- 4. GROUP RANKINGS (YTD, to match Group Performance Dashboard) ---
-      const groupRankings = relevantGroups.map(group => {
-         const gProspects = getGroupProspects(group.id);
-         const gSalesYTD = gProspects.filter(p =>
-            p.sales_outcome === 'successful' &&
-            isWithinDateRange(p.sales_completed_at || p.updated_at, startYTD, endYTD)
-         );
-         const gFYC = gSalesYTD.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
-         const gSales = gSalesYTD.length;
-         return { id: group.id, name: group.name, fyc: gFYC, sales: gSales };
-      }).sort((a, b) => b.fyc - a.fyc);
-
-      // YTD Metrics Filtered
-      const ytdAppointments_Mgmt = scopeProspects.filter(p =>
-         (p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled') &&
-         isWithinDateRange(p.appointment_date, startYTD, endYTD)
-      ).length;
-
-      const ytdSalesMeetings_Mgmt = scopeProspects.filter(p =>
-         p.appointment_status === 'done' &&
-         isWithinDateRange(p.appointment_completed_at || p.updated_at, startYTD, endYTD)
-      ).length;
-
-      const ytdSales_Mgmt = scopeProspects.filter(p =>
-         p.sales_outcome === 'successful' &&
-         isWithinDateRange(p.sales_completed_at || p.updated_at, startYTD, endYTD)
-      );
-
-      const totalSalesNOC_YTD_Mgmt = ytdSales_Mgmt.length;
-      const totalSalesACE_YTD_Mgmt = ytdSales_Mgmt.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
-
-      // Total agents in scope — counts ALL registered members regardless of activity
-      const noOfAgentsYTD = relevantAgents.length;
-
+      const ytdAppointments_Mgmt = ytd?.appointments_set ?? 0;
+      const ytdSalesMeetings_Mgmt = ytd?.sales_meetings ?? 0;
+      const totalSalesNOC_YTD_Mgmt = ytd?.sales_noc ?? 0;
+      const totalSalesACE_YTD_Mgmt = ytd?.sales_ace ?? 0;
+      const noOfAgentsYTD = ytd?.agents_count ?? 0;
       const acsYTD_Mgmt = totalSalesNOC_YTD_Mgmt > 0 ? (totalSalesACE_YTD_Mgmt / totalSalesNOC_YTD_Mgmt) : 0;
 
-      // --- 5. MTD CHART DATA ---
-      const currentMonth_Mgmt = now.getMonth();
-      const startMTD_Mgmt = new Date(currentYear, currentMonth_Mgmt, 1);
-      const endMTD_Mgmt = new Date(currentYear, currentMonth_Mgmt + 1, 0, 23, 59, 59);
+      // --- Group Rankings from /groups/stats (already sorted by ytd_sales_ace desc) ---
+      const groupRankings = groupStats.map(g => ({
+         id: g.group_id,
+         name: g.group_name,
+         fyc: g.ytd_sales_ace,
+         sales: g.ytd_sales_noc,
+      }));
 
-      const mtdProspects_Mgmt = scopeProspects.filter(p =>
-         isWithinDateRange(p.created_at, startMTD_Mgmt, endMTD_Mgmt)
-      ).length;
-      const mtdAppointments_Mgmt = scopeProspects.filter(p =>
-         (p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled') &&
-         isWithinDateRange(p.appointment_date, startMTD_Mgmt, endMTD_Mgmt)
-      ).length;
-      const mtdSalesMeetings_Mgmt = scopeProspects.filter(p =>
-         p.appointment_status === 'completed' &&
-         isWithinDateRange(p.appointment_completed_at || p.appointment_date, startMTD_Mgmt, endMTD_Mgmt)
-      ).length;
-      const mtdSalesArr_Mgmt = scopeProspects.filter(p =>
-         p.sales_outcome === 'successful' &&
-         isWithinDateRange(p.sales_completed_at || p.updated_at, startMTD_Mgmt, endMTD_Mgmt)
-      );
-      const mtdSalesNOC_Mgmt = mtdSalesArr_Mgmt.length;
-      const mtdSalesACE_Mgmt = mtdSalesArr_Mgmt.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
-
+      // --- MTD Chart Data from API ---
       const mgmtChartDataMTD = [
-         { name: 'Prospects',       value: mtdProspects_Mgmt,     barType: 'count' },
-         { name: 'Appointments Set', value: mtdAppointments_Mgmt,  barType: 'count' },
-         { name: 'Sales Meetings',   value: mtdSalesMeetings_Mgmt, barType: 'count' },
-         { name: 'Sales',           value: mtdSalesNOC_Mgmt,      barType: 'sales', ace: mtdSalesACE_Mgmt },
+         { name: 'Prospects',        value: mtd?.prospects ?? 0,        barType: 'count' },
+         { name: 'Appointments Set', value: mtd?.appointments_set ?? 0, barType: 'count' },
+         { name: 'Sales Meetings',   value: mtd?.sales_meetings ?? 0,   barType: 'count' },
+         { name: 'Sales',            value: mtd?.sales_noc ?? 0,        barType: 'sales', ace: mtd?.sales_ace ?? 0 },
       ];
 
       const MgmtCustomTooltip = ({ active, payload, label }: any) => {
@@ -257,7 +179,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
                      <div>
                         <p className="text-sm font-medium text-gray-500">Sales Force</p>
-                        <h3 className="text-3xl font-bold text-gray-900 mt-1">{totalAgents}</h3>
+                        <h3 className="text-3xl font-bold text-gray-900 mt-1">{noOfAgentsYTD}</h3>
                         <p className="text-xs text-gray-400">Agents & Leaders</p>
                      </div>
                      <div className="p-3 bg-blue-50 text-blue-600 rounded-lg"><Users className="w-6 h-6" /></div>
@@ -280,7 +202,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                            <div className="mt-1 flex justify-between items-end w-full">
                               <div>
                                  <h3 className="text-xl font-bold text-gray-900 truncate">ACE Generated</h3>
-                                 <p className="text-sm font-mono text-green-600 font-bold">RM {totalFYC.toLocaleString() || '0'}</p>
+                                 <p className="text-sm font-mono text-green-600 font-bold">RM {totalSalesACE_YTD_Mgmt.toLocaleString()}</p>
                               </div>
                               <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg"><Crown className="w-5 h-5" /></div>
                            </div>
@@ -476,83 +398,26 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
    // --- AGENT & GROUP LEADER PERSONAL DASHBOARD ---
 
-   // --- Date Filters ---
    const now = new Date();
-   const currentYear = now.getFullYear();
-   const currentMonth = now.getMonth();
-
-   // YTD Dates: Jan 1st to Dec 31st of Current Year
-   const startYTD = new Date(currentYear, 0, 1);
-   const endYTD = new Date(currentYear, 11, 31, 23, 59, 59);
-
-   // MTD Dates: 1st of Current Month to Last day of Current Month
-   const startMTD = new Date(currentYear, currentMonth, 1);
-   const endMTD = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
-
    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-   // --- STRICTLY PERSONAL DATA ---
-   const myProspects = prospects.filter(p => p.agent_id === currentUser?.id);
-   const myEvents = currentUser ? getEventsForUser(currentUser) : []; // This gets Admin/Trainer/Group events
+   // --- Stats from API (scoped to personal by backend) ---
+   const personalYtd = dashboardStats?.ytd;
+   const personalMtd = dashboardStats?.mtd;
 
-   // Helper to check if a date string falls within a date range
-   const isWithinDateRange = (dateStr: string | undefined, start: Date, end: Date) => {
-      if (!dateStr) return false;
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return false;
-      return d >= start && d <= end;
-   };
-
-   // --- YTD Calculations ---
-   // Prospects entered YTD
-   const ytdProspects = myProspects.filter(p => isWithinDateRange(p.created_at, startYTD, endYTD));
-   const totalProspectsYTD = ytdProspects.length;
-
-   // Appointments Scheduled YTD (including rescheduled)
-   const ytdAppointments = myProspects.filter(p =>
-      (p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled') &&
-      isWithinDateRange(p.appointment_date, startYTD, endYTD)
-   );
-   const totalAppointmentsYTD = ytdAppointments.length;
-
-   // Sales Meetings Completed YTD
-   const ytdSalesMeetings = myProspects.filter(p =>
-      p.appointment_status === 'done' &&
-      isWithinDateRange(p.appointment_completed_at || p.updated_at, startYTD, endYTD)
-   );
-   const totalSalesMeetingsYTD = ytdSalesMeetings.length;
-
-   // Sales (Successful) YTD
-   const ytdSales = myProspects.filter(p =>
-      p.sales_outcome === 'successful' &&
-      isWithinDateRange(p.sales_completed_at || p.updated_at, startYTD, endYTD)
-   );
-   const totalSalesNOC_YTD = ytdSales.length;
-   const totalSalesACE_YTD = ytdSales.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
-
-   // ACS (ACE / NOC) YTD
+   const totalProspectsYTD = personalYtd?.prospects ?? 0;
+   const totalAppointmentsYTD = personalYtd?.appointments_set ?? 0;
+   const totalSalesMeetingsYTD = personalYtd?.sales_meetings ?? 0;
+   const totalSalesNOC_YTD = personalYtd?.sales_noc ?? 0;
+   const totalSalesACE_YTD = personalYtd?.sales_ace ?? 0;
    const acsYTD = totalSalesNOC_YTD > 0 ? (totalSalesACE_YTD / totalSalesNOC_YTD) : 0;
 
-   // --- MTD Calculations ---
-   // Prospects entered MTD
-   const mtdProspectsCount = myProspects.filter(p => isWithinDateRange(p.created_at, startMTD, endMTD)).length;
-   // Appointments Set MTD — any prospect that moved into an appointment status this month
-   const mtdAppointmentsCount = myProspects.filter(p =>
-      p.appointment_status !== 'not_done' && p.appointment_status != null &&
-      isWithinDateRange(p.updated_at, startMTD, endMTD)
-   ).length;
-   // Sales Meetings Completed MTD — anchor on updated_at since appointment_completed_at is often null
-   const mtdSalesMeetingsCount = myProspects.filter(p =>
-      p.appointment_status === 'done' &&
-      isWithinDateRange(p.appointment_completed_at || p.updated_at, startMTD, endMTD)
-   ).length;
-   // Sales (Successful) MTD
-   const mtdSales = myProspects.filter(p =>
-      p.sales_outcome === 'successful' &&
-      isWithinDateRange(p.sales_completed_at || p.updated_at, startMTD, endMTD)
-   );
-   const mtdSalesNOC = mtdSales.length;
-   const mtdSalesACE = mtdSales.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
+   const mtdSalesNOC = personalMtd?.sales_noc ?? 0;
+   const mtdSalesACE = personalMtd?.sales_ace ?? 0;
+
+   // --- Prospects still needed for Upcoming Schedule (appointment dates) ---
+   const myProspects = prospects.filter(p => p.agent_id === currentUser?.id);
+   const myEvents = currentUser ? getEventsForUser(currentUser) : [];
 
 
    // --- UPCOMING SCHEDULE LOGIC — Next 5 items (all types combined) ---
@@ -612,9 +477,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    // We use separate bars conceptually if possible. Recharts allows Custom Tooltips or multi-bar if needed.
    // We will display Quantity (NOC) and Quality (ACE) in the chart tooltip for Sales.
    const chartDataMTD = [
-      { name: 'Prospects',       value: mtdProspectsCount,     barType: 'count' },
-      { name: 'Appointments Set', value: mtdAppointmentsCount,  barType: 'count' },
-      { name: 'Sales Meetings',   value: mtdSalesMeetingsCount, barType: 'count' },
+      { name: 'Prospects',        value: personalMtd?.prospects ?? 0,        barType: 'count' },
+      { name: 'Appointments Set', value: personalMtd?.appointments_set ?? 0, barType: 'count' },
+      { name: 'Sales Meetings',   value: personalMtd?.sales_meetings ?? 0,   barType: 'count' },
       { name: 'Sales',           value: mtdSalesNOC,           barType: 'sales', ace: mtdSalesACE },
    ];
 

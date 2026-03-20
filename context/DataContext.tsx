@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, PointConfig, Group } from '../types';
+import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, PointConfig, Group, DashboardStats, GroupStats } from '../types';
 import { apiCall } from '../services/apiClient';
 import { DEFAULT_POINT_CONFIG } from '../services/points';
 
@@ -25,10 +25,17 @@ interface DataContextType {
   getEventsForUser: (user: User) => Event[];
   refetchEvents: () => Promise<void>;
 
+  // Stats
+  dashboardStats: DashboardStats | null;
+  groupStats: GroupStats[];
+  refetchDashboardStats: () => Promise<void>;
+  refetchGroupStats: () => Promise<void>;
+
   // Loading states
   isLoadingProspects: boolean;
   isLoadingEvents: boolean;
   isLoadingCoaching: boolean;
+  isLoadingDashboardStats: boolean;
 
   // Coaching Methods
   coachingSessions: CoachingSession[];
@@ -61,6 +68,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoadingProspects, setIsLoadingProspects] = useState(false);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [isLoadingCoaching, setIsLoadingCoaching] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [groupStats, setGroupStats] = useState<GroupStats[]>([]);
+  const [isLoadingDashboardStats, setIsLoadingDashboardStats] = useState(false);
 
   const getCurrentUserId = (): string | null => {
     try {
@@ -141,6 +151,26 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoadingCoaching(false);
   };
 
+  const fetchDashboardStats = async () => {
+    if (!localStorage.getItem('authToken')) return;
+    setIsLoadingDashboardStats(true);
+    try {
+      const res = await apiCall('/dashboard/stats');
+      if (res?.data) setDashboardStats(res.data);
+    } catch (_e) { } finally {
+      setIsLoadingDashboardStats(false);
+    }
+  };
+
+  const fetchGroupStats = async () => {
+    if (!localStorage.getItem('authToken')) return;
+    try {
+      const res = await apiCall('/groups/stats');
+      const raw: GroupStats[] = Array.isArray(res.data) ? res.data : [];
+      setGroupStats(raw);
+    } catch (_e) { }
+  };
+
   // Track authentication state to trigger refetch on login
   const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('authToken'));
   const [userRole, setUserRole] = useState<string | null>(() => {
@@ -201,6 +231,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // 3. Clear coaching sessions on logout (fetch is triggered by Coaching page on mount)
   useEffect(() => {
     if (!authToken) setCoachingSessions([]);
+  }, [authToken]);
+
+  // 4. Clear stats on logout (fetch is triggered by Dashboard on mount)
+  useEffect(() => {
+    if (!authToken) {
+      setDashboardStats(null);
+      setGroupStats([]);
+    }
   }, [authToken]);
 
   const addProspect = async (data: Partial<Prospect>) => {
@@ -492,7 +530,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       getProspectsByScope, getGroupProspects, updateBadgeTiers, updatePointConfig,
       addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents,
       coachingSessions, addCoachingSession, updateCoachingSession, deleteCoachingSession,
-      joinCoachingSession, getCoachingSessionsForUser, refetchCoachingSessions: fetchCoachingSessions
+      joinCoachingSession, getCoachingSessionsForUser, refetchCoachingSessions: fetchCoachingSessions,
+      dashboardStats, groupStats, isLoadingDashboardStats,
+      refetchDashboardStats: fetchDashboardStats, refetchGroupStats: fetchGroupStats
     }}>
       {children}
     </DataContext.Provider>

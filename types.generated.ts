@@ -1382,6 +1382,155 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/groups/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get group statistics
+         * @description Returns a list of all groups in the authenticated user's tenant with their year-to-date (YTD) sales statistics, sorted by `ytd_sales_ace` descending. The caller must supply a valid Bearer token. All roles are permitted to call this endpoint.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Group statistics retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["GroupStatsObject"][];
+                        };
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/groups/{groupId}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get per-group detail statistics
+         * @description Returns YTD and MTD aggregated statistics scoped to a specific group, plus the current agent count for that group. The caller must supply a valid Bearer token. All roles are permitted to call this endpoint. Returns 404 if the group does not exist.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID of the group to retrieve statistics for. */
+                    groupId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Group detail statistics retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["GroupDetailStatsObject"];
+                        };
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Not found. Returned when no group exists for the given `groupId`. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Group not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/prospects": {
         parameters: {
             query?: never;
@@ -1443,7 +1592,7 @@ export interface paths {
         put?: never;
         /**
          * Create a prospect
-         * @description Creates a new prospect record scoped to the authenticated user's tenant. The caller must supply a valid Bearer token belonging to a user with the `agent` or `group_leader` role. The `agent_id`, `tenant_id`, and `group_id` are extracted directly from the JWT claims — they are not accepted in the request body. The `current_stage` is automatically set to `prospect` on creation.
+         * @description Creates a new prospect record scoped to the authenticated user's tenant. The caller must supply a valid Bearer token belonging to a user with the `agent` or `group_leader` role. The `agent_id` and `tenant_id` are extracted directly from the JWT claims — they are not accepted in the request body. The `current_stage` is automatically set to `prospect` on creation.
          */
         post: {
             parameters: {
@@ -2207,6 +2356,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get dashboard statistics
+         * @description Returns aggregated year-to-date (YTD) and month-to-date (MTD) dashboard statistics for the authenticated user's tenant. YTD figures cover the period from 1 January of the current year; MTD figures cover the period from the 1st of the current month. The caller must supply a valid Bearer token. All roles are permitted to call this endpoint.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Dashboard statistics retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["DashboardStatsObject"];
+                        };
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2290,6 +2505,64 @@ export interface components {
              */
             updated_at: string;
         };
+        GroupStatsObject: {
+            /**
+             * Format: uuid
+             * @example 7c9e6679-7425-40de-944b-e07fc1f90ae7
+             */
+            group_id: string;
+            /** @example Alpha Team */
+            group_name: string;
+            /**
+             * @description Total number of successful sales (NOC) for the group year-to-date.
+             * @example 25
+             */
+            ytd_sales_noc: number;
+            /**
+             * @description Total sum of products sold amounts (ACE) for the group year-to-date.
+             * @example 380000
+             */
+            ytd_sales_ace: number;
+        };
+        GroupDetailStatsObject: {
+            /**
+             * Format: uuid
+             * @example 7c9e6679-7425-40de-944b-e07fc1f90ae7
+             */
+            group_id: string;
+            /** @example Alpha Team */
+            group_name: string;
+            ytd: components["schemas"]["DashboardStatsPeriod"];
+            mtd: components["schemas"]["GroupDetailStatsMtdPeriod"];
+        };
+        /** @description Aggregated statistics for the month-to-date period scoped to a specific group. Excludes `agents_count` — agent count is a current point-in-time figure and is only present in the `ytd` object. */
+        GroupDetailStatsMtdPeriod: {
+            /**
+             * @description Total prospects created in the period.
+             * @example 8
+             */
+            prospects: number;
+            /**
+             * @description Prospects whose appointment status is `scheduled` or `rescheduled` in the period.
+             * @example 5
+             */
+            appointments_set: number;
+            /**
+             * @description Prospects whose appointment status is `done` in the period.
+             * @example 4
+             */
+            sales_meetings: number;
+            /**
+             * @description Prospects with a successful sales outcome in the period.
+             * @example 2
+             */
+            sales_noc: number;
+            /**
+             * @description Total sum of products sold amounts for successful sales in the period.
+             * @example 30000
+             */
+            sales_ace: number;
+        };
         ProspectObject: {
             /**
              * Format: uuid
@@ -2306,11 +2579,6 @@ export interface components {
              * @example 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
              */
             agent_id: string;
-            /**
-             * Format: uuid
-             * @example 7c9e6679-7425-40de-944b-e07fc1f90ae7
-             */
-            group_id: string | null;
             /** @example Alice Johnson */
             prospect_name: string;
             /**
@@ -2444,6 +2712,43 @@ export interface components {
              * @example 2026-03-14T08:00:00.000Z
              */
             updated_at: string;
+        };
+        DashboardStatsObject: {
+            ytd: components["schemas"]["DashboardStatsPeriod"];
+            mtd: components["schemas"]["DashboardStatsPeriod"];
+        };
+        /** @description Aggregated statistics for a single time period (YTD or MTD). `agents_count` reflects the current total count of users with the `agent` or `group_leader` role and is identical in both periods. */
+        DashboardStatsPeriod: {
+            /**
+             * @description Total prospects created in the period.
+             * @example 120
+             */
+            prospects: number;
+            /**
+             * @description Prospects whose appointment status is `scheduled` or `rescheduled` in the period.
+             * @example 85
+             */
+            appointments_set: number;
+            /**
+             * @description Prospects whose appointment status is `done` in the period.
+             * @example 60
+             */
+            sales_meetings: number;
+            /**
+             * @description Prospects with a successful sales outcome in the period.
+             * @example 30
+             */
+            sales_noc: number;
+            /**
+             * @description Total sum of products sold amounts for successful sales in the period.
+             * @example 450000
+             */
+            sales_ace: number;
+            /**
+             * @description Current total count of users with the `agent` or `group_leader` role. This value is the same for both YTD and MTD periods.
+             * @example 24
+             */
+            agents_count: number;
         };
         ErrorResponse: {
             /** @example Server Error */
