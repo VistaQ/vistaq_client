@@ -325,7 +325,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label="Prospect details">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl flex flex-col h-[90vh] animate-in fade-in zoom-in duration-200 relative">
 
         {showDeleteConfirm && (
@@ -373,7 +373,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                       if (!/\d/.test(val)) handleSave({ prospectName: val });
                     }}
                     onBlur={validateStep1}
-                    className={`block w-full bg-gray-50 border text-gray-900 rounded-lg p-2.5 text-sm ${errors.prospectName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+                    className={`block w-full bg-gray-50 border text-gray-900 rounded-lg p-2.5 text-sm ${errors.prospectName ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus-visible:ring-blue-500'}`}
                     placeholder="Enter full name"
                     disabled={isReadOnly}
                   />
@@ -391,7 +391,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                         setPhoneSuffix(val);
                       }}
                       onBlur={validateStep1}
-                      className={`rounded-none rounded-r-lg bg-gray-50 border text-gray-900 block flex-1 min-w-0 w-full text-sm p-2.5 ${errors.prospectPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+                      className={`rounded-none rounded-r-lg bg-gray-50 border text-gray-900 block flex-1 min-w-0 w-full text-sm p-2.5 ${errors.prospectPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus-visible:ring-blue-500'}`}
                       placeholder="123456789"
                       disabled={isReadOnly}
                     />
@@ -405,7 +405,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                     value={formData.prospectEmail || ''}
                     onChange={e => handleSave({ prospectEmail: e.target.value })}
                     onBlur={validateStep1}
-                    className={`block w-full bg-gray-50 border text-gray-900 rounded-lg p-2.5 text-sm ${errors.prospectEmail ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'}`}
+                    className={`block w-full bg-gray-50 border text-gray-900 rounded-lg p-2.5 text-sm ${errors.prospectEmail ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus-visible:ring-blue-500'}`}
                     placeholder="client@email.com"
                     disabled={isReadOnly}
                   />
@@ -511,7 +511,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                       value={formData.appointmentLocation || ''}
                       onChange={e => handleSave({ appointmentLocation: e.target.value })}
                       placeholder="e.g. Starbucks KLCC"
-                      className="block w-full pl-10 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500"
+                      className="block w-full pl-10 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus-visible:ring-blue-500 focus-visible:border-blue-500"
                       disabled={isReadOnly}
                     />
                   </div>
@@ -522,7 +522,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                   <select
                     value={formData.appointmentStatus || 'not_done'}
                     onChange={e => handleSave({ appointmentStatus: e.target.value as any })}
-                    className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-blue-500 focus:border-blue-500"
+                    className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus-visible:ring-blue-500 focus-visible:border-blue-500"
                     disabled={isReadOnly}
                   >
                     <option value="not_done">Not done (Default)</option>
@@ -611,7 +611,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                       <select
                         value={row.productName || ''}
                         onChange={e => handleProductChange(row.id, 'productName', e.target.value)}
-                        className="block w-full bg-white border border-gray-300 text-gray-900 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                        className="block w-full bg-white border border-gray-300 text-gray-900 rounded-md p-2 text-sm focus-visible:ring-blue-500 focus-visible:border-blue-500"
                         disabled={isReadOnly || isOutcomeDecided}
                       >
                         <option value="">Select Product...</option>
@@ -633,7 +633,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
                           type="number"
                           value={row.aceAmount || ''}
                           onChange={e => handleProductChange(row.id, 'aceAmount', Number(e.target.value))}
-                          className="block w-full pl-8 bg-white border border-gray-300 text-gray-900 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                          className="block w-full pl-8 bg-white border border-gray-300 text-gray-900 rounded-md p-2 text-sm focus-visible:ring-blue-500 focus-visible:border-blue-500"
                           placeholder="0"
                           disabled={isReadOnly || isOutcomeDecided}
                         />

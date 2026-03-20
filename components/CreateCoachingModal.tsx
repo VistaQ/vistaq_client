@@ -199,16 +199,16 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
     const isSeminar = coachingType === '2 Full Days Seminar' || coachingType === '2 Hours Online Seminar';
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label={editSession ? 'Edit Coaching Session' : 'Create Coaching Session'}>
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+                <div className="flex items-center justify-between p-6 bg-gradient-to-r from-green-600 to-emerald-600">
                     <div>
-                        <h2 className="text-xl font-bold text-gray-900">{editSession ? 'Edit Coaching / Training Session' : 'Create Coaching / Training Session'}</h2>
-                        <p className="text-sm text-gray-500 mt-1">{editSession ? 'Modify the details of this scheduled session.' : 'Schedule a new session for your agents.'}</p>
+                        <h2 className="text-xl font-bold text-white">{editSession ? 'Edit Coaching / Training Session' : 'Create Coaching / Training Session'}</h2>
+                        <p className="text-sm text-white/70 mt-1">{editSession ? 'Modify the details of this scheduled session.' : 'Schedule a new session for your agents.'}</p>
                     </div>
-                    <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+                    <button onClick={onClose} aria-label="Close" className="p-2 text-white/70 hover:text-white rounded-lg hover:bg-white/20 transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -272,7 +272,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                                 required
                                 value={title}
                                 onChange={e => setTitle(e.target.value)}
-                                className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2.5 text-sm"
+                                className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 p-2.5 text-sm"
                                 placeholder={`e.g. ${currentTypeInfo?.label} — March 2026`}
                             />
                         </div>
@@ -283,7 +283,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                                 value={description}
                                 onChange={e => setDescription(e.target.value)}
                                 rows={3}
-                                className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2.5 text-sm resize-none"
+                                className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 p-2.5 text-sm resize-none"
                                 placeholder="Describe the objectives or agenda of this coaching session..."
                             />
                         </div>
@@ -292,17 +292,17 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Date <span className="text-red-500">*</span></label>
                                 <input type="date" required value={date} onChange={e => setDate(e.target.value)}
-                                    className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2.5 text-sm" />
+                                    className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 p-2.5 text-sm" />
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Start Time <span className="text-red-500">*</span></label>
                                 <input type="time" required value={durationStart} onChange={handleStartTimeChange}
-                                    className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2.5 text-sm" />
+                                    className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 p-2.5 text-sm" />
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">End Time <span className="text-red-500">*</span></label>
                                 <input type="time" required value={durationEnd} onChange={e => setDurationEnd(e.target.value)}
-                                    className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2.5 text-sm" />
+                                    className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 p-2.5 text-sm" />
                             </div>
                         </div>
 
@@ -328,7 +328,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                                 <div className="relative">
                                     <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                     <input type="url" value={link} onChange={e => setLink(e.target.value)}
-                                        className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 pl-9 p-2.5 text-sm"
+                                        className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 pl-9 p-2.5 text-sm"
                                         placeholder="https://zoom.us/j/..." />
                                 </div>
                             </div>
@@ -340,7 +340,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                                 <div className="relative">
                                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                     <input type="text" value={link} onChange={e => setLink(e.target.value)}
-                                        className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 pl-9 p-2.5 text-sm"
+                                        className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 pl-9 p-2.5 text-sm"
                                         placeholder="e.g. Level 12, Menara XYZ or paste Google Maps / Waze link" />
                                 </div>
                             </div>

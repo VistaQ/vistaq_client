@@ -25,8 +25,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const MDRT_TARGET_FYC = 100000;
 const MDRT_TARGET_PROSPECTS = 100;
 
-// Zurich Palette for Charts
-const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC', '#10B981'];
+import { CHART_COLORS, CHART_LABEL_FILL } from '../constants/tokens';
+const COLORS = CHART_COLORS;
 
 // ---------------------------------------------------------------------------
 
@@ -352,7 +352,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
                            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                            <YAxis allowDecimals={false} tickFormatter={(v) => v.toLocaleString()}>
-                              <Label value="No. / RM'000" angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: '#6B7280' }} />
+                              <Label value="No. / RM'000" angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: CHART_LABEL_FILL }} />
                            </YAxis>
                            <Tooltip content={<MgmtCustomTooltip />} />
                            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
@@ -436,7 +436,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                                  {(() => { try { return new Date(item.date).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } })()}
                               </p>
                               {item.meta && (
-                                 <div className="flex items-center text-[10px] mt-1 font-medium" style={{ color: item.type === 'event' ? '#4f46e5' : '#16a34a' }}>
+                                 <div className={`flex items-center text-[10px] mt-1 font-medium ${item.type === 'event' ? 'text-indigo-600' : 'text-green-600'}`}>
                                     <MapPin className="w-3 h-3 mr-1" />{item.meta}
                                  </div>
                               )}
@@ -701,7 +701,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                         <YAxis allowDecimals={false} tickFormatter={(v) => v.toLocaleString()}>
-                           <Label value="No. / RM'000" angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: '#6B7280' }} />
+                           <Label value="No. / RM'000" angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: CHART_LABEL_FILL }} />
                         </YAxis>
                         <Tooltip content={<CustomTooltip />} />
                         <Bar dataKey="value" radius={[4, 4, 0, 0]}>

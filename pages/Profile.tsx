@@ -107,7 +107,7 @@ const Profile: React.FC = () => {
                                type="text"
                                value={formData.name || ''}
                                onChange={e => setFormData({...formData, name: e.target.value})}
-                               className="block w-full pl-10 bg-gray-50 border-gray-300 text-gray-900 rounded-lg border p-2.5 focus:ring-blue-500 focus:border-blue-500"
+                               className="block w-full pl-10 bg-gray-50 border-gray-300 text-gray-900 rounded-lg border p-2.5 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500"
                            />
                        </div>
                    </div>
@@ -120,7 +120,7 @@ const Profile: React.FC = () => {
                                type="email"
                                value={formData.email || ''}
                                onChange={e => setFormData({...formData, email: e.target.value})}
-                               className="block w-full pl-10 bg-gray-50 border-gray-300 text-gray-900 rounded-lg border p-2.5 focus:ring-blue-500 focus:border-blue-500"
+                               className="block w-full pl-10 bg-gray-50 border-gray-300 text-gray-900 rounded-lg border p-2.5 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500"
                            />
                        </div>
                    </div>
@@ -175,7 +175,7 @@ const Profile: React.FC = () => {
                            type="password"
                            value={newPassword}
                            onChange={e => setNewPassword(e.target.value)}
-                           className="block w-full bg-gray-50 border-gray-300 text-gray-900 rounded-lg border p-2.5 focus:ring-blue-500 focus:border-blue-500"
+                           className="block w-full bg-gray-50 border-gray-300 text-gray-900 rounded-lg border p-2.5 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500"
                            placeholder="••••••••"
                        />
                    </div>
@@ -186,7 +186,7 @@ const Profile: React.FC = () => {
                            type="password"
                            value={confirmPassword}
                            onChange={e => setConfirmPassword(e.target.value)}
-                           className="block w-full bg-gray-50 border-gray-300 text-gray-900 rounded-lg border p-2.5 focus:ring-blue-500 focus:border-blue-500"
+                           className="block w-full bg-gray-50 border-gray-300 text-gray-900 rounded-lg border p-2.5 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500"
                            placeholder="••••••••"
                        />
                    </div>

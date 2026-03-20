@@ -124,7 +124,7 @@ const Reports: React.FC = () => {
              <select 
                value={selectedGroupId}
                onChange={(e) => setSelectedGroupId(e.target.value)}
-               className="bg-gray-50 border border-gray-300 text-gray-900 rounded-md shadow-sm text-sm p-2 focus:ring-blue-500 focus:border-blue-500"
+               className="bg-gray-50 border border-gray-300 text-gray-900 rounded-md shadow-sm text-sm p-2 focus-visible:ring-blue-500 focus-visible:border-blue-500"
              >
                <option value="all">All Managed Groups</option>
                {visibleGroups.map(g => (
@@ -136,7 +136,7 @@ const Reports: React.FC = () => {
          <select 
             value={selectedOutcome}
             onChange={(e) => setSelectedOutcome(e.target.value)}
-            className="bg-gray-50 border border-gray-300 text-gray-900 rounded-md shadow-sm text-sm p-2 focus:ring-blue-500 focus:border-blue-500"
+            className="bg-gray-50 border border-gray-300 text-gray-900 rounded-md shadow-sm text-sm p-2 focus-visible:ring-blue-500 focus-visible:border-blue-500"
          >
             <option value="all">All Outcomes</option>
             <option value="SUCCESSFUL">Won (Successful)</option>

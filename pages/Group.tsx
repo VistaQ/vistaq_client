@@ -25,8 +25,8 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Label } from 'recharts';
 
-// Zurich Palette
-const COLORS = ['#23366F', '#3D6DB5', '#00C9B1', '#648FCC', '#10B981'];
+import { CHART_COLORS } from '../constants/tokens';
+const COLORS = CHART_COLORS;
 
 const Group: React.FC = () => {
   const { currentUser, getGroupMembers, groups, getUserById, users } = useAuth();
@@ -594,7 +594,7 @@ const Group: React.FC = () => {
          </div>
 
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
-            <div className="p-2 bg-slate-50 text-slate-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
+            <div className="p-2 bg-gray-50 text-gray-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
             <p className="text-sm font-medium text-gray-500 mb-1">No. of Agents</p>
             <h3 className="text-3xl font-bold text-gray-900">{activeMembersCount}</h3>
             <p className="text-xs text-gray-400 mt-1">Total in Group</p>
@@ -614,7 +614,7 @@ const Group: React.FC = () => {
           <input
             type="text"
             placeholder="Search agent by name..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus:outline-none"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
