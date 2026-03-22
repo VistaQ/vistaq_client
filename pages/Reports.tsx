@@ -1,13 +1,20 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { FileText, Download, Filter, PieChart, CheckCircle, XCircle, PauseCircle } from 'lucide-react';
-import { UserRole } from '../types';
+import { UserRole, Group } from '../types';
+import { apiCall } from '../services/apiClient';
 
 const Reports: React.FC = () => {
-  const { currentUser, groups } = useAuth();
+  const { currentUser } = useAuth();
   const { getProspectsByScope, getGroupProspects } = useData();
+
+  const [groups, setGroups] = useState<Group[]>([]);
+
+  useEffect(() => {
+    apiCall('/groups').then(res => setGroups(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+  }, []);
 
   // Filters State
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
@@ -88,10 +95,8 @@ const Reports: React.FC = () => {
 
   const isTrainer = currentUser?.role === UserRole.TRAINER || currentUser?.role === UserRole.ADMIN;
   
-  // Determine visible groups for dropdown
-  const visibleGroups = (currentUser?.role === UserRole.TRAINER && currentUser.managedGroupIds)
-    ? groups.filter(g => currentUser.managedGroupIds!.includes(g.id))
-    : groups;
+  // Determine visible groups for dropdown — backend RLS already scopes the response
+  const visibleGroups = groups;
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);

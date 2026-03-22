@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole, Event } from '../types';
+import { UserRole, Event, Group, User } from '../types';
+import { apiCall } from '../services/apiClient';
 import {
-    CalendarDays, Plus, MapPin, User, Users, X, Clock, Link as LinkIcon,
+    CalendarDays, Plus, MapPin, User as UserIcon, Users, X, Clock, Link as LinkIcon,
     Edit2, ExternalLink, LayoutGrid, ChevronLeft, ChevronRight, Archive, Search, Check
 } from 'lucide-react';
 
@@ -112,7 +113,7 @@ const EventDetailPopup: React.FC<EventDetailPopupProps> = ({ event, onClose, onE
 
                     {event.created_by_name && (
                         <div className="flex items-start gap-3 text-sm text-gray-700">
-                            <User className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                            <UserIcon className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                             <span>Organizer: <span className="font-medium">{event.created_by_name}</span></span>
                         </div>
                     )}
@@ -405,10 +406,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
 /* ─── Main Events Page ───────────────────────────────────── */
 
 const Events: React.FC = () => {
-    const { currentUser, groups, users } = useAuth();
+    const { currentUser } = useAuth();
     const { addEvent, deleteEvent, updateEvent, getEventsForUser, refetchEvents } = useData();
 
-    useEffect(() => { refetchEvents(); }, []);
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
+
+    useEffect(() => {
+        refetchEvents();
+        apiCall('/groups').then(res => setGroups(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+        apiCall('/users').then(res => setUsers(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+    }, []);
 
     const [viewMode, setViewMode] = useState<'card' | 'calendar'>('calendar');
     const [showArchived, setShowArchived] = useState(false);
@@ -454,11 +462,9 @@ const Events: React.FC = () => {
     const sortedEvents = [...visibleEvents].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
 
     let targetableGroups = groups;
-    if (currentUser.role === UserRole.TRAINER) {
-        targetableGroups = groups.filter(g => currentUser.managedGroupIds?.includes(g.id));
-    } else if (currentUser.role === UserRole.GROUP_LEADER) {
+    if (currentUser.role === UserRole.GROUP_LEADER) {
         targetableGroups = groups.filter(g => g.id === currentUser.group_id);
-    } else if (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.MASTER_TRAINER) {
+    } else if (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.MASTER_TRAINER && currentUser.role !== UserRole.TRAINER) {
         targetableGroups = [];
     }
 
@@ -713,7 +719,7 @@ const Events: React.FC = () => {
                                         <span className="font-medium">{evt.venue || 'TBD'}</span>
                                     </div>
                                     <div className="flex items-center text-sm text-gray-600">
-                                        <User className="w-4 h-4 mr-2 text-gray-400" />
+                                        <UserIcon className="w-4 h-4 mr-2 text-gray-400" />
                                         <span className="truncate">Organizer: {evt.created_by_name}</span>
                                     </div>
                                     {evt.meeting_link && (

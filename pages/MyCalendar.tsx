@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole, Event, CoachingSession, Prospect } from '../types';
+import { UserRole, Event, CoachingSession, Prospect, Group, User } from '../types';
+import { apiCall } from '../services/apiClient';
 import {
-    CalendarDays, Plus, MapPin, User, Users, X, Clock, Link as LinkIcon,
+    CalendarDays, Plus, MapPin, User as UserIcon, Users, X, Clock, Link as LinkIcon,
     Edit2, ExternalLink, LayoutGrid, ChevronLeft, ChevronRight, Archive,
     BookOpen, Briefcase, ChevronRight as ChevronRightIcon, Search, Check
 } from 'lucide-react';
@@ -70,8 +71,8 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
                 : session.durationStart || (valid ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '');
         }
         if (item.type === 'appointment' && prospect) {
-            return prospect.appointmentStartTime
-                ? `${prospect.appointmentStartTime}${prospect.appointmentEndTime ? ` – ${prospect.appointmentEndTime}` : ''}`
+            return prospect.appointment_start_time
+                ? `${prospect.appointment_start_time}${prospect.appointment_end_time ? ` – ${prospect.appointment_end_time}` : ''}`
                 : (valid ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '');
         }
         if (item.type === 'event') {
@@ -84,7 +85,7 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
 
     const venueDisplay = (() => {
         if (item.type === 'coaching' && session) return session.venue || '';
-        if (item.type === 'appointment' && prospect) return prospect.appointmentLocation || '';
+        if (item.type === 'appointment' && prospect) return prospect.appointment_location || '';
         return evt?.venue || '';
     })();
 
@@ -152,7 +153,7 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
 
                     {session?.createdByName && (
                         <div className="flex items-start gap-3 text-sm text-gray-700">
-                            <User className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                            <UserIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                             <span>Organizer: <span className="font-medium">{session.createdByName}</span></span>
                         </div>
                     )}
@@ -513,13 +514,18 @@ const CardList: React.FC<CardListProps> = ({ items, isAdminOrCreator, onSelect, 
 
 /* ─── Main Page ──────────────────────────────────────────── */
 const MyCalendar: React.FC = () => {
-    const { currentUser, groups, users } = useAuth();
+    const { currentUser } = useAuth();
     const { addEvent, deleteEvent, updateEvent, getEventsForUser, refetchEvents, getCoachingSessionsForUser, refetchCoachingSessions, prospects } = useData();
     const { occupiedSlots } = useCalendarConflicts();
+
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
 
     useEffect(() => {
       refetchEvents();
       refetchCoachingSessions();
+      apiCall('/groups').then(res => setGroups(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+      apiCall('/users').then(res => setUsers(Array.isArray(res.data) ? res.data : [])).catch(() => {});
     }, []);
 
     const [viewMode, setViewMode] = useState<'calendar' | 'card'>('calendar');
@@ -649,13 +655,11 @@ const MyCalendar: React.FC = () => {
 
     const sortedItems = [...calItems].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Groups available to target for event creation
+    // Groups available to target for event creation — backend RLS already scopes the response
     let targetableGroups = groups;
-    if (currentUser.role === UserRole.TRAINER) {
-        targetableGroups = groups.filter(g => currentUser.managedGroupIds?.includes(g.id));
-    } else if (currentUser.role === UserRole.GROUP_LEADER) {
+    if (currentUser.role === UserRole.GROUP_LEADER) {
         targetableGroups = groups.filter(g => g.id === currentUser.group_id);
-    } else if (!isAdmin && currentUser.role !== UserRole.MASTER_TRAINER) {
+    } else if (!isAdmin && currentUser.role !== UserRole.MASTER_TRAINER && currentUser.role !== UserRole.TRAINER) {
         targetableGroups = [];
     }
 
@@ -995,7 +999,7 @@ const MyCalendar: React.FC = () => {
                                                     setFormData(prev => ({
                                                         ...prev,
                                                         allAgents: checked,
-                                                        groupIds: checked ? (currentUser.groupId ? [currentUser.groupId] : []) : [],
+                                                        groupIds: checked ? (currentUser.group_id ? [currentUser.group_id] : []) : [],
                                                         targetAgentIds: []
                                                     }));
                                                 }}
@@ -1010,7 +1014,7 @@ const MyCalendar: React.FC = () => {
                                                 </div>
                                                 <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
                                                     {users
-                                                        .filter(u => u.groupId === currentUser.groupId && (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) && u.id !== currentUser.id)
+                                                        .filter(u => u.group_id === currentUser.group_id && (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) && u.id !== currentUser.id)
                                                         .filter(u => u.name?.toLowerCase().includes(agentSearch.toLowerCase()))
                                                         .map(u => (
                                                             <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">
@@ -1082,7 +1086,7 @@ const MyCalendar: React.FC = () => {
                                                             />
                                                             <div className="flex flex-col min-w-0">
                                                                 <span className="text-sm text-gray-900 font-medium truncate">{u.name}</span>
-                                                                <span className="text-[10px] text-gray-400 truncate">{groups.find(g => g.id === u.groupId)?.name || ''}</span>
+                                                                <span className="text-[10px] text-gray-400 truncate">{groups.find(g => g.id === u.group_id)?.name || ''}</span>
                                                             </div>
                                                         </label>
                                                     ));

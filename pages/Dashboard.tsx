@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole, Prospect, ProspectStage, CoachingSession } from '../types';
+import { UserRole, Prospect, ProspectStage, CoachingSession, User } from '../types';
+import { apiCall } from '../services/apiClient';
 import {
    Calendar,
    Target,
@@ -35,8 +36,10 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-   const { currentUser, groups, users } = useAuth();
+   const { currentUser } = useAuth();
    const { prospects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats } = useData();
+
+   const [users, setUsers] = useState<User[]>([]);
 
    // Fetch stats, events and coaching sessions on mount (deferred — not loaded on app start)
    useEffect(() => {
@@ -44,6 +47,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       refetchGroupStats();
       refetchEvents();
       refetchCoachingSessions();
+      apiCall('/users').then(res => setUsers(Array.isArray(res.data) ? res.data : [])).catch(() => {});
    }, []);
 
    // --- MANAGEMENT DASHBOARD (Admin, Master Trainer & Trainer ONLY) ---
@@ -56,7 +60,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       const isAdmin = currentUser?.role === UserRole.ADMIN;
       const isMasterTrainer = currentUser?.role === UserRole.MASTER_TRAINER;
 
-      const totalGroups = groups.length;
+      const totalGroups = groupStats.length;
       const now = new Date();
 
       // --- Stats from API ---

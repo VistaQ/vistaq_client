@@ -2,49 +2,30 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { User, UserRole } from '../types';
+import { User, UserRole, Group } from '../types';
 import { Trophy, Medal, Award, Crown, Filter } from 'lucide-react';
 import { computeUserPoints } from '../services/points';
 import { apiCall } from '../services/apiClient';
 
 const Leaderboard: React.FC = () => {
-  const { currentUser, users, groups } = useAuth();
+  const { currentUser } = useAuth();
   const { prospects, coachingSessions, pointConfig, badgeTiers, refetchCoachingSessions } = useData();
 
-  // For roles where /users is restricted, we fetch all groups' members directly
-  const [fetchedUsers, setFetchedUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
 
   useEffect(() => {
     refetchCoachingSessions();
+    apiCall('/users').then(res => setUsers(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+    apiCall('/groups').then(res => setGroups(Array.isArray(res.data) ? res.data : [])).catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (!currentUser) return;
-    // Admin and Master Trainer already receive all users via AuthContext
-    if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MASTER_TRAINER) return;
-    if (groups.length === 0) return;
-
-    Promise.all(groups.map(g => apiCall(`/users/group/${g.id}`)))
-      .then(responses => {
-        const all: any[] = responses.flatMap(r => r.users || []);
-        const normalized: User[] = all.map(u => ({ ...u, id: u.uid || u.id }));
-        const unique = normalized.filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i);
-        setFetchedUsers(unique);
-      })
-      .catch(() => {});
-  }, [currentUser?.id, groups.length]);
 
   if (!currentUser) return null;
 
-  const isFullAccess = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MASTER_TRAINER;
-
   const eligibleRoles = [UserRole.AGENT, UserRole.GROUP_LEADER];
 
-  // System-wide pool — all roles see the same data
-  const allUsers: User[] = isFullAccess
-    ? users.filter(u => eligibleRoles.includes(u.role))
-    : fetchedUsers.filter(u => eligibleRoles.includes(u.role));
+  const allUsers: User[] = users.filter(u => eligibleRoles.includes(u.role));
 
   const sortedBadges = [...badgeTiers].sort((a, b) => a.threshold - b.threshold);
 
@@ -64,7 +45,7 @@ const Leaderboard: React.FC = () => {
   // Group filter — applied only to the display; global rank is preserved
   const filteredRanked = selectedGroupId === 'all'
     ? ranked
-    : ranked.filter(e => e.user.groupId === selectedGroupId);
+    : ranked.filter(e => e.user.group_id === selectedGroupId);
 
   const top3 = filteredRanked.slice(0, 3);
 

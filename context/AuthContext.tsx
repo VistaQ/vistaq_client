@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, UserRole, Group, Notification } from '../types';
+import { User, Notification } from '../types';
 import { apiCall, getTenantSlug } from '../services/apiClient';
 
 interface AuthContextType {
@@ -11,10 +11,6 @@ interface AuthContextType {
   logout: () => Promise<void>;
   changePassword: (newPassword: string) => Promise<void>;
   isAuthenticated: boolean;
-  getGroupMembers: (groupId: string) => User[];
-  groups: Group[];
-  getUserById: (id: string) => User | undefined;
-  users: User[];
   refreshCurrentUser: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<void>;
   addUser: (user: Partial<User>) => Promise<void>;
@@ -37,8 +33,6 @@ const normalizeUser = (raw: any): User => ({
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<Notification | null>(null);
 
@@ -79,35 +73,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading(false);
     }
   }, []);
-
-  // Fetch users + groups whenever the current user changes
-  useEffect(() => {
-    if (!currentUser) {
-      setUsers([]);
-      setGroups([]);
-      return;
-    }
-    fetchUsers();
-    fetchGroups();
-  }, [currentUser?.id]);
-
-  const fetchUsers = async () => {
-    if (!currentUser) return;
-    try {
-      const res = await apiCall('/users');
-      const list: any[] = Array.isArray(res.data) ? res.data : [];
-      setUsers(list.map(normalizeUser));
-    } catch (_e) {}
-  };
-
-  const fetchGroups = async () => {
-    if (!currentUser) return;
-    try {
-      const res = await apiCall('/groups');
-      const list = Array.isArray(res.data) ? res.data : [];
-      setGroups(list);
-    } catch (_e) {}
-  };
 
   const login = async (identifier: string, password?: string): Promise<boolean> => {
     if (!password) return false;
@@ -198,11 +163,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await refreshCurrentUser();
   };
 
-  const getGroupMembers = (groupId: string) =>
-    users.filter((u: User) => u.group_id === groupId && (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER));
-
-  const getUserById = (id: string) => users.find((u: User) => u.id === id);
-
   // --- ADMIN: USERS ---
   const addUser = async (userData: Partial<User>) => {
     await apiCall('/users', {
@@ -220,8 +180,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       `Account has been created for ${userData.name}.\n\nLogin ID: Email: ${userData.email}\nPassword: ${userData.password}`,
       'success'
     );
-
-    await fetchUsers();
   };
 
   const updateUser = async (id: string, updates: Partial<User>) => {
@@ -229,15 +187,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const payload = { name, email, role };
     await apiCall(`/users/${id}`, { method: 'PUT', data: payload });
     showNotification("User Updated", "User profile has been updated successfully.", "success");
-
-    await fetchUsers();
   };
 
   const deleteUser = async (id: string) => {
     await apiCall(`/users/${id}`, { method: 'DELETE' });
     showNotification("User Deleted", "The user has been removed from the system.", "info");
-
-    await fetchUsers();
   };
 
   // --- ADMIN: GROUPS ---
@@ -251,9 +205,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
     showNotification("Group Created", `Group "${name}" has been created.`, "success");
-
-    await fetchGroups();
-    await fetchUsers();
   };
 
   const updateGroup = async (groupId: string, name: string, leaderId: string | undefined, trainerIds: string[], memberIds: string[]) => {
@@ -267,23 +218,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
     showNotification("Group Updated", `Group configuration for "${name}" has been saved.`, "success");
-
-    await fetchGroups();
-    await fetchUsers();
   };
 
   const deleteGroup = async (groupId: string) => {
     await apiCall(`/groups/${groupId}`, { method: 'DELETE' });
     showNotification("Group Deleted", "The group has been disbanded.", "info");
-
-    await fetchGroups();
   };
 
   return (
     <AuthContext.Provider value={{
       currentUser, login, register, logout, changePassword, isAuthenticated: !!currentUser,
       refreshCurrentUser, updateProfile,
-      getGroupMembers, groups, getUserById, users,
       addUser, updateUser, deleteUser,
       addGroup, updateGroup, deleteGroup,
       resetPassword,

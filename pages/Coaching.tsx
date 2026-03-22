@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { UserRole } from '../types';
+import { UserRole, Group, User } from '../types';
+import { apiCall } from '../services/apiClient';
 import { MessageSquarePlus, CalendarDays, MapPin, Users, CheckCircle2, ChevronRight, Clock, XCircle, Info, AlignLeft, Edit2, LogIn } from 'lucide-react';
 import CreateCoachingModal from '../components/CreateCoachingModal';
 import { CoachingSession } from '../types';
@@ -37,10 +38,17 @@ const isSessionOngoing = (session: CoachingSession) => {
 };
 
 const Coaching: React.FC = () => {
-    const { currentUser, groups, users } = useAuth();
+    const { currentUser } = useAuth();
     const { getCoachingSessionsForUser, updateCoachingSession, joinCoachingSession, refetchCoachingSessions } = useData();
 
-    useEffect(() => { refetchCoachingSessions(); }, []);
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
+
+    useEffect(() => {
+        refetchCoachingSessions();
+        apiCall('/groups').then(res => setGroups(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+        apiCall('/users').then(res => setUsers(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+    }, []);
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -326,7 +334,7 @@ const Coaching: React.FC = () => {
                                             (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) &&
                                             (
                                                 (sel.targetAgentIds && sel.targetAgentIds.includes(u.id)) ||
-                                                (u.groupId && sel.targetGroupIds && sel.targetGroupIds.includes(u.groupId)) ||
+                                                (u.group_id && sel.targetGroupIds && sel.targetGroupIds.includes(u.group_id)) ||
                                                 (sel.targetAgentIds?.length === 0 && sel.targetGroupIds?.length === 0)
                                             )
                                         ).map(a => [a.id, a])
@@ -375,7 +383,7 @@ const Coaching: React.FC = () => {
                                                                         <div key={agent.id} className="flex items-center justify-between py-2 px-3 bg-emerald-50 border border-emerald-100 rounded-xl">
                                                                             <div>
                                                                                 <p className="text-sm font-semibold text-slate-900">{agent.name || agent.email}</p>
-                                                                                <p className="text-xs text-slate-500">{agent.groupId ? groups.find(g => g.id === agent.groupId)?.name || '' : 'No Group'}</p>
+                                                                                <p className="text-xs text-slate-500">{agent.group_id ? groups.find(g => g.id === agent.group_id)?.name || '' : 'No Group'}</p>
                                                                             </div>
                                                                             <div className="text-right">
                                                                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 mb-0.5">
@@ -404,7 +412,7 @@ const Coaching: React.FC = () => {
                                                                     <div key={agent.id} className={`flex items-center justify-between py-2 px-3 border rounded-xl ${selOver ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
                                                                         <div>
                                                                             <p className="text-sm font-semibold text-slate-900">{agent.name || agent.email}</p>
-                                                                            <p className="text-xs text-slate-500">{agent.groupId ? groups.find(g => g.id === agent.groupId)?.name || '' : 'No Group'}</p>
+                                                                            <p className="text-xs text-slate-500">{agent.group_id ? groups.find(g => g.id === agent.group_id)?.name || '' : 'No Group'}</p>
                                                                         </div>
                                                                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${selOver ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
                                                                             {selOver ? 'Did Not Attend' : 'Invited'}

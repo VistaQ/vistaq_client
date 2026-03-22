@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { User, UserRole, getRoleLabel } from '../types';
+import { User, UserRole, getRoleLabel, Group } from '../types';
+import { apiCall } from '../services/apiClient';
 import { 
   Users, 
   Search, 
@@ -18,9 +19,23 @@ import {
 } from 'lucide-react';
 
 const AdminUsers: React.FC = () => {
-  const { users, groups, addUser, updateUser, deleteUser } = useAuth();
+  const { addUser, updateUser, deleteUser } = useAuth();
+
+  const [users, setUsers] = useState<User[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
+
+  const fetchData = async () => {
+    const [usersRes, groupsRes] = await Promise.all([
+      apiCall('/users').catch(() => ({ data: [] })),
+      apiCall('/groups').catch(() => ({ data: [] })),
+    ]);
+    setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+    setGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
+  };
+
+  useEffect(() => { fetchData(); }, []);
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -57,25 +72,23 @@ const AdminUsers: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSaveUser = () => {
+  const handleSaveUser = async () => {
     if (!editingUser || !editingUser.name || !editingUser.email) return;
 
     if (editingUser.id) {
-      updateUser(editingUser.id, editingUser);
+      await updateUser(editingUser.id, editingUser);
     } else {
-      // Add New User with password
-      addUser({
-          ...editingUser,
-          password: tempPassword
-      });
+      await addUser({ ...editingUser, password: tempPassword });
     }
     setIsModalOpen(false);
     setEditingUser(null);
+    fetchData();
   };
 
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUser = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
-      deleteUser(id);
+      await deleteUser(id);
+      fetchData();
     }
   };
 

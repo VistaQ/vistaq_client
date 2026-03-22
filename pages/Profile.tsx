@@ -1,11 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { User } from '../types';
+import { User, Group } from '../types';
+import { apiCall } from '../services/apiClient';
 import { UserCircle, Mail, IdCard, Users, Lock, Save, AlertCircle, CheckCircle } from 'lucide-react';
 
 const Profile: React.FC = () => {
-  const { currentUser, groups, updateProfile, refreshCurrentUser, changePassword } = useAuth();
+  const { currentUser, updateProfile, refreshCurrentUser, changePassword } = useAuth();
+
+  const [groups, setGroups] = useState<Group[]>([]);
   
   const [formData, setFormData] = useState<Partial<User>>({});
   const [newPassword, setNewPassword] = useState('');
@@ -14,8 +17,8 @@ const Profile: React.FC = () => {
   const [status, setStatus] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
 
   useEffect(() => {
-      // Fetch fresh user data from API on load
       refreshCurrentUser();
+      apiCall('/groups').then(res => setGroups(Array.isArray(res.data) ? res.data : [])).catch(() => {});
   }, []);
 
   useEffect(() => {
