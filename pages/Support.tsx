@@ -90,7 +90,7 @@ const FAQItem: React.FC<FAQItemProps> = ({ question, answer, isOpen, onToggle })
     <div className="border border-gray-200 rounded-xl overflow-hidden transition-all duration-200">
         <button
             onClick={onToggle}
-            className="w-full flex items-center justify-between px-6 py-4 text-left bg-white hover:bg-slate-50 transition-colors"
+            className="w-full flex items-center justify-between px-6 py-4 text-left bg-white hover:bg-gray-50 transition-colors"
         >
             <span className="font-semibold text-gray-800 pr-4">{question}</span>
             {isOpen ? (
@@ -100,7 +100,7 @@ const FAQItem: React.FC<FAQItemProps> = ({ question, answer, isOpen, onToggle })
             )}
         </button>
         {isOpen && (
-            <div className="px-6 pb-5 pt-1 bg-slate-50 border-t border-gray-100">
+            <div className="px-6 pb-5 pt-1 bg-gray-50 border-t border-gray-100">
                 <p className="text-gray-600 leading-relaxed text-sm">{answer}</p>
             </div>
         )}
@@ -141,7 +141,7 @@ const Support: React.FC = () => {
     };
 
     const fieldClass =
-        'block w-full pl-10 pr-3 py-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900 text-sm';
+        'block w-full pl-10 pr-3 py-3 bg-white border border-gray-200 rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500 transition-colors text-gray-900 text-sm';
 
     return (
         <div className="max-w-4xl mx-auto space-y-10">
@@ -304,7 +304,7 @@ const Support: React.FC = () => {
                                         value={message}
                                         onChange={(e) => setMessage(e.target.value)}
                                         rows={5}
-                                        className="block w-full pl-10 pr-3 py-3 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900 text-sm resize-none"
+                                        className="block w-full pl-10 pr-3 py-3 bg-white border border-gray-200 rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500 transition-colors text-gray-900 text-sm resize-none"
                                         placeholder="Please describe your issue or question in as much detail as possible..."
                                     />
                                 </div>

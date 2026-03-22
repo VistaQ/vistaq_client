@@ -121,8 +121,8 @@ const Coaching: React.FC = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Coaching & Attendance</h1>
-                    <p className="text-slate-500 mt-1">
+                    <h1 className="text-2xl font-bold text-gray-900">Coaching & Attendance</h1>
+                    <p className="text-gray-500 mt-1">
                         {currentUser.role === UserRole.GROUP_LEADER
                             ? 'Schedule Peer Circle sessions and track attendance for your team.'
                             : isManagement
@@ -143,12 +143,12 @@ const Coaching: React.FC = () => {
             </div>
 
             {sessions.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm">
                     <div className="inline-flex items-center justify-center p-4 bg-indigo-50 text-indigo-500 rounded-full mb-4">
                         <MessageSquarePlus className="w-8 h-8" />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-900">No Coaching Sessions</h3>
-                    <p className="text-slate-500 max-w-sm mx-auto mt-2">
+                    <h3 className="text-lg font-bold text-gray-900">No Coaching Sessions</h3>
+                    <p className="text-gray-500 max-w-sm mx-auto mt-2">
                         {currentUser.role === UserRole.GROUP_LEADER
                             ? "No sessions yet. Click 'Create Session' to run a Peer Circle with your agents."
                             : isManagement
@@ -160,7 +160,7 @@ const Coaching: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* List of Sessions */}
                     <div className={`col-span-1 ${isManagement ? 'lg:col-span-1' : 'lg:col-span-3'} space-y-4`}>
-                        <h2 className="font-semibold text-slate-700 uppercase text-xs tracking-wider mb-2">Your Sessions</h2>
+                        <h2 className="font-semibold text-gray-700 uppercase text-xs tracking-wider mb-2">Your Sessions</h2>
 
                         {sessions.map(session => {
                             const isCancelled = session.status === 'cancelled';
@@ -172,7 +172,7 @@ const Coaching: React.FC = () => {
                             const myAttendance = session.attendance.find(a => a.agentId === currentUser.id);
                             const hasJoined = isParticipant && myAttendance?.status === 'joined';
 
-                            let cardClass = 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-sm';
+                            let cardClass = 'bg-white border-gray-200 hover:border-indigo-300 hover:shadow-sm';
                             if (isCancelled) {
                                 cardClass = 'bg-red-50 border-red-200 opacity-80';
                             } else if (isParticipant) {
@@ -204,7 +204,7 @@ const Coaching: React.FC = () => {
                                     onClick={() => setSelectedSessionId(session.id)}
                                 >
                                     <div className="flex justify-between items-start mb-2">
-                                        <h3 className={`font-bold ${isCancelled ? 'text-red-700 line-through' : 'text-slate-900'}`}>{session.title}</h3>
+                                        <h3 className={`font-bold ${isCancelled ? 'text-red-700 line-through' : 'text-gray-900'}`}>{session.title}</h3>
                                         <div className="flex items-center gap-1.5">
                                             <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg ${typeBadgeClass}`}>
                                                 {session.coachingType}
@@ -218,30 +218,30 @@ const Coaching: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2 mt-3 text-sm text-slate-600">
+                                    <div className="space-y-2 mt-3 text-sm text-gray-600">
                                         <div className="flex items-center gap-2">
-                                            <CalendarDays className="w-4 h-4 text-slate-400" />
+                                            <CalendarDays className="w-4 h-4 text-gray-400" />
                                             <span>{formatDate(session.date)} ({session.durationStart} - {session.durationEnd})</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <MapPin className="w-4 h-4 text-slate-400" />
+                                            <MapPin className="w-4 h-4 text-gray-400" />
                                             <span>{session.venue} {session.venue === 'Online' && session.link ? `- ${session.link}` : session.venue === 'Face to Face' && session.link ? `- ${session.link}` : ''}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Users className="w-4 h-4 text-slate-400" />
+                                            <Users className="w-4 h-4 text-gray-400" />
                                             <span>{session.coachingType} | By: {session.createdByName}</span>
                                         </div>
                                         {session.description && (
-                                            <div className="flex items-start gap-2 pt-1 border-t border-slate-100">
-                                                <AlignLeft className="w-4 h-4 text-slate-400 mt-1 flex-shrink-0" />
-                                                <p className="text-sm font-medium text-slate-700 italic">{session.description}</p>
+                                            <div className="flex items-start gap-2 pt-1 border-t border-gray-100">
+                                                <AlignLeft className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />
+                                                <p className="text-sm font-medium text-gray-700 italic">{session.description}</p>
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Management: Edit and Cancel buttons */}
                                     {isManagement && !isCancelled && canManageSession(session.createdBy) && (
-                                        <div className="mt-3 pt-3 border-t border-slate-100 flex justify-end gap-2">
+                                        <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end gap-2">
                                             {canEditSession(session) && (
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); setEditingSession(session); setIsCreateModalOpen(true); }}
@@ -268,7 +268,7 @@ const Coaching: React.FC = () => {
                                                 ? 'border-emerald-200'
                                                 : sessionOver
                                                     ? 'border-amber-200'
-                                                    : 'border-slate-100'
+                                                    : 'border-gray-100'
                                         }`}>
                                             {hasJoined ? (
                                                 <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
@@ -287,7 +287,7 @@ const Coaching: React.FC = () => {
                                                     <Info className="w-4 h-4" /> Did Not Attend
                                                 </span>
                                             ) : (
-                                                <span className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                                                <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400">
                                                     <Clock className="w-4 h-4" /> Join button available at {session.durationStart}
                                                 </span>
                                             )}
@@ -311,7 +311,7 @@ const Coaching: React.FC = () => {
                     {/* Attendance Log (For Management Only) */}
                     {isManagement && (
                         <div className="col-span-1 lg:col-span-2">
-                            <h2 className="font-semibold text-slate-700 uppercase text-xs tracking-wider mb-2">Attendance Log</h2>
+                            <h2 className="font-semibold text-gray-700 uppercase text-xs tracking-wider mb-2">Attendance Log</h2>
 
                             {selectedSessionId ? (() => {
                                 const sel = sessions.find(s => s.id === selectedSessionId);
@@ -319,8 +319,8 @@ const Coaching: React.FC = () => {
 
                                 if (!canManageSession(sel.createdBy)) {
                                     return (
-                                        <div className="bg-slate-50 rounded-2xl border border-slate-200 border-dashed p-10 text-center text-slate-500">
-                                            <Info className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                                        <div className="bg-gray-50 rounded-2xl border border-gray-200 border-dashed p-10 text-center text-gray-500">
+                                            <Info className="w-8 h-8 mx-auto mb-2 text-gray-300" />
                                             <p className="font-medium">Attendance managed by the session creator.</p>
                                             <p className="text-xs mt-1">Only admins and the trainer who created this session can view the attendance log.</p>
                                         </div>
@@ -350,19 +350,19 @@ const Coaching: React.FC = () => {
                                 const selOver = isSessionOver(sel);
 
                                 return (
-                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                                         {/* Panel Header */}
-                                        <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-                                            <h3 className="font-bold text-slate-900 text-lg">{sel.title}</h3>
-                                            <p className="text-sm text-slate-500 mt-0.5">{sel.coachingType} · {formatDate(sel.date)} · {sel.durationStart}–{sel.durationEnd}</p>
-                                            <p className="text-xs font-semibold text-slate-500 mt-2">
+                                        <div className="p-5 border-b border-gray-100 bg-gray-50/50">
+                                            <h3 className="font-bold text-gray-900 text-lg">{sel.title}</h3>
+                                            <p className="text-sm text-gray-500 mt-0.5">{sel.coachingType} · {formatDate(sel.date)} · {sel.durationStart}–{sel.durationEnd}</p>
+                                            <p className="text-xs font-semibold text-gray-500 mt-2">
                                                 {attendedAgents.length} of {invitedAgents.length} attended
                                             </p>
                                         </div>
 
                                         <div className="divide-y divide-slate-100">
                                             {invitedAgents.length === 0 ? (
-                                                <div className="p-10 text-center text-slate-500">
+                                                <div className="p-10 text-center text-gray-500">
                                                     No agents are assigned to this session.
                                                 </div>
                                             ) : (
@@ -374,7 +374,7 @@ const Coaching: React.FC = () => {
                                                             Attended ({attendedAgents.length})
                                                         </h4>
                                                         {attendedAgents.length === 0 ? (
-                                                            <p className="text-sm text-slate-400 italic">No agents have logged attendance yet.</p>
+                                                            <p className="text-sm text-gray-400 italic">No agents have logged attendance yet.</p>
                                                         ) : (
                                                             <div className="space-y-2">
                                                                 {attendedAgents.map(agent => {
@@ -382,14 +382,14 @@ const Coaching: React.FC = () => {
                                                                     return (
                                                                         <div key={agent.id} className="flex items-center justify-between py-2 px-3 bg-emerald-50 border border-emerald-100 rounded-xl">
                                                                             <div>
-                                                                                <p className="text-sm font-semibold text-slate-900">{agent.name || agent.email}</p>
-                                                                                <p className="text-xs text-slate-500">{agent.group_id ? groups.find(g => g.id === agent.group_id)?.name || '' : 'No Group'}</p>
+                                                                                <p className="text-sm font-semibold text-gray-900">{agent.name || agent.email}</p>
+                                                                                <p className="text-xs text-gray-500">{agent.group_id ? groups.find(g => g.id === agent.group_id)?.name || '' : 'No Group'}</p>
                                                                             </div>
                                                                             <div className="text-right">
                                                                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 mb-0.5">
                                                                                     <CheckCircle2 className="w-3 h-3 mr-1" /> Attended
                                                                                 </span>
-                                                                                <p className="text-xs text-slate-400">{rec?.joinedAt ? formatDateTime(rec.joinedAt) : '—'}</p>
+                                                                                <p className="text-xs text-gray-400">{rec?.joinedAt ? formatDateTime(rec.joinedAt) : '—'}</p>
                                                                             </div>
                                                                         </div>
                                                                     );
@@ -400,21 +400,21 @@ const Coaching: React.FC = () => {
 
                                                     {/* Did Not Attend Section */}
                                                     <div className="p-5">
-                                                        <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${selOver ? 'text-amber-600' : 'text-slate-400'}`}>
+                                                        <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${selOver ? 'text-amber-600' : 'text-gray-400'}`}>
                                                             <Info className="w-3.5 h-3.5" />
                                                             {selOver ? `Did Not Attend (${notAttendedAgents.length})` : `Not Yet Joined (${notAttendedAgents.length})`}
                                                         </h4>
                                                         {notAttendedAgents.length === 0 ? (
-                                                            <p className="text-sm text-slate-400 italic">All invited agents attended.</p>
+                                                            <p className="text-sm text-gray-400 italic">All invited agents attended.</p>
                                                         ) : (
                                                             <div className="space-y-2">
                                                                 {notAttendedAgents.map(agent => (
-                                                                    <div key={agent.id} className={`flex items-center justify-between py-2 px-3 border rounded-xl ${selOver ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
+                                                                    <div key={agent.id} className={`flex items-center justify-between py-2 px-3 border rounded-xl ${selOver ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
                                                                         <div>
-                                                                            <p className="text-sm font-semibold text-slate-900">{agent.name || agent.email}</p>
-                                                                            <p className="text-xs text-slate-500">{agent.group_id ? groups.find(g => g.id === agent.group_id)?.name || '' : 'No Group'}</p>
+                                                                            <p className="text-sm font-semibold text-gray-900">{agent.name || agent.email}</p>
+                                                                            <p className="text-xs text-gray-500">{agent.group_id ? groups.find(g => g.id === agent.group_id)?.name || '' : 'No Group'}</p>
                                                                         </div>
-                                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${selOver ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${selOver ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-gray-500'}`}>
                                                                             {selOver ? 'Did Not Attend' : 'Invited'}
                                                                         </span>
                                                                     </div>
@@ -428,8 +428,8 @@ const Coaching: React.FC = () => {
                                     </div>
                                 );
                             })() : (
-                                <div className="bg-slate-50 rounded-2xl border border-slate-200 border-dashed p-12 text-center text-slate-500 flex flex-col items-center justify-center">
-                                    <ChevronRight className="w-8 h-8 text-slate-300 mb-2" />
+                                <div className="bg-gray-50 rounded-2xl border border-gray-200 border-dashed p-12 text-center text-gray-500 flex flex-col items-center justify-center">
+                                    <ChevronRight className="w-8 h-8 text-gray-300 mb-2" />
                                     <p>Select a session from the list to view the attendance log.</p>
                                 </div>
                             )}

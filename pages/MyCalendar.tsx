@@ -10,9 +10,9 @@ import {
 } from 'lucide-react';
 import { useCalendarConflicts, checkConflict } from '../hooks/useCalendarConflicts';
 
-/* ─── Unified Calendar Item ─────────────────────────────────── */
-type CalItemType = 'event' | 'coaching' | 'appointment';
+import { ITEM_TYPE_STYLES, CANCELLED_ITEM_STYLE, CalItemType } from '../constants/tokens';
 
+/* ─── Unified Calendar Item ─────────────────────────────────── */
 interface CalItem {
     id: string;
     title: string;
@@ -25,16 +25,11 @@ interface CalItem {
     raw?: Event | CoachingSession | Prospect;
 }
 
-const TYPE_CONFIG: Record<CalItemType, { bg: string; text: string; dot: string; label: string }> = {
-    event: { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500', label: 'Event' },
-    coaching: { bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500', label: 'Coaching' },
-    appointment: { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500', label: 'Appointment' },
-};
+const TYPE_CONFIG = ITEM_TYPE_STYLES;
 
 /** Returns override styles for cancelled items regardless of type */
-const cancelledStyle = { bg: 'bg-red-100', text: 'text-red-600', dot: 'bg-red-400', label: 'Cancelled' };
 const getItemStyle = (item: CalItem) =>
-    item.cancelled ? cancelledStyle : TYPE_CONFIG[item.type];
+    item.cancelled ? CANCELLED_ITEM_STYLE : TYPE_CONFIG[item.type];
 
 const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -90,7 +85,7 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
     })();
 
     return (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={item.title}>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className={`px-6 py-5 text-white ${item.type === 'event' ? 'bg-gradient-to-r from-blue-600 to-indigo-600' : item.type === 'coaching' ? 'bg-gradient-to-r from-green-600 to-emerald-600' : 'bg-gradient-to-r from-purple-600 to-violet-600'}`}>
                     <div className="flex justify-between items-start">
@@ -108,7 +103,7 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
                                 <h2 className="text-lg font-bold leading-tight">{item.title}</h2>
                             </div>
                         </div>
-                        <button onClick={onClose} className="text-white/70 hover:text-white transition-colors mt-1">
+                        <button onClick={onClose} aria-label="Close" className="text-white/70 hover:text-white transition-colors mt-1 p-1 rounded-full hover:bg-white/20">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -224,9 +219,9 @@ interface DayPopupProps {
 }
 
 const DayPopup: React.FC<DayPopupProps> = ({ date, items, onClose, onSelect }) => (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label="Items for this day">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50">
+            <div className="px-5 py-4 border-b flex justify-between items-center bg-gray-50">
                 <div>
                     <div className="text-xs font-semibold text-blue-600 uppercase tracking-wider">
                         {date.toLocaleString('default', { weekday: 'long' })}
@@ -235,7 +230,7 @@ const DayPopup: React.FC<DayPopupProps> = ({ date, items, onClose, onSelect }) =
                         {date.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })}
                     </div>
                 </div>
-                <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X className="w-5 h-5" /></button>
+                <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 transition-colors"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-2 max-h-80 overflow-y-auto">
                 {items.length === 0 ? (
@@ -343,12 +338,12 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({ items, isAdmin, includeArch
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
-                <button onClick={prevMonth} disabled={!canGoPrev}
+                <button onClick={prevMonth} disabled={!canGoPrev} aria-label="Previous month"
                     className={`p-2 rounded-lg transition-colors ${canGoPrev ? 'hover:bg-gray-200 text-gray-700' : 'text-gray-300 cursor-not-allowed'}`}>
                     <ChevronLeft className="w-5 h-5" />
                 </button>
                 <h3 className="text-base font-bold text-gray-900">{MONTHS[viewMonth]} {viewYear}</h3>
-                <button onClick={nextMonth} disabled={!canGoNext}
+                <button onClick={nextMonth} disabled={!canGoNext} aria-label="Next month"
                     className={`p-2 rounded-lg transition-colors ${canGoNext ? 'hover:bg-gray-200 text-gray-700' : 'text-gray-300 cursor-not-allowed'}`}>
                     <ChevronRight className="w-5 h-5" />
                 </button>
@@ -371,7 +366,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({ items, isAdmin, includeArch
                         <button key={date.toISOString()}
                             onClick={() => dayItems.length > 0 ? onDayClick(date, dayItems) : undefined}
                             className={`min-h-[6rem] flex flex-col p-1.5 border-b border-r border-gray-100 transition-colors w-full text-left
-                                ${dayItems.length > 0 ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default'}
+                                ${dayItems.length > 0 ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'}
                                 ${isLast ? 'border-r-0' : ''}
                             `}
                         >
@@ -778,7 +773,7 @@ const MyCalendar: React.FC = () => {
         return isAdmin || evt.created_by === currentUser.id;
     };
 
-    const inputClass = 'block w-full bg-gray-50 border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2.5 text-sm';
+    const inputClass = 'block w-full bg-gray-50 border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 border p-2.5 text-sm';
     const labelClass = 'block text-xs font-semibold text-gray-500 uppercase mb-1';
 
     return (
@@ -871,16 +866,16 @@ const MyCalendar: React.FC = () => {
 
             {/* Create / Edit Event Modal */}
             {isEventModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label={editingEventId ? 'Edit Event' : 'Create New Event'}>
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
                         {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+                        <div className="flex items-center justify-between p-6 bg-gradient-to-r from-blue-600 to-indigo-600">
                             <div>
-                                <h2 className="text-xl font-bold text-gray-900">{editingEventId ? 'Edit Event' : 'Create New Event'}</h2>
-                                <p className="text-sm text-gray-500 mt-1">{editingEventId ? 'Update the details of this event.' : 'Schedule a new event for your team.'}</p>
+                                <h2 className="text-xl font-bold text-white">{editingEventId ? 'Edit Event' : 'Create New Event'}</h2>
+                                <p className="text-sm text-white/70 mt-1">{editingEventId ? 'Update the details of this event.' : 'Schedule a new event for your team.'}</p>
                             </div>
-                            <button onClick={() => setIsEventModalOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+                            <button onClick={() => setIsEventModalOpen(false)} aria-label="Close" className="p-2 text-white/70 hover:text-white rounded-lg hover:bg-white/20 transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -992,7 +987,7 @@ const MyCalendar: React.FC = () => {
                                 {currentUser.role === UserRole.GROUP_LEADER ? (
                                     <div className="space-y-3">
                                         <label className="flex items-center gap-2 cursor-pointer">
-                                            <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500"
                                                 checked={formData.allAgents}
                                                 onChange={e => {
                                                     const checked = e.target.checked;
@@ -1018,7 +1013,7 @@ const MyCalendar: React.FC = () => {
                                                         .filter(u => u.name?.toLowerCase().includes(agentSearch.toLowerCase()))
                                                         .map(u => (
                                                             <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">
-                                                                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500"
                                                                     checked={formData.targetAgentIds.includes(u.id)}
                                                                     onChange={() => setFormData(prev => ({
                                                                         ...prev,
@@ -1039,7 +1034,7 @@ const MyCalendar: React.FC = () => {
                                         <div className="space-y-2">
                                             <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Groups</p>
                                             <label className="flex items-center gap-2 cursor-pointer">
-                                                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500"
                                                     checked={formData.allGroups}
                                                     onChange={e => {
                                                         const checked = e.target.checked;
@@ -1052,7 +1047,7 @@ const MyCalendar: React.FC = () => {
                                                 <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
                                                     {targetableGroups.length > 0 ? targetableGroups.map(g => (
                                                         <label key={g.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">
-                                                            <input type="checkbox" checked={formData.groupIds.includes(g.id)} onChange={() => toggleGroup(g.id)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                                            <input type="checkbox" checked={formData.groupIds.includes(g.id)} onChange={() => toggleGroup(g.id)} className="rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500" />
                                                             <span className="text-sm text-gray-800 font-medium">{g.name}</span>
                                                         </label>
                                                     )) : <p className="text-xs text-gray-400 col-span-2">No groups available.</p>}
@@ -1077,7 +1072,7 @@ const MyCalendar: React.FC = () => {
                                                     if (pool.length === 0) return <p className="text-xs text-gray-400 col-span-2">No agents found.</p>;
                                                     return pool.map(u => (
                                                         <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">
-                                                            <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500"
                                                                 checked={formData.targetAgentIds.includes(u.id)}
                                                                 onChange={() => setFormData(prev => ({
                                                                     ...prev,

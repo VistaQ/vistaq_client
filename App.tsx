@@ -32,7 +32,7 @@ const AddToHomeScreen = React.lazy(() => import('./pages/AddToHomeScreen'));
 
 const PageSpinner: React.FC = () => (
   <div className="flex h-full min-h-[60vh] items-center justify-center">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
   </div>
 );
 const AuthenticatedApp: React.FC = () => {

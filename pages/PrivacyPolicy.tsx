@@ -26,7 +26,7 @@ const PrivacyPolicy: React.FC<Props> = ({ onBack }) => {
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
         {/* Header */}
-        <div className="bg-[#0F172A] p-6 flex items-center text-white">
+        <div className="bg-sidebar-primary p-6 flex items-center text-white">
           {onBack && (
             <button
               onClick={onBack}

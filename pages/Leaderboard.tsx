@@ -87,7 +87,7 @@ const Leaderboard: React.FC = () => {
             <select
               value={selectedGroupId}
               onChange={e => setSelectedGroupId(e.target.value)}
-              className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               <option value="all">All Groups</option>
               {groups.map(g => (
@@ -110,7 +110,7 @@ const Leaderboard: React.FC = () => {
         <>
           {/* Podium — top 3 */}
           {top3.length > 0 && (
-            <div className="bg-gradient-to-br from-[#0F172A] to-[#1E293B] rounded-2xl p-8 shadow-xl">
+            <div className="bg-gradient-to-br from-sidebar-primary to-sidebar-border rounded-2xl p-8 shadow-xl">
               <h2 className="text-center text-white font-bold text-lg mb-8 tracking-wide uppercase opacity-70">Top Performers</h2>
               <div className="flex items-end justify-center gap-4 md:gap-8">
                 {(top3.length === 3 ? podiumOrder : top3).map((entry, podiumIdx) => {

@@ -38,7 +38,7 @@ const EventDetailPopup: React.FC<EventDetailPopupProps> = ({ event, onClose, onE
     const timeDisplay = startTimeStr;
 
     return (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4" onClick={onClose}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={event.eventTitle}>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
@@ -63,7 +63,7 @@ const EventDetailPopup: React.FC<EventDetailPopupProps> = ({ event, onClose, onE
                                 )}
                             </div>
                         </div>
-                        <button onClick={onClose} className="text-white/70 hover:text-white transition-colors mt-1">
+                        <button onClick={onClose} aria-label="Close event details" className="text-white/70 hover:text-white transition-colors mt-1">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -182,9 +182,9 @@ interface DayPopupProps {
 }
 
 const DayPopup: React.FC<DayPopupProps> = ({ date, events, onClose, onSelectEvent }) => (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label="Events for this day">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-4 border-b flex justify-between items-center bg-slate-50">
+            <div className="px-5 py-4 border-b flex justify-between items-center bg-gray-50">
                 <div>
                     <div className="text-xs font-semibold text-blue-600 uppercase tracking-wider">
                         {date.toLocaleString('default', { weekday: 'long' })}
@@ -193,7 +193,7 @@ const DayPopup: React.FC<DayPopupProps> = ({ date, events, onClose, onSelectEven
                         {date.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })}
                     </div>
                 </div>
-                <button onClick={onClose} className="text-gray-400 hover:text-gray-700">
+                <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 transition-colors">
                     <X className="w-5 h-5" />
                 </button>
             </div>
@@ -314,6 +314,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
                 <button
                     onClick={prevMonth}
                     disabled={!canGoPrev}
+                    aria-label="Previous month"
                     className={`p-2 rounded-lg transition-colors ${canGoPrev ? 'hover:bg-gray-200 text-gray-700' : 'text-gray-300 cursor-not-allowed'}`}
                 >
                     <ChevronLeft className="w-5 h-5" />
@@ -324,6 +325,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
                 <button
                     onClick={nextMonth}
                     disabled={!canGoNext}
+                    aria-label="Next month"
                     className={`p-2 rounded-lg transition-colors ${canGoNext ? 'hover:bg-gray-200 text-gray-700' : 'text-gray-300 cursor-not-allowed'}`}
                 >
                     <ChevronRight className="w-5 h-5" />
@@ -587,7 +589,7 @@ const Events: React.FC = () => {
 
     const closeDayPopup = () => { setSelectedDayDate(null); setSelectedDayEvents([]); };
 
-    const inputClass = 'block w-full bg-gray-50 border-gray-300 text-gray-900 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2.5 text-sm';
+    const inputClass = 'block w-full bg-gray-50 border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 border p-2.5 text-sm';
     const labelClass = 'block text-xs font-semibold text-gray-500 uppercase mb-1';
 
     return (
@@ -787,16 +789,16 @@ const Events: React.FC = () => {
 
             {/* ── CREATE / EDIT MODAL ── */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label={editingEventId ? 'Edit Event' : 'Create New Event'}>
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
                         {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+                        <div className="flex items-center justify-between p-6 bg-gradient-to-r from-blue-600 to-indigo-600">
                             <div>
-                                <h2 className="text-xl font-bold text-gray-900">{editingEventId ? 'Edit Event' : 'Create New Event'}</h2>
-                                <p className="text-sm text-gray-500 mt-1">{editingEventId ? 'Update the details of this event.' : 'Schedule a new event for your team.'}</p>
+                                <h2 className="text-xl font-bold text-white">{editingEventId ? 'Edit Event' : 'Create New Event'}</h2>
+                                <p className="text-sm text-white/70 mt-1">{editingEventId ? 'Update the details of this event.' : 'Schedule a new event for your team.'}</p>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+                            <button onClick={() => setIsModalOpen(false)} aria-label="Close" className="p-2 text-white/70 hover:text-white rounded-lg hover:bg-white/20 transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -915,7 +917,7 @@ const Events: React.FC = () => {
                                     /* Group Leader: agents in their group */
                                     <div className="space-y-3">
                                         <label className="flex items-center gap-2 cursor-pointer">
-                                            <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500"
                                                 checked={formData.allAgents}
                                                 onChange={e => {
                                                     const checked = e.target.checked;
@@ -941,7 +943,7 @@ const Events: React.FC = () => {
                                                         .filter(u => u.name?.toLowerCase().includes(agentSearch.toLowerCase()))
                                                         .map(u => (
                                                             <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">
-                                                                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500"
                                                                     checked={formData.targetAgentIds.includes(u.id)}
                                                                     onChange={() => setFormData(prev => ({
                                                                         ...prev,
@@ -963,7 +965,7 @@ const Events: React.FC = () => {
                                         <div className="space-y-2">
                                             <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Groups</p>
                                             <label className="flex items-center gap-2 cursor-pointer">
-                                                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500"
                                                     checked={formData.allGroups}
                                                     onChange={e => {
                                                         const checked = e.target.checked;
@@ -976,7 +978,7 @@ const Events: React.FC = () => {
                                                 <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
                                                     {targetableGroups.length > 0 ? targetableGroups.map(g => (
                                                         <label key={g.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">
-                                                            <input type="checkbox" checked={formData.groupIds.includes(g.id)} onChange={() => toggleGroup(g.id)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                                            <input type="checkbox" checked={formData.groupIds.includes(g.id)} onChange={() => toggleGroup(g.id)} className="rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500" />
                                                             <span className="text-sm text-gray-800 font-medium">{g.name}</span>
                                                         </label>
                                                     )) : <p className="text-xs text-gray-400 col-span-2">No groups available.</p>}
@@ -1002,7 +1004,7 @@ const Events: React.FC = () => {
                                                     if (pool.length === 0) return <p className="text-xs text-gray-400 col-span-2">No agents found.</p>;
                                                     return pool.map(u => (
                                                         <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">
-                                                            <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                            <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500"
                                                                 checked={formData.targetAgentIds.includes(u.id)}
                                                                 onChange={() => setFormData(prev => ({
                                                                     ...prev,

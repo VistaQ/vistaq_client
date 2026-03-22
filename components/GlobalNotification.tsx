@@ -9,7 +9,7 @@ const GlobalNotification: React.FC = () => {
   if (!notification) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" role="alertdialog" aria-modal="true" aria-live="assertive">
        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 animate-in zoom-in-95 duration-200">
           <div className={`h-2 w-full ${
               notification.type === 'success' ? 'bg-green-500' : 

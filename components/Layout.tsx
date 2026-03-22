@@ -5,7 +5,6 @@ import { UserRole } from '../types';
 import {
   LayoutDashboard,
   Users,
-  BarChart,
   LogOut,
   Menu,
   X,
@@ -13,12 +12,11 @@ import {
   Briefcase,
   GraduationCap,
   Award,
-  Crown,
+  Star,
   DollarSign,
   Settings,
   Gift,
   Layers,
-  Upload,
   CalendarDays,
   UserCircle,
   TrendingUp,
@@ -52,9 +50,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
   const NavItem = ({ id, label, icon: Icon, badge }: { id: string; label: string; icon: any; badge?: number }) => (
     <button
       onClick={() => { onNavigate(id); setIsMobileMenuOpen(false); }}
+      aria-current={activePage === id ? 'page' : undefined}
       className={`relative flex items-center w-full px-6 py-3.5 text-sm font-medium transition-all duration-200 group ${activePage === id
         ? 'text-white bg-white/10'
-        : 'text-slate-400 hover:text-white hover:bg-white/5'
+        : 'text-gray-400 hover:text-white hover:bg-white/5'
         }`}
     >
       {activePage === id && (
@@ -87,8 +86,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar - Desktop */}
-      <aside className="hidden md:flex flex-col w-72 bg-[#0F172A] border-r border-gray-800 shadow-xl z-20">
-        <div className="flex flex-col justify-center h-24 px-8 border-b border-gray-800/50 bg-[#0F172A]">
+      <aside className="hidden md:flex flex-col w-72 bg-sidebar-primary border-r border-gray-800 shadow-xl z-20">
+        <div className="flex flex-col justify-center h-24 px-8 border-b border-gray-800/50 bg-sidebar-primary">
           {/* Top Branding Area */}
           <div className="flex items-center">
             <img src="/vistaq-logo.png" alt="VistaQ" className="h-12 w-auto" />
@@ -103,22 +102,22 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
           )}
 
           <NavItem id="events" label="Calendar" icon={CalendarDays} />
-          <NavItem id="coaching" label="Coaching" icon={Users} />
+          <NavItem id="coaching" label="Coaching" icon={GraduationCap} />
           <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
 
           {/* Personal Views for Agent and Group Leader */}
           {(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER) && (
             <>
-              <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Personal</div>
-              <NavItem id="sales" label="My Sales" icon={Award} />
-              <NavItem id="points" label="My Points" icon={Award} />
+              <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Personal</div>
+              <NavItem id="sales" label="My Sales" icon={DollarSign} />
+              <NavItem id="points" label="My Points" icon={Star} />
             </>
           )}
 
           {/* Management Views for Admin, Master Trainer, Trainer & Leaders */}
           {isManagement && (
             <>
-              <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Performance</div>
+              <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Performance</div>
               <NavItem id="group" label="Group Progress" icon={TrendingUp} />
             </>
           )}
@@ -126,22 +125,20 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
           {/* ADMIN MANAGEMENT ONLY */}
           {isAdmin && (
             <>
-              <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">System</div>
+              <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">System</div>
               <NavItem id="users" label="User Management" icon={Settings} />
               <NavItem id="admin-groups" label="Group Management" icon={Layers} />
               <NavItem id="admin-rewards" label="Rewards Config" icon={Gift} />
             </>
           )}
 
-          <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Account</div>
-
           {/* Support & Tutorials — always visible */}
-          <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Help</div>
+          <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Help</div>
           <NavItem id="tutorials" label="Tutorials" icon={BookOpen} />
           <NavItem id="support" label="Support" icon={HelpCircle} />
         </nav>
 
-        <div className="p-4 border-t border-gray-800/50 bg-[#0B1120]">
+        <div className="p-4 border-t border-gray-800/50 bg-sidebar-secondary">
           {/* User Profile Card */}
           <div className="flex items-center gap-3 p-3 mb-3 rounded-lg bg-slate-800/50 border border-slate-700/50 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => onNavigate('profile')}>
             <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-600 text-white font-bold shadow-inner flex-shrink-0">
@@ -182,11 +179,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
 
       {/* Mobile Header */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="md:hidden flex items-center justify-between h-16 px-4 bg-[#0F172A] border-b border-gray-800 shadow-md z-20 text-white">
+        <header className="md:hidden flex items-center justify-between h-16 px-4 bg-sidebar-primary border-b border-gray-800 shadow-md z-20 text-white">
           <div className="flex items-center">
             <img src="/vistaq-logo.png" alt="VistaQ" className="h-8 w-auto" />
           </div>
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-300 hover:text-white">
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'} className="p-2 text-gray-300 hover:text-white">
             {isMobileMenuOpen ? <X /> : <Menu />}
           </button>
         </header>
@@ -194,7 +191,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
-            <div className="fixed inset-y-0 left-0 w-72 bg-[#0F172A] shadow-2xl border-r border-gray-800" onClick={e => e.stopPropagation()}>
+            <div className="fixed inset-y-0 left-0 w-72 bg-sidebar-primary shadow-2xl border-r border-gray-800" onClick={e => e.stopPropagation()}>
               <div className="h-20 flex items-center px-6 border-b border-gray-800/50">
                 <img src="/vistaq-logo.png" alt="VistaQ" className="h-10 w-auto" />
               </div>
@@ -206,22 +203,22 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                 )}
 
                 <NavItem id="events" label="My Calendar" icon={CalendarDays} />
-                <NavItem id="coaching" label="Coaching" icon={Users} />
+                <NavItem id="coaching" label="Coaching" icon={GraduationCap} />
                 <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
 
                 {/* Personal Views for Agent and Group Leader */}
                 {(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER) && (
                   <>
-                    <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Personal</div>
-                    <NavItem id="sales" label="My Sales" icon={Award} />
-                    <NavItem id="points" label="My Points" icon={Award} />
+                    <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Personal</div>
+                    <NavItem id="sales" label="My Sales" icon={DollarSign} />
+                    <NavItem id="points" label="My Points" icon={Star} />
                   </>
                 )}
 
                 {/* Management */}
                 {isManagement && (
                   <>
-                    <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Performance</div>
+                    <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Performance</div>
                     <NavItem id="group" label="Group Progress" icon={TrendingUp} />
                   </>
                 )}
@@ -229,23 +226,21 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                 {/* Admin */}
                 {isAdmin && (
                   <>
-                    <div className="my-2 border-t border-gray-800 mx-6"></div>
+                    <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">System</div>
                     <NavItem id="users" label="User Management" icon={Settings} />
                     <NavItem id="admin-groups" label="Group Management" icon={Layers} />
                     <NavItem id="admin-rewards" label="Rewards Config" icon={Gift} />
                   </>
                 )}
 
-                <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Account</div>
-
                 {/* Support & Tutorials */}
-                <div className="px-6 py-2 mt-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Help</div>
+                <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Help</div>
                 <NavItem id="tutorials" label="Tutorials" icon={BookOpen} />
                 <NavItem id="support" label="Support" icon={HelpCircle} />
               </nav>
 
               {/* Mobile Footer */}
-              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800 bg-[#0B1120] space-y-2">
+              <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800 bg-sidebar-secondary space-y-2">
                 <button
                   onClick={() => { onNavigate('profile'); setIsMobileMenuOpen(false); }}
                   className="flex items-center text-sm text-slate-300 font-medium w-full p-2 hover:bg-slate-800 rounded transition-colors"
@@ -270,7 +265,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
         )}
 
         {/* Main Content */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 relative bg-slate-50">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 relative bg-gray-50">
           {children}
         </main>
       </div>
