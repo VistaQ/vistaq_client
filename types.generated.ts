@@ -2572,15 +2572,35 @@ export interface components {
             /** @example Alpha Team */
             group_name: string;
             /**
+             * @description Total prospects created for the group year-to-date.
+             * @example 45
+             */
+            ytd_prospects: number;
+            /**
+             * @description Prospects whose appointment status is `scheduled` or `rescheduled` for the group year-to-date.
+             * @example 30
+             */
+            ytd_appointments_set: number;
+            /**
+             * @description Prospects whose appointment status is `done` for the group year-to-date.
+             * @example 20
+             */
+            ytd_sales_meetings: number;
+            /**
              * @description Total number of successful sales (NOC) for the group year-to-date.
-             * @example 25
+             * @example 12
              */
             ytd_sales_noc: number;
             /**
              * @description Total sum of products sold amounts (ACE) for the group year-to-date.
-             * @example 380000
+             * @example 180000
              */
             ytd_sales_ace: number;
+            /**
+             * @description Current total count of agents belonging to the group.
+             * @example 8
+             */
+            ytd_agents_count: number;
         };
         GroupDetailStatsObject: {
             /**
@@ -2592,6 +2612,8 @@ export interface components {
             group_name: string;
             ytd: components["schemas"]["DashboardStatsPeriod"];
             mtd: components["schemas"]["GroupDetailStatsMtdPeriod"];
+            /** @description List of individual agent statistics for the group. */
+            agents: components["schemas"]["AgentStats"][];
         };
         /** @description Aggregated statistics for the month-to-date period scoped to a specific group. Excludes `agents_count` — agent count is a current point-in-time figure and is only present in the `ytd` object. */
         GroupDetailStatsMtdPeriod: {
@@ -2620,6 +2642,66 @@ export interface components {
              * @example 30000
              */
             sales_ace: number;
+        };
+        /** @description YTD and MTD statistics for an individual agent within a group. */
+        AgentStats: {
+            /**
+             * Format: uuid
+             * @example a1b2c3d4-e5f6-7890-abcd-ef1234567890
+             */
+            agent_id: string;
+            /** @example John Doe */
+            agent_name: string;
+            /**
+             * @description Total prospects created by the agent year-to-date.
+             * @example 15
+             */
+            ytd_prospects: number;
+            /**
+             * @description Prospects whose appointment status is `scheduled` or `rescheduled` for the agent year-to-date.
+             * @example 10
+             */
+            ytd_appointments_set: number;
+            /**
+             * @description Prospects whose appointment status is `done` for the agent year-to-date.
+             * @example 7
+             */
+            ytd_sales_meetings: number;
+            /**
+             * @description Prospects with a successful sales outcome for the agent year-to-date.
+             * @example 4
+             */
+            ytd_sales_noc: number;
+            /**
+             * @description Total sum of products sold amounts for the agent year-to-date.
+             * @example 60000
+             */
+            ytd_sales_ace: number;
+            /**
+             * @description Total prospects created by the agent month-to-date.
+             * @example 2
+             */
+            mtd_prospects: number;
+            /**
+             * @description Prospects whose appointment status is `scheduled` or `rescheduled` for the agent month-to-date.
+             * @example 1
+             */
+            mtd_appointments_set: number;
+            /**
+             * @description Prospects whose appointment status is `done` for the agent month-to-date.
+             * @example 1
+             */
+            mtd_sales_meetings: number;
+            /**
+             * @description Prospects with a successful sales outcome for the agent month-to-date.
+             * @example 1
+             */
+            mtd_sales_noc: number;
+            /**
+             * @description Total sum of products sold amounts for the agent month-to-date.
+             * @example 10000
+             */
+            mtd_sales_ace: number;
         };
         ProspectObject: {
             /**

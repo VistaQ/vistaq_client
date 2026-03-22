@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
-import { User, UserRole, Prospect } from "../types";
+import { UserRole, GroupDetailStats } from "../types";
 import { apiCall } from "../services/apiClient";
 import {
   Users,
@@ -37,25 +37,18 @@ import {
 const COLORS = ["#23366F", "#3D6DB5", "#00C9B1", "#648FCC", "#10B981"];
 
 const Group: React.FC = () => {
-  const { currentUser, getGroupMembers, groups, getUserById, users } =
-    useAuth();
-  const { prospects } = useData();
+  const { currentUser } = useAuth();
+  const { groupStats, refetchGroupStats } = useData();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "sales">("overview");
   const [searchTerm, setSearchTerm] = useState("");
 
   // Trainer/Admin Logic: Allow selecting a group
-  const [trainerSelectedGroupId, setTrainerSelectedGroupId] = useState<
-    string | null
-  >(null);
+  const [trainerSelectedGroupId, setTrainerSelectedGroupId] = useState<string | null>(null);
 
-  // Store group prospects fetched from API (for group leaders)
-  const [groupProspectsFromAPI, setGroupProspectsFromAPI] = useState<
-    Prospect[]
-  >([]);
-
-  // Store group users fetched from API (for group leaders)
-  const [groupUsersFromAPI, setGroupUsersFromAPI] = useState<User[]>([]);
+  // Group detail stats fetched from API
+  const [groupDetailStats, setGroupDetailStats] = useState<GroupDetailStats | null>(null);
+  const [isLoadingGroupDetail, setIsLoadingGroupDetail] = useState(false);
 
   // User Roles Logic
   const isTrainer = currentUser?.role === UserRole.TRAINER;
@@ -68,37 +61,35 @@ const Group: React.FC = () => {
     ? trainerSelectedGroupId
     : currentUser?.group_id;
 
-  // Fetch group prospects and users from API for group leaders
-  // IMPORTANT: This must be before any early returns to comply with Rules of Hooks
+  // Fetch group detail stats for the selected/current group
+  // IMPORTANT: Must be before any early returns to comply with Rules of Hooks
   useEffect(() => {
-    const fetchGroupData = async () => {
-      if (currentUser?.role === UserRole.GROUP_LEADER && currentGroupId) {
-        try {
-          const prospectsResponse = await apiCall(
-            `/prospects/group/${currentGroupId}`,
-          );
-          const raw: any[] = prospectsResponse.data || [];
-          setGroupProspectsFromAPI(raw);
-
-          const usersResponse = await apiCall(`/users/group/${currentGroupId}`);
-          const groupUsers = usersResponse.data || [];
-          setGroupUsersFromAPI(groupUsers);
-        } catch (error) {
-          console.error("Failed to fetch group data:", error);
-          setGroupProspectsFromAPI([]);
-          setGroupUsersFromAPI([]);
-        }
+    const fetchGroupDetailStats = async () => {
+      if (!currentGroupId) return;
+      setIsLoadingGroupDetail(true);
+      try {
+        const res = await apiCall(`/groups/${currentGroupId}/stats`);
+        setGroupDetailStats(res.data ?? null);
+      } catch (error) {
+        console.error("Failed to fetch group detail stats:", error);
+        setGroupDetailStats(null);
+      } finally {
+        setIsLoadingGroupDetail(false);
       }
     };
-    fetchGroupData();
-  }, [currentGroupId, currentUser?.role]);
+    fetchGroupDetailStats();
+  }, [currentGroupId]);
+
+  // Refresh group stats list when trainer/admin grid is shown
+  useEffect(() => {
+    if (isMultiGroupUser) {
+      refetchGroupStats();
+    }
+  }, []);
 
   // TRAINER / ADMIN VIEW: GROUP SELECTION GRID
   if (isMultiGroupUser && !trainerSelectedGroupId) {
-    const visibleGroups =
-      isTrainer && currentUser.managedGroupIds
-        ? groups.filter((g) => currentUser.managedGroupIds!.includes(g.id))
-        : groups;
+    const visibleGroupStats = groupStats;
 
     return (
       <div className="space-y-6">
@@ -115,90 +106,21 @@ const Group: React.FC = () => {
           </div>
         </div>
 
-        {visibleGroups.length > 0 ? (
+        {visibleGroupStats.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {visibleGroups.map((group) => {
-              const gAgentIds = new Set(
-                users.filter((u) => u.group_id === group.id).map((u) => u.id),
-              );
-              const gProspects = prospects.filter((p) =>
-                gAgentIds.has(p.agent_id),
-              );
-              // Calculations for YTD metrics per group in the Trainer Grid
-              const now = new Date();
-              const currentYear = now.getFullYear();
-              const startYTD = new Date(currentYear, 0, 1);
-              const endYTD = new Date(currentYear, 11, 31, 23, 59, 59);
-
-              const isWithinDateRange = (
-                dateStr: string | undefined,
-                start: Date,
-                end: Date,
-              ) => {
-                if (!dateStr) return false;
-                const d = new Date(dateStr);
-                if (isNaN(d.getTime())) return false;
-                return d >= start && d <= end;
-              };
-
-              const gAppointmentsYTD = gProspects.filter(
-                (p) =>
-                  (p.appointment_status === "scheduled" ||
-                    p.appointment_status === "rescheduled") &&
-                  isWithinDateRange(p.appointment_date, startYTD, endYTD),
-              ).length;
-
-              const gSalesMeetingsYTD = gProspects.filter(
-                (p) =>
-                  p.appointment_status === "done" &&
-                  isWithinDateRange(
-                    p.appointment_completed_at || p.updated_at,
-                    startYTD,
-                    endYTD,
-                  ),
-              ).length;
-
-              const gSalesYTD = gProspects.filter(
-                (p) =>
-                  p.sales_outcome === "successful" &&
-                  isWithinDateRange(
-                    p.sales_completed_at || p.updated_at,
-                    startYTD,
-                    endYTD,
-                  ),
-              );
-
-              const gProspectsYTD = gProspects.filter(p => isWithinDateRange(p.created_at, startYTD, endYTD)).length;
-              const gSalesNOC_YTD = gSalesYTD.length;
-              const gSalesACE_YTD = gSalesYTD.reduce(
-                (sum, p) =>
-                  sum +
-                  (p.products_sold || []).reduce(
-                    (s, prod) => s + (prod.amount || 0),
-                    0,
-                  ),
-                0,
-              );
-
-              // Count ALL registered members in this group regardless of activity
-              const gNoOfAgentsYTD = users.filter(
-                (u) =>
-                  u.group_id === group.id &&
-                  (u.role === UserRole.AGENT ||
-                    u.role === UserRole.GROUP_LEADER),
-              ).length;
+            {visibleGroupStats.map((g) => {
               const gAcsYTD =
-                gSalesNOC_YTD > 0 ? gSalesACE_YTD / gSalesNOC_YTD : 0;
+                g.ytd_sales_noc > 0 ? g.ytd_sales_ace / g.ytd_sales_noc : 0;
 
               return (
                 <button
-                  key={group.id}
-                  onClick={() => setTrainerSelectedGroupId(group.id)}
+                  key={g.group_id}
+                  onClick={() => setTrainerSelectedGroupId(g.group_id)}
                   className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-300 transition-all text-left group flex flex-col h-full"
                 >
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-gray-800 group-hover:text-blue-600 transition-colors line-clamp-1">
-                      {group.name}
+                      {g.group_name}
                     </h3>
                     <div className="p-2 bg-blue-50 text-blue-600 rounded-lg shrink-0 ml-2">
                       <Layers className="w-5 h-5" />
@@ -208,34 +130,26 @@ const Group: React.FC = () => {
                   <div className="space-y-3 flex-1">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Prospects (YTD)</span>
-                      <span className="font-bold text-gray-900">{gProspectsYTD}</span>
+                      <span className="font-bold text-gray-900">{g.ytd_prospects}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Appointments (YTD)</span>
-                      <span className="font-bold text-gray-900">
-                        {gAppointmentsYTD}
-                      </span>
+                      <span className="font-bold text-gray-900">{g.ytd_appointments_set}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">
-                        Sales Meetings (YTD)
-                      </span>
-                      <span className="font-bold text-gray-900">
-                        {gSalesMeetingsYTD}
-                      </span>
+                      <span className="text-gray-500">Sales Meetings (YTD)</span>
+                      <span className="font-bold text-gray-900">{g.ytd_sales_meetings}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Sales (YTD)</span>
                       <div className="text-right">
-                        <span className="font-bold text-gray-900 block">{gSalesNOC_YTD} NOC</span>
-                        <span className="font-bold text-green-600 text-xs text-right block">RM {gSalesACE_YTD.toLocaleString()} ACE</span>
+                        <span className="font-bold text-gray-900 block">{g.ytd_sales_noc} NOC</span>
+                        <span className="font-bold text-green-600 text-xs text-right block">RM {g.ytd_sales_ace.toLocaleString()} ACE</span>
                       </div>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">No. of Agents</span>
-                      <span className="font-bold text-gray-900">
-                        {gNoOfAgentsYTD}
-                      </span>
+                      <span className="font-bold text-gray-900">{g.ytd_agents_count}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">ACS (YTD)</span>
@@ -274,142 +188,33 @@ const Group: React.FC = () => {
     );
   }
 
-  // --- GROUP DATA PREPARATION ---
-  const myGroup = groups.find((g) => g.id === currentGroupId);
-
-  // Determine group members first (needed to filter prospects by agent ID)
-  const groupUsers =
-    currentUser?.role === UserRole.GROUP_LEADER
-      ? groupUsersFromAPI
-      : users.filter(
-          (u) =>
-            u.group_id === currentGroupId &&
-            (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER),
-        );
-
-  // Filter prospects by agent_id membership rather than group_id on the prospect
-  // (group_id on a prospect can be null if not set at creation time)
-  const groupUserIds = new Set(groupUsers.map((u) => u.id));
-  const groupProspects =
-    currentUser?.role === UserRole.GROUP_LEADER
-      ? groupProspectsFromAPI
-      : prospects.filter((p) => groupUserIds.has(p.agent_id));
-
-  const groupMembers = getGroupMembers(currentGroupId);
-
-  // --- MTD & YTD Dates ---
+  // --- GROUP DATA FROM API ---
+  const ytd = groupDetailStats?.ytd;
+  const groupName = groupDetailStats?.group_name ?? 'My Group';
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
 
-  const startYTD = new Date(currentYear, 0, 1);
-  const endYTD = new Date(currentYear, 11, 31, 23, 59, 59);
+  // ACS derived
+  const acsYTD_Grp = (ytd?.sales_noc ?? 0) > 0
+    ? (ytd?.sales_ace ?? 0) / (ytd?.sales_noc ?? 1)
+    : 0;
 
-  const startMTD = new Date(currentYear, currentMonth, 1);
-  const endMTD = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
-
-  // Helper for dates
-  const isWithinDateRange = (
-    dateStr: string | undefined,
-    start: Date,
-    end: Date,
-  ) => {
-    if (!dateStr) return false;
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return false;
-    return d >= start && d <= end;
-  };
-
-  // --- YTD Calculations ---
-  // Total Prospects YTD
-  const totalProspectsYTD_Grp = groupProspects.filter(p =>
-    isWithinDateRange(p.created_at, startYTD, endYTD)
-  ).length;
-
-  // Appointments Scheduled YTD
-  const ytdAppointments_Grp = groupProspects.filter(
-    (p) =>
-      (p.appointment_status === "scheduled" ||
-        p.appointment_status === "rescheduled") &&
-      isWithinDateRange(p.appointment_date, startYTD, endYTD),
-  ).length;
-
-  // Sales Meetings Completed YTD
-  const ytdSalesMeetings_Grp = groupProspects.filter(
-    (p) =>
-      p.appointment_status === "done" &&
-      isWithinDateRange(
-        p.appointment_completed_at || p.updated_at,
-        startYTD,
-        endYTD,
-      ),
-  ).length;
-
-  // Sales (Successful) YTD
-  const ytdSales_Grp = groupProspects.filter(
-    (p) =>
-      p.sales_outcome === "successful" &&
-      isWithinDateRange(p.sales_completed_at || p.updated_at, startYTD, endYTD),
-  );
-  const totalSalesNOC_YTD_Grp = ytdSales_Grp.length;
-  const totalSalesACE_YTD_Grp = ytdSales_Grp.reduce(
-    (sum, p) =>
-      sum +
-      (p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0),
-    0,
-  );
-
-  // ACS YTD
-  const acsYTD_Grp =
-    totalSalesNOC_YTD_Grp > 0
-      ? totalSalesACE_YTD_Grp / totalSalesNOC_YTD_Grp
-      : 0;
-
-  // Count all team members (both agents and group leaders)
-  const activeMembersCount = groupUsers.length;
-
-  // Get all team members (agents + group leaders) - reuse groupUsers from above
-  const allGroupUsers = groupUsers;
-
-  // Build agent list with performance metrics - calculate from prospects for all roles
-  const agentList = allGroupUsers
-    .map((member) => {
-      const memberProspects = groupProspects.filter(
-        (p) => p.agent_id === member.id,
-      );
-      const memberFYC = memberProspects
-        .filter((p) => p.sales_outcome === "successful")
-        .reduce(
-          (sum, p) =>
-            sum +
-            (p.products_sold || []).reduce(
-              (s, prod) => s + (prod.amount || 0),
-              0,
-            ),
-          0,
-        );
-      const memberSales = memberProspects.filter(
-        (p) => p.sales_outcome === "successful",
-      ).length;
-      const memberAppointments = memberProspects.filter(
-        (p) =>
-          p.appointment_status === "scheduled" ||
-          p.appointment_status === "rescheduled",
-      ).length;
-      const memberSalesMeetings = memberProspects.filter(
-        (p) => p.appointment_status === "done",
-      ).length;
-      return {
-        ...member,
-        id: member.id,
-        fyc: memberFYC,
-        sales: memberSales,
-        prospects: memberProspects.length,
-        appointments: memberAppointments,
-        salesMeetings: memberSalesMeetings,
-      };
-    })
-    .sort((a, b) => b.fyc - a.fyc); // Sort by FYC descending
+  // Agent list mapped from API response, sorted by ACE desc
+  const agentList = (groupDetailStats?.agents ?? [])
+    .map((a) => ({
+      id: a.agent_id,
+      name: a.agent_name,
+      prospects: a.ytd_prospects,
+      appointments: a.ytd_appointments_set,
+      salesMeetings: a.ytd_sales_meetings,
+      sales: a.ytd_sales_noc,
+      fyc: a.ytd_sales_ace,
+      mtd_prospects: a.mtd_prospects,
+      mtd_appointments_set: a.mtd_appointments_set,
+      mtd_sales_meetings: a.mtd_sales_meetings,
+      mtd_sales_noc: a.mtd_sales_noc,
+      mtd_sales_ace: a.mtd_sales_ace,
+    }))
+    .sort((a, b) => b.fyc - a.fyc);
 
   const filteredAgentList = agentList.filter((a) =>
     a.name.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -420,35 +225,13 @@ const Group: React.FC = () => {
     const agent = agentList.find((u) => u.id === selectedAgentId);
     if (!agent) return <div>Agent not found</div>;
 
-    const agentProspects = groupProspects.filter(
-      (p) => p.agent_id === selectedAgentId,
-    );
-    const successfulSales = agentProspects.filter(
-      (p) => p.sales_outcome === "successful",
-    );
-
-    // MTD calculations for bar chart
-    const aMtdProspects = agentProspects.filter(p => isWithinDateRange(p.created_at, startMTD, endMTD)).length;
-    const aMtdAppointments = agentProspects.filter(p =>
-      (p.appointment_status === 'scheduled' || p.appointment_status === 'rescheduled') &&
-      isWithinDateRange(p.appointment_date, startMTD, endMTD)
-    ).length;
-    const aMtdSalesMeetings = agentProspects.filter(p =>
-      p.appointment_status === 'completed' &&
-      isWithinDateRange(p.appointment_completed_at || p.appointment_date, startMTD, endMTD)
-    ).length;
-    const aMtdSalesArr = agentProspects.filter(p =>
-      p.sales_outcome === 'successful' &&
-      isWithinDateRange(p.sales_completed_at || p.updated_at, startMTD, endMTD)
-    );
-    const aMtdSalesNOC = aMtdSalesArr.length;
-    const aMtdSalesACE = aMtdSalesArr.reduce((sum, p) => sum + ((p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0)), 0);
+    const aAcsYTD = agent.sales > 0 ? agent.fyc / agent.sales : 0;
 
     const chartData = [
-      { name: 'Prospects',       value: aMtdProspects,     barType: 'count' },
-      { name: 'Appointments Set', value: aMtdAppointments,  barType: 'count' },
-      { name: 'Sales Meetings',   value: aMtdSalesMeetings, barType: 'count' },
-      { name: 'Sales',           value: aMtdSalesNOC,      barType: 'sales', ace: aMtdSalesACE },
+      { name: 'Prospects',        value: agent.mtd_prospects,        barType: 'count' },
+      { name: 'Appointments Set', value: agent.mtd_appointments_set, barType: 'count' },
+      { name: 'Sales Meetings',   value: agent.mtd_sales_meetings,   barType: 'count' },
+      { name: 'Sales',            value: agent.mtd_sales_noc,        barType: 'sales', ace: agent.mtd_sales_ace },
     ];
 
     const AgentCustomTooltip = ({ active, payload, label }: any) => {
@@ -470,46 +253,6 @@ const Group: React.FC = () => {
       }
       return null;
     };
-
-    // YTD Calculations for the specific agent
-    const aProspectsYTD = agentProspects.filter(p => isWithinDateRange(p.created_at, startYTD, endYTD)).length;
-
-    const aAppointmentsYTD = agentProspects.filter(
-      (p) =>
-        (p.appointment_status === "scheduled" ||
-          p.appointment_status === "rescheduled") &&
-        isWithinDateRange(p.appointment_date, startYTD, endYTD),
-    ).length;
-
-    const aSalesMeetingsYTD = agentProspects.filter(
-      (p) =>
-        p.appointment_status === "done" &&
-        isWithinDateRange(
-          p.appointment_completed_at || p.updated_at,
-          startYTD,
-          endYTD,
-        ),
-    ).length;
-
-    const aSalesYTD = agentProspects.filter(
-      (p) =>
-        p.sales_outcome === "successful" &&
-        isWithinDateRange(
-          p.sales_completed_at || p.updated_at,
-          startYTD,
-          endYTD,
-        ),
-    );
-    const aSalesNOC_YTD = aSalesYTD.length;
-    const aSalesACE_YTD = aSalesYTD.reduce(
-      (sum, p) =>
-        sum +
-        (p.products_sold || []).reduce((s, prod) => s + (prod.amount || 0), 0),
-      0,
-    );
-
-    const aAcsYTD = aSalesNOC_YTD > 0 ? (aSalesACE_YTD / aSalesNOC_YTD) : 0;
-
 
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -533,30 +276,30 @@ const Group: React.FC = () => {
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
              <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects (YTD)</p>
-             <h3 className="text-3xl font-bold text-gray-900">{aProspectsYTD}</h3>
+             <h3 className="text-3xl font-bold text-gray-900">{agent.prospects}</h3>
           </div>
 
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
              <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Calendar className="w-5 h-5" /></div>
              <p className="text-sm font-medium text-gray-500 mb-1">Total Appointments (YTD)</p>
-             <h3 className="text-3xl font-bold text-gray-900">{aAppointmentsYTD}</h3>
+             <h3 className="text-3xl font-bold text-gray-900">{agent.appointments}</h3>
           </div>
 
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg mb-3"><Target className="w-5 h-5" /></div>
              <p className="text-sm font-medium text-gray-500 mb-1">Sales Meetings (YTD)</p>
-             <h3 className="text-3xl font-bold text-gray-900">{aSalesMeetingsYTD}</h3>
+             <h3 className="text-3xl font-bold text-gray-900">{agent.salesMeetings}</h3>
           </div>
 
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
              <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
              <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (YTD)</p>
              <div className="flex items-baseline gap-2">
-                <h3 className="text-3xl font-bold text-gray-900">{aSalesNOC_YTD}</h3>
+                <h3 className="text-3xl font-bold text-gray-900">{agent.sales}</h3>
                 <span className="text-xs text-gray-400">NOC</span>
              </div>
              <div className="flex items-baseline gap-1 mt-1">
-                <p className="text-2xl font-bold text-green-600">RM {aSalesACE_YTD.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-green-600">RM {agent.fyc.toLocaleString()}</p>
                 <span className="text-xs text-gray-400">ACE</span>
              </div>
           </div>
@@ -613,7 +356,7 @@ const Group: React.FC = () => {
           )}
           <h1 className="text-2xl font-bold text-gray-900 uppercase tracking-wide flex items-center">
             <Crown className="w-6 h-6 mr-3 text-yellow-500" />
-            {myGroup?.name || "My Group"}
+            {groupName}
           </h1>
           <p className="text-sm text-gray-500">
             Team Performance & Sales Overview
@@ -630,30 +373,30 @@ const Group: React.FC = () => {
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
             <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
             <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects (YTD)</p>
-            <h3 className="text-3xl font-bold text-gray-900">{totalProspectsYTD_Grp}</h3>
+            <h3 className="text-3xl font-bold text-gray-900">{ytd?.prospects ?? 0}</h3>
          </div>
 
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
             <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Calendar className="w-5 h-5" /></div>
             <p className="text-sm font-medium text-gray-500 mb-1">Total Appointments (YTD)</p>
-            <h3 className="text-3xl font-bold text-gray-900">{ytdAppointments_Grp}</h3>
+            <h3 className="text-3xl font-bold text-gray-900">{ytd?.appointments_set ?? 0}</h3>
          </div>
 
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg mb-3"><Target className="w-5 h-5" /></div>
             <p className="text-sm font-medium text-gray-500 mb-1">Sales Meetings (YTD)</p>
-            <h3 className="text-3xl font-bold text-gray-900">{ytdSalesMeetings_Grp}</h3>
+            <h3 className="text-3xl font-bold text-gray-900">{ytd?.sales_meetings ?? 0}</h3>
          </div>
 
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
             <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
             <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (YTD)</p>
             <div className="flex items-baseline gap-2">
-               <h3 className="text-3xl font-bold text-gray-900">{totalSalesNOC_YTD_Grp}</h3>
+               <h3 className="text-3xl font-bold text-gray-900">{ytd?.sales_noc ?? 0}</h3>
                <span className="text-xs text-gray-400">NOC</span>
             </div>
             <div className="flex items-baseline gap-1 mt-1">
-               <p className="text-2xl font-bold text-green-600">RM {totalSalesACE_YTD_Grp.toLocaleString()}</p>
+               <p className="text-2xl font-bold text-green-600">RM {(ytd?.sales_ace ?? 0).toLocaleString()}</p>
                <span className="text-xs text-gray-400">ACE</span>
             </div>
          </div>
@@ -661,7 +404,7 @@ const Group: React.FC = () => {
          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
             <div className="p-2 bg-slate-50 text-slate-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
             <p className="text-sm font-medium text-gray-500 mb-1">No. of Agents</p>
-            <h3 className="text-3xl font-bold text-gray-900">{activeMembersCount}</h3>
+            <h3 className="text-3xl font-bold text-gray-900">{ytd?.agents_count ?? 0}</h3>
             <p className="text-xs text-gray-400 mt-1">Total in Group</p>
          </div>
 

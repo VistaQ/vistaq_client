@@ -153,7 +153,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                      {isAdmin
                         ? 'System-wide statistics and performance monitoring.'
                         : isMasterTrainer
-                           ? `High-level analytics for ${relevantGroups.length} managed group(s).`
+                           ? `High-level analytics for ${groupRankings.length} managed group(s).`
                            : ''}
                   </p>
                </div>
