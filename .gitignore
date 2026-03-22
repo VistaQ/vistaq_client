@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 .env
 .vercel
+
+# Test fixtures (contain credentials/IDs)
+tests/fixtures/testData.json
