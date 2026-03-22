@@ -30,11 +30,11 @@ interface EventDetailPopupProps {
 }
 
 const EventDetailPopup: React.FC<EventDetailPopupProps> = ({ event, onClose, onEdit, onDelete, groups }) => {
-    const evtDate = new Date(event.date);
+    const evtDate = new Date(event.start_date);
     const validDate = !isNaN(evtDate.getTime());
 
     const startTimeStr = validDate ? evtDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
-    const timeDisplay = startTimeStr && event.endTime ? `${startTimeStr} – ${event.endTime}` : startTimeStr;
+    const timeDisplay = startTimeStr;
 
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4" onClick={onClose}>
@@ -200,10 +200,10 @@ const DayPopup: React.FC<DayPopupProps> = ({ date, events, onClose, onSelectEven
                 {events.length === 0 ? (
                     <p className="text-sm text-gray-400 text-center py-4">No events on this day.</p>
                 ) : events.map(evt => {
-                    const d = new Date(evt.date);
+                    const d = new Date(evt.start_date);
                     const validDate = !isNaN(d.getTime());
                     const timeStr = validDate ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Time TBD';
-                    const endStr = evt.endTime ? ` – ${evt.endTime}` : '';
+                    const endStr = '';
                     return (
                         <button
                             key={evt.id}
@@ -260,7 +260,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
     const latestEventDate = useMemo(() => {
         if (events.length === 0) return null;
         return events.reduce((latest, e) => {
-            const d = new Date(e.date);
+            const d = new Date(e.start_date);
             return d > latest ? d : latest;
         }, new Date(0));
     }, [events]);
@@ -300,7 +300,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
     // Map events to dates in this month
     const eventsOnDay = (date: Date) =>
         events.filter(e => {
-            const d = new Date(e.date);
+            const d = new Date(e.start_date);
             return !isNaN(d.getTime()) && isSameDay(d, date);
         });
 
@@ -344,8 +344,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
                     if (!date) return <div key={`empty-${idx}`} className="min-h-[6rem] h-full bg-gray-50/50 border-b border-r border-gray-100" />;
                     const dayEvts = eventsOnDay(date);
                     const isToday = isSameDay(date, today);
-                    const hasFuture = dayEvts.some(e => new Date(e.date) >= today);
-                    const hasPast = dayEvts.some(e => new Date(e.date) < today);
+                    const hasFuture = dayEvts.some(e => new Date(e.start_date) >= today);
+                    const hasPast = dayEvts.some(e => new Date(e.start_date) < today);
                     const isLast = idx % 7 === 6;
 
                     return (
@@ -367,7 +367,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
                             {dayEvts.length > 0 && (
                                 <div className="w-full space-y-1 text-left flex-1 flex flex-col justify-start overflow-hidden">
                                     {dayEvts.slice(0, 2).map(evt => {
-                                        const isPastEvt = new Date(evt.date) < today;
+                                        const isPastEvt = new Date(evt.start_date) < today;
                                         return (
                                             <div
                                                 key={evt.id}
@@ -451,7 +451,7 @@ const Events: React.FC = () => {
         return true;
     });
 
-    const sortedEvents = [...visibleEvents].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sortedEvents = [...visibleEvents].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
 
     let targetableGroups = groups;
     if (currentUser.role === UserRole.TRAINER) {
@@ -477,13 +477,13 @@ const Events: React.FC = () => {
     const handleOpenModal = (event?: Event) => {
         setAgentSearch('');
         if (event) {
-            const d = new Date(event.date);
+            const d = new Date(event.start_date);
             let dateStr = '', startTimeStr = '', endTimeStr = '';
             if (!isNaN(d.getTime())) {
                 dateStr = d.toISOString().split('T')[0];
                 startTimeStr = d.toTimeString().slice(0, 5);
-                if (event.endTime) {
-                    endTimeStr = event.endTime;
+                if (event.end_date) {
+                    endTimeStr = new Date(event.end_date).toTimeString().slice(0, 5);
                 } else {
                     const endH = (d.getHours() + 1) % 24;
                     endTimeStr = `${endH.toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
@@ -497,15 +497,15 @@ const Events: React.FC = () => {
             setEditingEventId(event.id);
             setFormData({
                 eventTitle: event.event_title,
-                description: event.description,
+                description: event.description || '',
                 date: dateStr,
                 startTime: startTimeStr,
                 endTime: endTimeStr,
-                eventType: event.event_type || 'online',
+                eventType: event.type === 'Online' ? 'online' : 'face-to-face',
                 venue: event.venue || '',
                 meetingLink: event.meeting_link || '',
-                groupIds: event.group_ids || [],
-                targetAgentIds: event.target_agent_ids || [],
+                groupIds: event.groupIds || [],
+                targetAgentIds: event.agentIds || [],
                 allGroups: false,
                 allAgents: false,
                 status: (event.status || 'upcoming') as 'upcoming' | 'completed' | 'cancelled'
@@ -538,24 +538,22 @@ const Events: React.FC = () => {
             alert('Please select at least one group or agent to share this event with.');
             return;
         }
-        const dateTime = new Date(`${formData.date}T${formData.startTime}`);
-        if (isNaN(dateTime.getTime())) { alert('Invalid date or time selected.'); return; }
         const eventData = {
             event_title: formData.eventTitle,
             description: formData.description,
-            event_type: formData.eventType,
+            date: formData.date,
+            startTime: formData.startTime || undefined,
+            endTime: formData.endTime || undefined,
+            type: (formData.eventType === 'online' ? 'Online' : 'Face to Face') as 'Online' | 'Face to Face',
             venue: formData.eventType === 'face-to-face' ? formData.venue : undefined,
             meeting_link: formData.eventType === 'online' ? formData.meetingLink : undefined,
-            date: dateTime.toISOString(),
-            end_time: formData.endTime || undefined,
-            group_ids: formData.groupIds,
-            target_agent_ids: formData.targetAgentIds.length > 0 ? formData.targetAgentIds : undefined,
-            status: formData.status
+            groupIds: formData.groupIds,
+            agentIds: formData.targetAgentIds.length > 0 ? formData.targetAgentIds : undefined,
         };
         if (editingEventId) {
             await updateEvent(editingEventId, eventData);
         } else {
-            await addEvent({ ...eventData, created_by: currentUser.id, created_by_name: currentUser.name });
+            await addEvent(eventData);
         }
         setIsModalOpen(false);
         setEditingEventId(null);
@@ -663,7 +661,7 @@ const Events: React.FC = () => {
                     {sortedEvents.length > 0 ? sortedEvents.map(evt => {
                         const isCreator = evt.created_by === currentUser.id;
                         const canEditEvent = isAdmin || isCreator;
-                        const evtDate = new Date(evt.date);
+                        const evtDate = new Date(evt.start_date);
                         const validDate = !isNaN(evtDate.getTime());
                         const isPast = validDate && evtDate < new Date();
 
@@ -918,7 +916,7 @@ const Events: React.FC = () => {
                                                     setFormData(prev => ({
                                                         ...prev,
                                                         allAgents: checked,
-                                                        groupIds: checked ? (currentUser.groupId ? [currentUser.groupId] : []) : [],
+                                                        groupIds: checked ? (currentUser.group_id ? [currentUser.group_id] : []) : [],
                                                         targetAgentIds: checked ? [] : []
                                                     }));
                                                 }}
@@ -933,7 +931,7 @@ const Events: React.FC = () => {
                                                 </div>
                                                 <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
                                                     {users
-                                                        .filter(u => u.groupId === currentUser.groupId && (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) && u.id !== currentUser.id)
+                                                        .filter(u => u.group_id === currentUser.group_id && (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) && u.id !== currentUser.id)
                                                         .filter(u => u.name?.toLowerCase().includes(agentSearch.toLowerCase()))
                                                         .map(u => (
                                                             <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">
@@ -989,11 +987,12 @@ const Events: React.FC = () => {
                                             </div>
                                             <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
                                                 {(() => {
-                                                    const pool = users.filter(u =>
-                                                        (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) &&
-                                                        (targetableGroups.length === 0 || targetableGroups.some(g => g.id === u.groupId)) &&
-                                                        u.name?.toLowerCase().includes(agentSearch.toLowerCase())
-                                                    );
+                                                    const pool = users.filter(u => {
+                                                        if (u.role !== UserRole.AGENT && u.role !== UserRole.GROUP_LEADER) return false;
+                                                        if (agentSearch && !u.name?.toLowerCase().includes(agentSearch.toLowerCase())) return false;
+                                                        if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MASTER_TRAINER) return true;
+                                                        return targetableGroups.some(g => g.id === u.group_id);
+                                                    });
                                                     if (pool.length === 0) return <p className="text-xs text-gray-400 col-span-2">No agents found.</p>;
                                                     return pool.map(u => (
                                                         <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">
@@ -1006,7 +1005,7 @@ const Events: React.FC = () => {
                                                             />
                                                             <div className="flex flex-col min-w-0">
                                                                 <span className="text-sm text-gray-900 font-medium truncate">{u.name}</span>
-                                                                <span className="text-[10px] text-gray-400 truncate">{groups.find(g => g.id === u.groupId)?.name || ''}</span>
+                                                                <span className="text-[10px] text-gray-400 truncate">{groups.find(g => g.id === u.group_id)?.name || ''}</span>
                                                             </div>
                                                         </label>
                                                     ));

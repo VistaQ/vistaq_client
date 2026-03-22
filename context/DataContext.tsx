@@ -362,16 +362,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const addEvent = async (evt: any) => {
-    const { date, time } = toUtcDateTime(evt.date, evt.time);
+    const { date, time: startTimeUtc } = toUtcDateTime(evt.date, evt.startTime);
+    const { time: endTimeUtc } = toUtcDateTime(evt.date, evt.endTime);
     const payload: Record<string, any> = {
       title: evt.event_title || 'New Event',
       date,
       description: evt.description || '',
       groupIds: evt.groupIds || [],
     };
-    if (time) payload.time = time;
+    if (startTimeUtc) payload.startTime = startTimeUtc;
+    if (endTimeUtc) payload.endTime = endTimeUtc;
+    if (evt.type) payload.type = evt.type;
     if (evt.meeting_link) payload.link = evt.meeting_link;
     if (evt.venue) payload.venue = evt.venue;
+    if (evt.agentIds?.length) payload.agentIds = evt.agentIds;
     await apiCall('/events', { method: 'POST', data: payload });
     await fetchEvents();
   };
@@ -380,14 +384,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const payload: Record<string, any> = {};
     if (evt.event_title) payload.title = evt.event_title;
     if (evt.date) {
-      const { date, time } = toUtcDateTime(evt.date, evt.time);
+      const { date, time: startTimeUtc } = toUtcDateTime(evt.date, evt.startTime);
+      const { time: endTimeUtc } = toUtcDateTime(evt.date, evt.endTime);
       payload.date = date;
-      if (time) payload.time = time;
+      if (startTimeUtc) payload.startTime = startTimeUtc;
+      if (endTimeUtc) payload.endTime = endTimeUtc;
     }
     if (evt.description) payload.description = evt.description;
+    if (evt.type) payload.type = evt.type;
     if (evt.meeting_link) payload.link = evt.meeting_link;
     if (evt.venue) payload.venue = evt.venue;
     if (evt.groupIds) payload.groupIds = evt.groupIds;
+    if (evt.agentIds?.length) payload.agentIds = evt.agentIds;
     await apiCall(`/events/${id}`, { method: 'PUT', data: payload });
     await fetchEvents();
   };

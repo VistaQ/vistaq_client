@@ -42,12 +42,9 @@ export type Prospect = Omit<components['schemas']['ProspectObject'], 'current_st
 };
 
 export type Event = components['schemas']['EventObject'] & {
-  // Derived from event_groups junction table
-  groupIds?: string[];
-  groupNames?: string[];
+  groupNames?: string[];  // derived display names for groupIds
   // Fields pending backend addition to openapi spec
   created_by_name?: string | null;
-  status?: string;
   archived?: boolean;
 };
 

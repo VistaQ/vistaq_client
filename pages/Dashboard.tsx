@@ -118,7 +118,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
          ...mgmtEvents
             .filter(e => e.status !== 'cancelled')
             .map(e => ({
-               id: `evt_${e.id}`, title: e.event_title, date: e.date,
+               id: `evt_${e.id}`, title: e.event_title, date: e.start_date,
                type: 'event' as const, meta: e.venue, link: e.meeting_link || undefined,
                isOwned: e.created_by === currentUser?.id
             })),
@@ -444,9 +444,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       });
 
    const upcomingEvents: ScheduleItem[] = myEvents
-      .filter(e => { const d = new Date(e.date); return e.status !== 'cancelled' && d >= now && d <= sevenDaysFromNow; })
+      .filter(e => { const d = new Date(e.start_date); return e.status !== 'cancelled' && d >= now && d <= sevenDaysFromNow; })
       .map(e => ({
-         id: e.id, title: e.event_title, date: e.date, type: 'event' as const,
+         id: e.id, title: e.event_title, date: e.start_date, type: 'event' as const,
          meta: e.venue, link: e.meeting_link || undefined, isOwned: e.created_by === currentUser?.id
       }));
 

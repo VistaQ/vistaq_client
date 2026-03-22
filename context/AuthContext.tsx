@@ -212,7 +212,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         email: userData.email,
         password: userData.password,
         role: userData.role || UserRole.AGENT,
-        agentCode: userData.agent_code,
+        ...(userData.role === UserRole.AGENT && userData.agent_code ? { agentCode: userData.agent_code } : {}),
       }
     });
     showNotification(

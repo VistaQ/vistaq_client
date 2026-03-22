@@ -54,9 +54,9 @@ const buildOccupiedSlots = (
     allEvents
         .filter(e => e.status !== 'cancelled')
         .forEach(e => {
-            if (!e.date) return;
+            if (!e.start_date) return;
             try {
-                const start = new Date(e.date);
+                const start = new Date(e.start_date);
                 if (isNaN(start.getTime())) return;
                 // Events are treated as 1-hour blocks for overlap detection
                 const end = new Date(start.getTime() + 60 * 60 * 1000);

@@ -76,7 +76,8 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
         }
         if (item.type === 'event') {
             const startStr = valid ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
-            return startStr && evt?.endTime ? `${startStr} – ${evt.endTime}` : startStr;
+            const endStr = evt?.end_date ? new Date(evt.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
+            return startStr && endStr ? `${startStr} – ${endStr}` : startStr;
         }
         return valid ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
     })();
@@ -242,7 +243,14 @@ const DayPopup: React.FC<DayPopupProps> = ({ date, items, onClose, onSelect }) =
                     const cfg = getItemStyle(item);
                     const d = new Date(item.date);
                     const startStr = !isNaN(d.getTime()) ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
-                    const timeStr = startStr && item.endTime ? `${startStr} – ${item.endTime}` : startStr;
+                    const endStr = (() => {
+                        if (!item.endTime) return '';
+                        const [h, m] = item.endTime.split(':').map(Number);
+                        if (isNaN(h) || isNaN(m)) return item.endTime;
+                        const t = new Date(); t.setHours(h, m, 0, 0);
+                        return t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                    })();
+                    const timeStr = startStr && endStr ? `${startStr} – ${endStr}` : startStr;
                     return (
                         <button key={item.id} onClick={() => onSelect(item)}
                             className="w-full text-left flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
@@ -560,11 +568,11 @@ const MyCalendar: React.FC = () => {
             result.push({
                 id: `evt_${e.id}`,
                 title: e.event_title,
-                date: e.date,
+                date: e.start_date,
                 type: 'event',
-                subType: e.venue,
-                endTime: e.end_time,
-                link: e.meeting_link,
+                subType: e.venue || undefined,
+                endTime: e.end_date ? new Date(e.end_date).toTimeString().slice(0, 5) : undefined,
+                link: e.meeting_link || undefined,
                 cancelled: e.status === 'cancelled',
                 raw: e,
             });
@@ -667,18 +675,18 @@ const MyCalendar: React.FC = () => {
     const handleOpenEventModal = (item?: CalItem) => {
         if (item && item.type === 'event') {
             const evt = item.raw as Event;
-            const d = new Date(evt.date);
+            const d = new Date(evt.start_date);
             const dateStr = !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : '';
             const startTimeStr = !isNaN(d.getTime()) ? d.toTimeString().slice(0, 5) : '';
             let endTimeStr = '';
-            if (evt.end_time) {
-                endTimeStr = evt.end_time;
+            if (evt.end_date) {
+                endTimeStr = new Date(evt.end_date).toTimeString().slice(0, 5);
             } else if (!isNaN(d.getTime())) {
                 const endH = (d.getHours() + 1) % 24;
                 endTimeStr = `${endH.toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
             }
             setEditingEventId(evt.id);
-            setFormData({ eventTitle: evt.event_title, description: evt.description, date: dateStr, startTime: startTimeStr, endTime: endTimeStr, eventType: evt.event_type || 'online', venue: evt.venue || '', meetingLink: evt.meeting_link || '', groupIds: evt.group_ids || [], targetAgentIds: evt.target_agent_ids || [], allGroups: false, allAgents: false, status: (evt.status || 'upcoming') as 'upcoming' | 'completed' | 'cancelled' });
+            setFormData({ eventTitle: evt.event_title, description: evt.description || '', date: dateStr, startTime: startTimeStr, endTime: endTimeStr, eventType: evt.type === 'Online' ? 'online' : 'face-to-face', venue: evt.venue || '', meetingLink: evt.meeting_link || '', groupIds: evt.groupIds || [], targetAgentIds: evt.agentIds || [], allGroups: false, allAgents: false, status: (evt.status || 'upcoming') as 'upcoming' | 'completed' | 'cancelled' });
         } else {
             setEditingEventId(null);
             const initialGroups = (currentUser.role === UserRole.GROUP_LEADER && currentUser.group_id) ? [currentUser.group_id] : [];
@@ -708,9 +716,6 @@ const MyCalendar: React.FC = () => {
             alert('Please select at least one group or agent to share this event with.');
             return;
         }
-        const dateTime = new Date(`${formData.date}T${formData.startTime}`);
-        if (isNaN(dateTime.getTime())) { alert('Invalid date or time.'); return; }
-
         // ── Double Booking Check ──────────────────────────────────
         const { hasConflict, conflictWith } = checkConflict(
             occupiedSlots,
@@ -729,19 +734,19 @@ const MyCalendar: React.FC = () => {
         const eventData = {
             event_title: formData.eventTitle,
             description: formData.description,
-            event_type: formData.eventType,
+            date: formData.date,
+            startTime: formData.startTime || undefined,
+            endTime: formData.endTime || undefined,
+            type: (formData.eventType === 'online' ? 'Online' : 'Face to Face') as 'Online' | 'Face to Face',
             venue: formData.eventType === 'face-to-face' ? formData.venue : undefined,
             meeting_link: formData.eventType === 'online' ? formData.meetingLink : undefined,
-            date: dateTime.toISOString(),
-            end_time: formData.endTime || undefined,
             groupIds: formData.groupIds,
-            targetAgentIds: formData.targetAgentIds.length > 0 ? formData.targetAgentIds : undefined,
-            status: formData.status
+            agentIds: formData.targetAgentIds.length > 0 ? formData.targetAgentIds : undefined,
         };
         if (editingEventId) {
             await updateEvent(editingEventId, eventData);
         } else {
-            await addEvent({ ...eventData, created_by: currentUser.id, created_by_name: currentUser.name });
+            await addEvent(eventData);
         }
         setIsEventModalOpen(false);
         setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: [], targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming' });
@@ -1059,11 +1064,12 @@ const MyCalendar: React.FC = () => {
                                             </div>
                                             <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
                                                 {(() => {
-                                                    const pool = users.filter(u =>
-                                                        (u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER) &&
-                                                        (targetableGroups.length === 0 || targetableGroups.some(g => g.id === u.groupId)) &&
-                                                        u.name?.toLowerCase().includes(agentSearch.toLowerCase())
-                                                    );
+                                                    const pool = users.filter(u => {
+                                                        if (u.role !== UserRole.AGENT && u.role !== UserRole.GROUP_LEADER) return false;
+                                                        if (agentSearch && !u.name?.toLowerCase().includes(agentSearch.toLowerCase())) return false;
+                                                        if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MASTER_TRAINER) return true;
+                                                        return targetableGroups.some(g => g.id === u.group_id);
+                                                    });
                                                     if (pool.length === 0) return <p className="text-xs text-gray-400 col-span-2">No agents found.</p>;
                                                     return pool.map(u => (
                                                         <label key={u.id} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-200">

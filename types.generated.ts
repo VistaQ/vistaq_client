@@ -2019,7 +2019,7 @@ export interface paths {
         put?: never;
         /**
          * Create an event
-         * @description Creates a new event scoped to the authenticated user's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin`, `master_trainer`, `trainer`, or `group_leader` role — `agent` users will receive a 403. For `trainer` users, all supplied `groupIds` must belong to groups that the trainer manages via the `group_trainers` junction table; any unmanaged group IDs result in a 400.
+         * @description Creates a new event scoped to the authenticated user's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin`, `master_trainer`, `trainer`, or `group_leader` role — `agent` users will receive a 403. At least one of `groupIds` or `agentIds` must be provided. For `trainer` users, all supplied `groupIds` must belong to groups that the trainer manages via the `group_trainers` junction table; any unmanaged group IDs result in a 400.
          */
         post: {
             parameters: {
@@ -2043,10 +2043,27 @@ export interface paths {
                          */
                         date: string;
                         /**
-                         * @description Time of the event in HH:MM 24-hour format (optional).
+                         * @description Start time of the event in HH:MM 24-hour format.
                          * @example 09:00
                          */
-                        time?: string;
+                        startTime: string;
+                        /**
+                         * @description End time of the event in HH:MM 24-hour format.
+                         * @example 11:00
+                         */
+                        endTime: string;
+                        /**
+                         * @description Status of the event. Defaults to `upcoming` when not supplied.
+                         * @example upcoming
+                         * @enum {string}
+                         */
+                        status?: "upcoming" | "completed" | "cancelled";
+                        /**
+                         * @description Delivery format of the event. Must be either `Face to Face` or `Online`.
+                         * @example Face to Face
+                         * @enum {string}
+                         */
+                        type: "Face to Face" | "Online";
                         /**
                          * Format: uri
                          * @description Optional URL for the event (e.g. a video call link).
@@ -2064,12 +2081,19 @@ export interface paths {
                          */
                         description: string;
                         /**
-                         * @description Array of group UUIDs the event is associated with. At least one must be provided. For trainers, all IDs must be groups they manage.
+                         * @description Array of group UUIDs the event is associated with. Must contain at least one UUID if provided, and must not contain duplicates. For trainers, all IDs must be groups they manage. At least one of `groupIds` or `agentIds` must be supplied.
                          * @example [
                          *       "7c9e6679-7425-40de-944b-e07fc1f90ae7"
                          *     ]
                          */
-                        groupIds: string[];
+                        groupIds?: string[];
+                        /**
+                         * @description Array of agent user UUIDs to assign individually to the event via the `event_agents` junction table. Must contain at least one UUID if provided, and must not contain duplicates. At least one of `groupIds` or `agentIds` must be supplied.
+                         * @example [
+                         *       "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                         *     ]
+                         */
+                        agentIds?: string[];
                     };
                 };
             };
@@ -2087,7 +2111,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Bad request. Returned when the request body fails validation (e.g. `title` is missing, `date` is in the past, `groupIds` is empty, a supplied group UUID does not exist, or a trainer supplies a group they do not manage). */
+                /** @description Bad request. Returned when the request body fails validation (e.g. `title` is missing, `date` is in the past, neither `groupIds` nor `agentIds` is provided, a supplied group UUID does not exist, or a trainer supplies a group they do not manage). */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2218,7 +2242,7 @@ export interface paths {
         };
         /**
          * Update an event
-         * @description Updates the event identified by `eventId`. The caller must supply a valid Bearer token belonging to a user with the `admin`, `master_trainer`, `trainer`, or `group_leader` role — `agent` users will receive a 403. All request body fields are optional, but at least one must be provided. When `groupIds` is supplied, the existing `event_groups` entries for this event are replaced entirely. For `trainer` users, all supplied `groupIds` must belong to groups they manage; any unmanaged group IDs result in a 400.
+         * @description Updates the event identified by `eventId`. The caller must supply a valid Bearer token belonging to a user with the `admin`, `master_trainer`, `trainer`, or `group_leader` role — `agent` users will receive a 403. All request body fields are optional, but at least one must be provided. When `groupIds` is supplied, the existing `event_groups` entries for this event are replaced entirely. When `agentIds` is supplied, the existing `event_agents` entries for this event are replaced entirely. For `trainer` users, all supplied `groupIds` must belong to groups they manage; any unmanaged group IDs result in a 400.
          */
         put: {
             parameters: {
@@ -2245,10 +2269,27 @@ export interface paths {
                          */
                         date?: string;
                         /**
-                         * @description Updated time of the event in HH:MM 24-hour format.
+                         * @description Updated start time of the event in HH:MM 24-hour format.
                          * @example 10:00
                          */
-                        time?: string;
+                        startTime?: string;
+                        /**
+                         * @description Updated end time of the event in HH:MM 24-hour format.
+                         * @example 12:00
+                         */
+                        endTime?: string;
+                        /**
+                         * @description Updated status of the event.
+                         * @example completed
+                         * @enum {string}
+                         */
+                        status?: "upcoming" | "completed" | "cancelled";
+                        /**
+                         * @description Updated delivery format of the event.
+                         * @example Online
+                         * @enum {string}
+                         */
+                        type?: "Face to Face" | "Online";
                         /**
                          * Format: uri
                          * @description Updated URL for the event.
@@ -2266,12 +2307,19 @@ export interface paths {
                          */
                         description?: string;
                         /**
-                         * @description Replacement set of group UUIDs for the event. Existing `event_groups` entries are deleted and replaced with these values. For trainers, all IDs must be groups they manage.
+                         * @description Replacement set of group UUIDs for the event. Existing `event_groups` entries are deleted and replaced with these values. Must not contain duplicates. For trainers, all IDs must be groups they manage.
                          * @example [
                          *       "7c9e6679-7425-40de-944b-e07fc1f90ae7"
                          *     ]
                          */
                         groupIds?: string[];
+                        /**
+                         * @description Replacement set of agent user UUIDs for the event. Existing `event_agents` entries are deleted and replaced with these values. Must not contain duplicates.
+                         * @example [
+                         *       "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                         *     ]
+                         */
+                        agentIds?: string[];
                     };
                 };
             };
@@ -2695,10 +2743,28 @@ export interface components {
             event_title: string;
             /**
              * Format: date-time
-             * @description Date (and optional time) of the event stored as a TIMESTAMPTZ value. When a `time` is supplied on create/update it is combined with the `date` into a single ISO 8601 timestamp.
+             * @description Start date and time of the event stored as a TIMESTAMPTZ value. Formed by combining the `date` and `startTime` fields supplied on create/update into a single ISO 8601 timestamp.
              * @example 2026-04-15T09:00:00.000Z
              */
-            date: string;
+            start_date: string;
+            /**
+             * Format: date-time
+             * @description End date and time of the event stored as a TIMESTAMPTZ value. Formed by combining the `date` and `endTime` fields supplied on create/update into a single ISO 8601 timestamp.
+             * @example 2026-04-15T11:00:00.000Z
+             */
+            end_date?: string | null;
+            /**
+             * @description Current status of the event. Defaults to `upcoming` on creation.
+             * @example upcoming
+             * @enum {string}
+             */
+            status: "upcoming" | "completed" | "cancelled";
+            /**
+             * @description Delivery format of the event.
+             * @example Face to Face
+             * @enum {string}
+             */
+            type: "Face to Face" | "Online";
             /** @example Quarterly training kickoff covering Q2 targets and new product modules. */
             description?: string | null;
             /** @example https://meet.example.com/q2-kickoff */
@@ -2722,6 +2788,22 @@ export interface components {
              * @example 2026-03-14T08:00:00.000Z
              */
             updated_at: string;
+            /**
+             * @description IDs of groups assigned to this event
+             * @example [
+             *       "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+             *       "c3d4e5f6-a7b8-9012-cdef-123456789012"
+             *     ]
+             */
+            groupIds: string[];
+            /**
+             * @description IDs of agents individually assigned to this event
+             * @example [
+             *       "d4e5f6a7-b8c9-0123-def0-234567890123",
+             *       "e5f6a7b8-c9d0-1234-ef01-345678901234"
+             *     ]
+             */
+            agentIds: string[];
         };
         DashboardStatsObject: {
             ytd: components["schemas"]["DashboardStatsPeriod"];
