@@ -1,10 +1,7 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BookOpen, ExternalLink, ChevronRight } from 'lucide-react';
-
-interface Props {
-    onNavigate: (page: string) => void;
-}
 
 const TUTORIALS: { number: string; title: string; description: string; url?: string; page?: string }[] = [
     {
@@ -57,7 +54,8 @@ const TUTORIALS: { number: string; title: string; description: string; url?: str
     },
 ];
 
-const Tutorials: React.FC<Props> = ({ onNavigate }) => {
+const Tutorials: React.FC = () => {
+    const navigate = useNavigate();
     return (
         <div className="max-w-5xl mx-auto space-y-8">
             {/* Page Header */}
@@ -110,7 +108,7 @@ const Tutorials: React.FC<Props> = ({ onNavigate }) => {
                                 </a>
                             ) : (
                                 <button
-                                    onClick={() => onNavigate(tutorial.page!)}
+                                    onClick={() => navigate(`/${tutorial.page!}`)}
                                     className="mt-5 inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-lg hover:from-violet-700 hover:to-indigo-700 transition-all shadow-sm shadow-indigo-200 active:scale-95"
                                 >
                                     <ChevronRight className="w-4 h-4" />

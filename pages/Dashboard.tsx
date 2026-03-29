@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { UserRole, Prospect, ProspectStage, CoachingSession, User } from '../types';
@@ -32,11 +33,8 @@ const COLORS = CHART_COLORS;
 
 // ---------------------------------------------------------------------------
 
-interface DashboardProps {
-   onNavigate?: (page: string) => void;
-}
-
-const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+const Dashboard: React.FC = () => {
+   const navigate = useNavigate();
    const { currentUser } = useAuth();
    const { prospects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats, isLoadingProspects } = useData();
 
@@ -335,11 +333,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   </h3>
                   <div className="flex items-center gap-2">
 
-                     {onNavigate && (
-                        <button onClick={() => onNavigate('events')} className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
-                           View Calendar <ExternalLink className="w-3 h-3" />
-                        </button>
-                     )}
+                     <button onClick={() => navigate('/events')} className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
+                        View Calendar <ExternalLink className="w-3 h-3" />
+                     </button>
                   </div>
                </div>
                <div className="flex-1 space-y-3 overflow-y-auto pr-1">
@@ -347,8 +343,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                      <div
                         key={item.id}
                         className={`flex flex-col p-3 rounded-lg border transition-colors ${item.type === 'event' ? 'bg-indigo-50/50 border-indigo-100' : 'bg-green-50/50 border-green-100'
-                           } ${item.isOwned && onNavigate ? 'cursor-pointer hover:brightness-95' : ''}`}
-                        onClick={item.isOwned && onNavigate ? () => onNavigate(item.type === 'coaching' ? 'coaching' : 'events') : undefined}
+                           } ${item.isOwned ? 'cursor-pointer hover:brightness-95' : ''}`}
+                        onClick={item.isOwned ? () => navigate(item.type === 'coaching' ? '/coaching' : '/events') : undefined}
                      >
                         <div className="flex items-start">
                            <div className="mt-1 mr-3">
@@ -601,11 +597,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                      Upcoming Schedule
                   </h3>
                   <div className="flex items-center gap-2">
-                     {onNavigate && (
-                        <button onClick={() => onNavigate('events')} className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
-                           View Calendar <ExternalLink className="w-3 h-3" />
-                        </button>
-                     )}
+                     <button onClick={() => navigate('/events')} className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
+                        View Calendar <ExternalLink className="w-3 h-3" />
+                     </button>
                   </div>
                </div>
 
@@ -617,9 +611,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                            className={`flex flex-col p-3 rounded-lg border transition-colors ${item.type === 'event' ? 'bg-indigo-50/50 border-indigo-100'
                               : item.type === 'coaching' ? 'bg-green-50/50 border-green-100'
                                  : 'bg-gray-50 border-gray-100'
-                              } ${item.isOwned && onNavigate ? 'cursor-pointer hover:brightness-95' : ''}`}
-                           onClick={item.isOwned && onNavigate
-                              ? () => onNavigate(item.type === 'coaching' ? 'coaching' : item.type === 'meeting' ? 'prospects' : 'events')
+                              } ${item.isOwned ? 'cursor-pointer hover:brightness-95' : ''}`}
+                           onClick={item.isOwned
+                              ? () => navigate(item.type === 'coaching' ? '/coaching' : item.type === 'meeting' ? '/prospects' : '/events')
                               : undefined}
                         >
                            <div className="flex items-start">
