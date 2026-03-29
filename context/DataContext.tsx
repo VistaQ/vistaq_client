@@ -73,7 +73,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const user = JSON.parse(stored);
         return user.id || user.uid || null;
       }
-    } catch (_e) { }
+    } catch (e) { console.error('[DataContext] getCurrentUserId:', e); }
     return null;
   };
 
@@ -88,7 +88,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const res = await apiCall('/prospects');
       const raw: any[] = Array.isArray(res.data) ? res.data : [];
       setProspects(raw);
-    } catch (_e) { } finally {
+    } catch (e) { console.error('[DataContext] fetchProspects:', e); } finally {
       setIsLoadingProspects(false);
     }
   };
@@ -104,7 +104,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const res = await apiCall('/events');
       const raw: any[] = Array.isArray(res.data) ? res.data : [];
       setEvents(raw);
-    } catch (_e) {
+    } catch (e) {
+      console.error('[DataContext] fetchEvents:', e);
       setEvents([]);
     } finally {
       setIsLoadingEvents(false);
@@ -151,7 +152,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const res = await apiCall('/dashboard/stats');
       if (res?.data) setDashboardStats(res.data);
-    } catch (_e) { } finally {
+    } catch (e) { console.error('[DataContext] fetchDashboardStats:', e); } finally {
       setIsLoadingDashboardStats(false);
     }
   };
@@ -162,7 +163,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const res = await apiCall('/groups/stats');
       const raw: GroupStats[] = Array.isArray(res.data) ? res.data : [];
       setGroupStats(raw);
-    } catch (_e) { }
+    } catch (e) { console.error('[DataContext] fetchGroupStats:', e); }
   };
 
   // Track authentication state to trigger refetch on login
@@ -190,7 +191,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (role !== userRole) {
           setUserRole(role);
         }
-      } catch { }
+      } catch (e) { console.error('[DataContext] checkAuth:', e); }
     };
 
     // Check periodically for same-tab auth changes (cross-tab handled by storage event)
@@ -215,7 +216,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setProspects([]);
       setPointConfig(DEFAULT_POINT_CONFIG);
     }
-  }, [authToken, userRole]);
+  }, [authToken]);
 
   // 2. Clear events on logout (fetch is triggered by the Calendar/Events page on mount)
   useEffect(() => {
