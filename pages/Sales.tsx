@@ -31,7 +31,7 @@ const Sales: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">My Sales Portfolio</h1>
-          <p className="text-sm text-gray-500">Track your successful closings and commissionable premiums.</p>
+          <p className="text-sm text-gray-500">Track your successful sales</p>
         </div>
         <div className="flex items-center gap-3">
             <div className="bg-blue-600 text-white px-6 py-3 rounded-xl shadow-lg flex items-center">

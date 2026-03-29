@@ -95,6 +95,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
         </div>
 
         <nav className="flex-1 overflow-y-auto py-6 space-y-1">
+          {/* "Personal" label before Dashboard — Group Leaders only */}
+          {currentUser?.role === UserRole.GROUP_LEADER && (
+            <div className="px-6 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Personal</div>
+          )}
+
           <NavItem id="dashboard" label="Dashboard" icon={LayoutDashboard} />
 
           {canSeeProspects && (
@@ -105,10 +110,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
           <NavItem id="coaching" label="Coaching" icon={GraduationCap} />
           <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
 
-          {/* Personal Views for Agent and Group Leader */}
+          {/* My Sales + My Points — Agents and Group Leaders, no section label */}
           {(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER) && (
             <>
-              <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Personal</div>
               <NavItem id="sales" label="My Sales" icon={DollarSign} />
               <NavItem id="points" label="My Points" icon={Star} />
             </>
@@ -196,6 +200,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                 <img src="/vistaq-logo.png" alt="VistaQ" className="h-10 w-auto" />
               </div>
               <nav className="py-4 overflow-y-auto max-h-[calc(100vh-180px)]">
+                {/* "Personal" label before Dashboard — Group Leaders only */}
+                {currentUser?.role === UserRole.GROUP_LEADER && (
+                  <div className="px-6 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Personal</div>
+                )}
+
                 <NavItem id="dashboard" label="Dashboard" icon={LayoutDashboard} />
 
                 {canSeeProspects && (
@@ -206,10 +215,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                 <NavItem id="coaching" label="Coaching" icon={GraduationCap} />
                 <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
 
-                {/* Personal Views for Agent and Group Leader */}
+                {/* My Sales + My Points — Agents and Group Leaders, no section label */}
                 {(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER) && (
                   <>
-                    <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Personal</div>
                     <NavItem id="sales" label="My Sales" icon={DollarSign} />
                     <NavItem id="points" label="My Points" icon={Star} />
                   </>

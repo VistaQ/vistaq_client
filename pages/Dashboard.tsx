@@ -86,7 +86,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       // --- MTD Chart Data from API ---
       const mgmtChartDataMTD = [
          { name: 'Prospects',        value: mtd?.prospects ?? 0,        barType: 'count' },
-         { name: 'Appointments Set', value: mtd?.appointments_set ?? 0, barType: 'count' },
+         { name: 'Appointments', value: mtd?.appointments_set ?? 0, barType: 'count' },
          { name: 'Sales Meetings',   value: mtd?.sales_meetings ?? 0,   barType: 'count' },
          { name: 'Sales',            value: mtd?.sales_noc ?? 0,        barType: 'sales', ace: mtd?.sales_ace ?? 0 },
       ];
@@ -279,7 +279,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
                            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                            <YAxis allowDecimals={false} tickFormatter={(v) => v.toLocaleString()}>
-                              <Label value="No. / RM'000" angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: CHART_LABEL_FILL }} />
+                              <Label value="No." angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: CHART_LABEL_FILL }} />
                            </YAxis>
                            <Tooltip content={<MgmtCustomTooltip />} />
                            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
@@ -484,7 +484,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    // Chart Data (Month-To-Date Funnel)
    const chartDataMTD = useMemo(() => [
       { name: 'Prospects',        value: personalMtd?.prospects ?? 0,        barType: 'count' },
-      { name: 'Appointments Set', value: personalMtd?.appointments_set ?? 0, barType: 'count' },
+      { name: 'Appointments', value: personalMtd?.appointments_set ?? 0, barType: 'count' },
       { name: 'Sales Meetings',   value: personalMtd?.sales_meetings ?? 0,   barType: 'count' },
       { name: 'Sales',           value: mtdSalesNOC,           barType: 'sales', ace: mtdSalesACE },
    ], [personalMtd, mtdSalesNOC, mtdSalesACE]);
@@ -580,7 +580,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                         <YAxis allowDecimals={false} tickFormatter={(v) => v.toLocaleString()}>
-                           <Label value="No. / RM'000" angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: CHART_LABEL_FILL }} />
+                           <Label value="No." angle={-90} position="insideLeft" offset={-5} style={{ fontSize: '10px', fill: CHART_LABEL_FILL }} />
                         </YAxis>
                         <Tooltip content={<CustomTooltip />} />
                         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
