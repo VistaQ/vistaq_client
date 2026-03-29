@@ -1,9 +1,11 @@
 
-import React, { useState, Suspense } from 'react';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import React, { Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import Layout from './components/Layout';
 import GlobalNotification from './components/GlobalNotification';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Lazy-load all page components so Vite splits them into separate chunks.
 // Only the chunk for the active page is downloaded and parsed.
@@ -35,99 +37,58 @@ const PageSpinner: React.FC = () => (
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
   </div>
 );
-const AuthenticatedApp: React.FC = () => {
-  const [activePage, setActivePage] = useState('dashboard');
-
-  const renderPage = () => {
-    switch (activePage) {
-      case 'dashboard': return <Dashboard onNavigate={setActivePage} />;
-      case 'prospects': return <Prospects />;
-      case 'profile': return <Profile />;
-
-      // Admin Routes
-      case 'users': return <AdminUsers />;
-      case 'admin-groups': return <AdminGroups />;
-
-      case 'points': return <PointsHistory />;
-      case 'leaderboard': return <Leaderboard />;
-      case 'admin-rewards': return <AdminRewards />;
-      case 'group': return <Group />;
-      case 'sales': return <Sales />;
-      case 'reports': return <Reports />;
-      case 'events': return <MyCalendar />;
-      case 'coaching': return <Coaching />;
-      case 'import': return <Import />;
-      case 'support': return <Support />;
-      case 'tutorials': return <Tutorials onNavigate={setActivePage} />;
-      case 'add-to-home-screen': return <AddToHomeScreen onBack={() => setActivePage('tutorials')} />;
-      case 'privacy-policy': return <PrivacyPolicy />;
-
-      default: return <Dashboard />;
-    }
-  };
-
-  return (
-    <Layout activePage={activePage} onNavigate={setActivePage}>
-      <Suspense fallback={<PageSpinner />}>
-        {renderPage()}
-      </Suspense>
-    </Layout>
-  );
-};
-
-type AuthView = 'login' | 'signup' | 'privacy' | 'forgot-password' | 'reset-password';
-
-const AuthFlow: React.FC = () => {
-  const { isAuthenticated } = useAuth();
-  const [view, setView] = useState<AuthView>(
-    window.location.pathname === '/reset-password' ? 'reset-password' : 'login'
-  );
-
-  if (isAuthenticated) {
-    if (window.location.pathname !== '/') {
-      window.history.replaceState(null, '', '/');
-    }
-    return <AuthenticatedApp />;
-  }
-
-  const switchToLogin = () => {
-    window.history.replaceState(null, '', '/');
-    setView('login');
-  };
-
-  return (
-    <Suspense fallback={<PageSpinner />}>
-      {view === 'login' && (
-        <Login
-          onSwitchToSignup={() => setView('signup')}
-          onSwitchToForgotPassword={() => setView('forgot-password')}
-        />
-      )}
-      {view === 'signup' && (
-        <Signup
-          onSwitchToLogin={switchToLogin}
-          onNavigateToPolicy={(page) => setView(page)}
-        />
-      )}
-      {view === 'privacy' && (
-        <PrivacyPolicy onBack={() => setView('signup')} />
-      )}
-      {view === 'forgot-password' && (
-        <ForgotPasswordPage onSwitchToLogin={switchToLogin} />
-      )}
-      {view === 'reset-password' && (
-        <ResetPasswordPage onSwitchToLogin={switchToLogin} />
-      )}
-    </Suspense>
-  );
-};
 
 const App: React.FC = () => {
   return (
     <AuthProvider>
       <DataProvider>
         <GlobalNotification />
-        <AuthFlow />
+        <Suspense fallback={<PageSpinner />}>
+          <Routes>
+            {/* Public auth routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+            {/* Protected app routes — nested inside Layout */}
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Routes>
+                      <Route index element={<Navigate to="/dashboard" replace />} />
+                      <Route path="dashboard" element={<Dashboard />} />
+                      <Route path="prospects" element={<Prospects />} />
+                      <Route path="events" element={<MyCalendar />} />
+                      <Route path="coaching" element={<Coaching />} />
+                      <Route path="leaderboard" element={<Leaderboard />} />
+                      <Route path="sales" element={<Sales />} />
+                      <Route path="points" element={<PointsHistory />} />
+                      <Route path="group" element={<Group />} />
+                      <Route path="reports" element={<Reports />} />
+                      <Route path="import" element={<Import />} />
+                      <Route path="profile" element={<Profile />} />
+                      <Route path="support" element={<Support />} />
+                      <Route path="tutorials" element={<Tutorials />} />
+                      <Route path="add-to-home-screen" element={<AddToHomeScreen />} />
+                      <Route path="privacy-policy" element={<PrivacyPolicy />} />
+                      <Route path="users" element={<AdminUsers />} />
+                      <Route path="admin-groups" element={<AdminGroups />} />
+                      <Route path="admin-rewards" element={<AdminRewards />} />
+                      {/* Catch-all: unknown protected paths redirect to dashboard */}
+                      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                    </Routes>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Root redirect */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </Suspense>
       </DataProvider>
     </AuthProvider>
   );

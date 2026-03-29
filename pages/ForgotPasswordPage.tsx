@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Mail, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { forgotPassword } from '../services/auth.service';
+import { useAuth } from '../context/AuthContext';
 
-interface ForgotPasswordPageProps {
-  onSwitchToLogin: () => void;
-}
+const ForgotPasswordPage: React.FC = () => {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
-const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onSwitchToLogin }) => {
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [error, setError] = useState('');
@@ -46,7 +50,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onSwitchToLogin
                 Password reset email sent. Please check your inbox.
               </p>
               <button
-                onClick={onSwitchToLogin}
+                onClick={() => navigate('/login')}
                 className="text-blue-600 font-bold text-sm hover:underline"
               >
                 Back to Login
@@ -96,7 +100,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onSwitchToLogin
               <div className="text-center">
                 <button
                   type="button"
-                  onClick={onSwitchToLogin}
+                  onClick={() => navigate('/login')}
                   className="text-sm text-blue-600 hover:underline"
                 >
                   Back to Login

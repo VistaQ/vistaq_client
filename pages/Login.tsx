@@ -1,15 +1,16 @@
 
 import React, { useState } from 'react';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Lock, Mail, AlertCircle, Loader2 } from 'lucide-react';
 
-interface LoginProps {
-  onSwitchToSignup: () => void;
-  onSwitchToForgotPassword: () => void;
-}
+const Login: React.FC = () => {
+  const { login, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
-const Login: React.FC<LoginProps> = ({ onSwitchToSignup, onSwitchToForgotPassword }) => {
-  const { login } = useAuth();
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
   
   // Login State
   const [identifier, setIdentifier] = useState('');
@@ -26,7 +27,7 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup, onSwitchToForgotPasswor
 
     try {
       await login(identifier, password);
-      // AuthContext handles redirect
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
       if (err.status === 429) {
         setRateLimited(true);
@@ -90,13 +91,12 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup, onSwitchToForgotPasswor
                 />
               </div>
               <div className="flex justify-end mt-2">
-                  <button
-                    type="button"
-                    onClick={onSwitchToForgotPassword}
+                  <Link
+                    to="/forgot-password"
                     className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
                   >
                     Forgot Password?
-                  </button>
+                  </Link>
               </div>
             </div>
 
@@ -111,12 +111,12 @@ const Login: React.FC<LoginProps> = ({ onSwitchToSignup, onSwitchToForgotPasswor
 
           <div className="mt-8 text-center text-sm text-gray-500">
             <p className="mb-2">Don't have an account?</p>
-            <button 
-              onClick={onSwitchToSignup}
+            <Link
+              to="/signup"
               className="text-blue-600 font-bold hover:underline"
             >
               Register as a new Agent
-            </button>
+            </Link>
           </div>
         </div>
       </div>

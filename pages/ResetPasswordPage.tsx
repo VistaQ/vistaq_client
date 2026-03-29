@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Lock, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { resetPassword } from '../services/auth.service';
-
-interface ResetPasswordPageProps {
-  onSwitchToLogin: () => void;
-}
 
 function validatePassword(password: string): string {
   if (password.length < 6) return 'Password must be at least 6 characters.';
@@ -14,7 +11,8 @@ function validatePassword(password: string): string {
   return '';
 }
 
-const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({ onSwitchToLogin }) => {
+const ResetPasswordPage: React.FC = () => {
+  const navigate = useNavigate();
   const hashParams = new URLSearchParams(window.location.hash.substring(1));
   const token = hashParams.get('access_token') ?? '';
 
@@ -28,12 +26,11 @@ const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({ onSwitchToLogin }
   useEffect(() => {
     if (status === 'success') {
       const timer = setTimeout(() => {
-        window.history.replaceState(null, '', '/');
-        onSwitchToLogin();
+        navigate('/login', { replace: true });
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [status, onSwitchToLogin]);
+  }, [status, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +77,7 @@ const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({ onSwitchToLogin }
               <h2 className="text-lg font-bold text-gray-900">Invalid reset link</h2>
               <p className="text-sm text-gray-500">Invalid or expired reset link.</p>
               <button
-                onClick={onSwitchToLogin}
+                onClick={() => navigate('/login')}
                 className="text-blue-600 font-bold text-sm hover:underline"
               >
                 Back to Login
@@ -161,7 +158,7 @@ const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({ onSwitchToLogin }
               <div className="text-center">
                 <button
                   type="button"
-                  onClick={onSwitchToLogin}
+                  onClick={() => navigate('/login')}
                   className="text-sm text-blue-600 hover:underline"
                 >
                   Back to Login

@@ -1,19 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../services/apiClient';
 import { Group } from '../types';
 import { Lock, Mail, User, Users, AlertCircle, Loader2, IdCard, MapPin } from 'lucide-react';
 
-interface SignupProps {
-  onSwitchToLogin: () => void;
-  onNavigateToPolicy: (page: 'privacy') => void;
-}
-
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) => {
-  const { register } = useAuth();
+const Signup: React.FC = () => {
+  const { register, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const [publicGroups, setPublicGroups] = useState<Group[]>([]);
   const [name, setName] = useState('');
@@ -95,6 +96,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
     setLoading(true);
     try {
       await register(name, email, password, groupId, agentCode, location);
+      navigate('/login');
     } catch (err: any) {
       const msg: string = err?.message || 'An error occurred. Please try again.';
       const status: number = err?.status;
@@ -194,7 +196,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
                 <p className="text-xs text-red-500 mt-1">
                   {emailError}{' '}
                   {emailError.toLowerCase().includes('already') && (
-                    <button type="button" onClick={onSwitchToLogin} className="font-bold underline">Sign in instead</button>
+                    <button type="button" onClick={() => navigate('/login')} className="font-bold underline">Sign in instead</button>
                   )}
                 </p>
               )}
@@ -269,7 +271,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
                 <div className="ml-3 text-sm">
                   <label htmlFor="compliance" className="text-gray-600 leading-tight">
                     I acknowledge that I have read and understood the{' '}
-                    <button type="button" onClick={() => onNavigateToPolicy('privacy')} className="text-blue-600 font-bold hover:underline">Privacy Policy</button>,
+                    <button type="button" onClick={() => navigate('/privacy-policy')} className="text-blue-600 font-bold hover:underline">Privacy Policy</button>,
                     {' '}and I consent to the collection and processing of my Personal Data in accordance with the Personal Data Protection Act 2010 (Malaysia).
                   </label>
                 </div>
@@ -288,7 +290,7 @@ const Signup: React.FC<SignupProps> = ({ onSwitchToLogin, onNavigateToPolicy }) 
           <div className="mt-8 text-center text-sm text-gray-500">
             <p className="mb-2">Already have an account?</p>
             <button
-              onClick={onSwitchToLogin}
+              onClick={() => navigate('/login')}
               className="text-blue-600 font-bold hover:underline"
             >
               Sign In
