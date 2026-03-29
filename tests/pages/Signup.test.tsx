@@ -1,18 +1,19 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { MemoryRouter } from 'react-router-dom';
 import { server } from '../mocks/server';
 import Signup from '../../pages/Signup';
 import { AuthProvider } from '../../context/AuthContext';
 
-const noop = vi.fn();
-
 function renderSignup() {
   return render(
-    <AuthProvider>
-      <Signup onSwitchToLogin={noop} onNavigateToPolicy={noop} />
-    </AuthProvider>
+    <MemoryRouter>
+      <AuthProvider>
+        <Signup />
+      </AuthProvider>
+    </MemoryRouter>
   );
 }
 
