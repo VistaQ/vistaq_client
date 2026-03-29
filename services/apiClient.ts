@@ -25,7 +25,7 @@ export interface ApiCallOptions {
   headers?: Record<string, string>;
 }
 
-export const apiCall = async <T = unknown>(endpoint: string, options: ApiCallOptions = {}): Promise<{ data: T; status: number }> => {
+export const apiCall = async <T = any>(endpoint: string, options: ApiCallOptions = {}): Promise<T> => {
   const token = localStorage.getItem('authToken');
 
   const slug = getTenantSlug();
@@ -62,7 +62,7 @@ export const apiCall = async <T = unknown>(endpoint: string, options: ApiCallOpt
   }
 
   if (response.status === 204) {
-    return { data: null as T, status: 204 };
+    return null as T;
   }
 
   let data: unknown = {};
@@ -73,7 +73,7 @@ export const apiCall = async <T = unknown>(endpoint: string, options: ApiCallOpt
   }
 
   if (!response.ok) {
-    const apiMessage = data.message || '';
+    const apiMessage = (data as Record<string, unknown>).message as string || '';
     let message: string;
     switch (response.status) {
       case 403: message = "You don't have permission to do that."; break;
@@ -84,5 +84,5 @@ export const apiCall = async <T = unknown>(endpoint: string, options: ApiCallOpt
     throw { status: response.status, message } as ApiError;
   }
 
-  return { data: data as T, status: response.status };
+  return data as T;
 };
