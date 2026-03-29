@@ -107,14 +107,6 @@ export type ProspectProduct = {
   amount: number;
 };
 
-// AI Service Types
-export interface AIChatMessage {
-  id: string;
-  role: 'user' | 'model';
-  text: string;
-  timestamp: number;
-}
-
 // Coaching & Attendance Types
 export interface CoachingAttendance {
   agentId: string;

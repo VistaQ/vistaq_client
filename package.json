@@ -8,12 +8,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "gen:types": "openapi-typescript openapi.yaml -o types.generated.ts",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
-    "@google/genai": "^1.38.0",
     "@lottiefiles/react-lottie-player": "^3.6.0",
     "@vercel/config": "^0.0.33",
     "lottie-react": "^2.4.1",
@@ -24,6 +24,11 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "globals": "^15.0.0",
+    "typescript-eslint": "^8.0.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",

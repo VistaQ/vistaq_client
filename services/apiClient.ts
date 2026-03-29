@@ -19,7 +19,13 @@ export interface ApiError {
   message: string;
 }
 
-export const apiCall = async (endpoint: string, options: any = {}): Promise<any> => {
+export interface ApiCallOptions {
+  method?: string;
+  data?: unknown;
+  headers?: Record<string, string>;
+}
+
+export const apiCall = async <T = unknown>(endpoint: string, options: ApiCallOptions = {}): Promise<{ data: T; status: number }> => {
   const token = localStorage.getItem('authToken');
 
   const slug = getTenantSlug();
@@ -56,10 +62,10 @@ export const apiCall = async (endpoint: string, options: any = {}): Promise<any>
   }
 
   if (response.status === 204) {
-    return null;
+    return { data: null as T, status: 204 };
   }
 
-  let data: any = {};
+  let data: unknown = {};
   try {
     data = await response.json();
   } catch (_e) {
@@ -78,5 +84,5 @@ export const apiCall = async (endpoint: string, options: any = {}): Promise<any>
     throw { status: response.status, message } as ApiError;
   }
 
-  return data;
+  return { data: data as T, status: response.status };
 };

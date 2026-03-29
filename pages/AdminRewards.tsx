@@ -11,7 +11,7 @@ const AdminRewards: React.FC = () => {
   const [hasTierChanges, setHasTierChanges] = useState(false);
   const [hasPointChanges, setHasPointChanges] = useState(false);
 
-  const handleUpdateTier = (id: string, field: keyof BadgeTier, value: any) => {
+  const handleUpdateTier = (id: string, field: keyof BadgeTier, value: string | number) => {
     setTiers(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
     setHasTierChanges(true);
   };

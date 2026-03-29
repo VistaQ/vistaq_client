@@ -1,15 +1,15 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { User, UserRole, Group } from '../types';
-import { Trophy, Medal, Award, Crown, Filter } from 'lucide-react';
+import { Trophy, Medal, Award, Crown, Filter, AlertCircle } from 'lucide-react';
 import { computeUserPoints } from '../services/points';
 import { apiCall } from '../services/apiClient';
 
 const Leaderboard: React.FC = () => {
   const { currentUser } = useAuth();
-  const { prospects, coachingSessions, pointConfig, badgeTiers, refetchCoachingSessions } = useData();
+  const { prospects, coachingSessions, pointConfig, badgeTiers, refetchCoachingSessions, isLoadingProspects } = useData();
 
   const [users, setUsers] = useState<User[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -25,27 +25,37 @@ const Leaderboard: React.FC = () => {
 
   const eligibleRoles = [UserRole.AGENT, UserRole.GROUP_LEADER];
 
-  const allUsers: User[] = users.filter(u => eligibleRoles.includes(u.role));
+  const allUsers: User[] = useMemo(
+    () => users.filter(u => eligibleRoles.includes(u.role)),
+    [users]
+  );
 
-  const sortedBadges = [...badgeTiers].sort((a, b) => a.threshold - b.threshold);
+  const sortedBadges = useMemo(
+    () => [...badgeTiers].sort((a, b) => a.threshold - b.threshold),
+    [badgeTiers]
+  );
 
   const getCurrentBadge = (pts: number) => {
     const reversed = [...sortedBadges].reverse();
     return reversed.find(b => pts >= b.threshold) || sortedBadges[0];
   };
 
-  const ranked = allUsers
-    .map(user => {
-      const userProspects = prospects.filter(p => p.uid === user.id);
-      const { total } = computeUserPoints(user.id, userProspects, coachingSessions, pointConfig);
-      return { user, points: total, badge: getCurrentBadge(total) };
-    })
-    .sort((a, b) => b.points - a.points);
+  const ranked = useMemo(
+    () => allUsers
+      .map(user => {
+        const userProspects = prospects.filter(p => p.uid === user.id);
+        const { total } = computeUserPoints(user.id, userProspects, coachingSessions, pointConfig);
+        return { user, points: total, badge: getCurrentBadge(total) };
+      })
+      .sort((a, b) => b.points - a.points),
+    [allUsers, prospects, coachingSessions, pointConfig, sortedBadges]
+  );
 
   // Group filter — applied only to the display; global rank is preserved
-  const filteredRanked = selectedGroupId === 'all'
-    ? ranked
-    : ranked.filter(e => e.user.group_id === selectedGroupId);
+  const filteredRanked = useMemo(
+    () => selectedGroupId === 'all' ? ranked : ranked.filter(e => e.user.group_id === selectedGroupId),
+    [ranked, selectedGroupId]
+  );
 
   const top3 = filteredRanked.slice(0, 3);
 
@@ -67,6 +77,12 @@ const Leaderboard: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {!isLoadingProspects && prospects.length === 0 && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <span>Leaderboard data could not be loaded. Check your connection and refresh.</span>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center">

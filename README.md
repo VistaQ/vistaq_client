@@ -3,15 +3,13 @@
 ## 1. System Architecture
 **Architecture Style:** Modular Monolith (Logical) / Microservices (Physical scaling).
 **Frontend:** React 19 SPA with TypeScript and Tailwind CSS.
-**Backend (Simulated):** The current implementation uses React Context + LocalStorage to simulate a RESTful backend behavior.
-**AI Layer:** Google Gemini API for intelligent coaching, market insights, and data analysis.
+**Backend:** External REST API at `stg-api.vistaq.co`. Client communicates via `services/apiClient.ts` with JWT auth and tenant-slug headers.
 
 ### High-Level Components
 1.  **Auth Service:** Handles JWT issuance, role validation (RBAC).
 2.  **Core API:** Manages Users, Groups, Prospects, Sales.
 3.  **Workflow Engine:** State machine ensuring strict transitions (Info -> Appt -> Sales -> Points).
 4.  **Reporting Engine:** Aggregates data for dashboards and CSV/PDF exports.
-5.  **AI Gateway:** Interfaces with Gemini models for specific tasks (Search, Chat, Thinking).
 
 ## 2. Database Schema (ERD Concept)
 *   **Users:** `id, name, email, role (ADMIN|TRAINER|LEADER|AGENT), group_id`
@@ -38,4 +36,4 @@
 
 ## 5. Deployment Strategy
 *   **CI/CD:** GitHub Actions -> Build -> S3/CloudFront (Frontend) + ECS/Fargate (Backend).
-*   **Environment:** Production build with distinct API keys for Gemini.
+*   **Environment:** Production build uses `main` branch; staging uses `staging` branch.

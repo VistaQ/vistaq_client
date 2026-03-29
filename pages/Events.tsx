@@ -5,7 +5,7 @@ import { UserRole, Event, Group, User } from '../types';
 import { apiCall } from '../services/apiClient';
 import {
     CalendarDays, Plus, MapPin, User as UserIcon, Users, X, Clock, Link as LinkIcon,
-    Edit2, ExternalLink, LayoutGrid, ChevronLeft, ChevronRight, Archive, Search, Check, Loader2
+    Edit2, ExternalLink, LayoutGrid, ChevronLeft, ChevronRight, Archive, Search, Check, Loader2, AlertCircle
 } from 'lucide-react';
 
 /* ─── Helpers ─────────────────────────────────────────────── */
@@ -409,7 +409,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
 
 const Events: React.FC = () => {
     const { currentUser } = useAuth();
-    const { addEvent, deleteEvent, updateEvent, getEventsForUser, refetchEvents, isLoadingEvents } = useData();
+    const { addEvent, deleteEvent, updateEvent, getEventsForUser, refetchEvents, isLoadingEvents, eventsError } = useData();
 
     const [groups, setGroups] = useState<Group[]>([]);
     const [users, setUsers] = useState<User[]>([]);
@@ -600,6 +600,14 @@ const Events: React.FC = () => {
 
     return (
         <div className="space-y-6">
+            {/* Error Banner */}
+            {eventsError && (
+                <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                    <span>Failed to load events. Check your connection and refresh the page.</span>
+                </div>
+            )}
+
             {/* Page Header */}
             <div className="flex flex-wrap gap-3 justify-between items-center">
                 <div>

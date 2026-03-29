@@ -20,6 +20,7 @@ import {
   Search,
   BarChart2,
   Calendar,
+  AlertCircle,
 } from "lucide-react";
 import {
   BarChart,
@@ -38,7 +39,7 @@ const COLORS = CHART_COLORS;
 
 const Group: React.FC = () => {
   const { currentUser } = useAuth();
-  const { groupStats, refetchGroupStats } = useData();
+  const { groupStats, refetchGroupStats, isLoadingProspects, prospects } = useData();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "sales">("overview");
   const [searchTerm, setSearchTerm] = useState("");
@@ -93,6 +94,12 @@ const Group: React.FC = () => {
 
     return (
       <div className="space-y-6">
+        {!isLoadingProspects && prospects.length === 0 && (
+          <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <span>Prospect data could not be loaded. Check your connection and refresh.</span>
+          </div>
+        )}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
@@ -234,7 +241,7 @@ const Group: React.FC = () => {
       { name: 'Sales',            value: agent.mtd_sales_noc,        barType: 'sales', ace: agent.mtd_sales_ace },
     ];
 
-    const AgentCustomTooltip = ({ active, payload, label }: any) => {
+    const AgentCustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { payload: { barType: string; value: number; ace?: number } }[]; label?: string }) => {
       if (active && payload && payload.length) {
         const data = payload[0].payload;
         return (

@@ -4,7 +4,7 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, Group, User } from '../types';
 import { apiCall } from '../services/apiClient';
-import { MessageSquarePlus, CalendarDays, MapPin, Users, CheckCircle2, ChevronRight, Clock, XCircle, Info, AlignLeft, Edit2, LogIn, Loader2 } from 'lucide-react';
+import { MessageSquarePlus, CalendarDays, MapPin, Users, CheckCircle2, ChevronRight, Clock, XCircle, Info, AlignLeft, Edit2, LogIn, Loader2, AlertCircle } from 'lucide-react';
 import CreateCoachingModal from '../components/CreateCoachingModal';
 import { CoachingSession } from '../types';
 
@@ -39,7 +39,7 @@ const isSessionOngoing = (session: CoachingSession) => {
 
 const Coaching: React.FC = () => {
     const { currentUser } = useAuth();
-    const { getCoachingSessionsForUser, updateCoachingSession, joinCoachingSession, refetchCoachingSessions, isLoadingCoaching } = useData();
+    const { getCoachingSessionsForUser, updateCoachingSession, joinCoachingSession, refetchCoachingSessions, isLoadingCoaching, coachingError } = useData();
 
     const [groups, setGroups] = useState<Group[]>([]);
     const [users, setUsers] = useState<User[]>([]);
@@ -118,6 +118,14 @@ const Coaching: React.FC = () => {
 
     return (
         <div className="space-y-6">
+            {/* Error Banner */}
+            {coachingError && (
+                <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                    <span>Failed to load coaching sessions. Check your connection and refresh the page.</span>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>

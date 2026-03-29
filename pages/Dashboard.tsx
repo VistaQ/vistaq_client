@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { UserRole, Prospect, ProspectStage, CoachingSession, User } from '../types';
@@ -19,7 +19,8 @@ import {
    MapPin,
    ExternalLink,
    DollarSign,
-   TrendingUp
+   TrendingUp,
+   AlertCircle
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, Label } from 'recharts';
 
@@ -37,7 +38,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
    const { currentUser } = useAuth();
-   const { prospects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats } = useData();
+   const { prospects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats, isLoadingProspects } = useData();
 
    const [users, setUsers] = useState<User[]>([]);
 
@@ -90,7 +91,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
          { name: 'Sales',            value: mtd?.sales_noc ?? 0,        barType: 'sales', ace: mtd?.sales_ace ?? 0 },
       ];
 
-      const MgmtCustomTooltip = ({ active, payload, label }: any) => {
+      const MgmtCustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { payload: { barType: string; value: number; ace?: number } }[]; label?: string }) => {
          if (active && payload && payload.length) {
             const data = payload[0].payload;
             return (
@@ -473,22 +474,23 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       .filter(i => { const d = new Date(i.date); return d >= now && d <= sevenDaysFromNow; });
 
    // Take the 5 soonest upcoming items across all 3 types
-   const combinedSchedule = [...upcomingAppointments, ...upcomingEvents, ...upcomingCoachingSessions]
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .slice(0, 5);
+   const combinedSchedule = useMemo(
+     () => [...upcomingAppointments, ...upcomingEvents, ...upcomingCoachingSessions]
+       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+       .slice(0, 5),
+     [upcomingAppointments, upcomingEvents, upcomingCoachingSessions]
+   );
 
    // Chart Data (Month-To-Date Funnel)
-   // We use separate bars conceptually if possible. Recharts allows Custom Tooltips or multi-bar if needed.
-   // We will display Quantity (NOC) and Quality (ACE) in the chart tooltip for Sales.
-   const chartDataMTD = [
+   const chartDataMTD = useMemo(() => [
       { name: 'Prospects',        value: personalMtd?.prospects ?? 0,        barType: 'count' },
       { name: 'Appointments Set', value: personalMtd?.appointments_set ?? 0, barType: 'count' },
       { name: 'Sales Meetings',   value: personalMtd?.sales_meetings ?? 0,   barType: 'count' },
       { name: 'Sales',           value: mtdSalesNOC,           barType: 'sales', ace: mtdSalesACE },
-   ];
+   ], [personalMtd, mtdSalesNOC, mtdSalesACE]);
 
    // Custom Tooltip for the MTD Bar Chart
-   const CustomTooltip = ({ active, payload, label }: any) => {
+   const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { payload: { barType: string; value: number; ace?: number } }[]; label?: string }) => {
       if (active && payload && payload.length) {
          const data = payload[0].payload;
          return (
@@ -510,6 +512,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
    return (
       <div className="space-y-6">
+         {/* Stats load error */}
+         {!isLoadingDashboardStats && !dashboardStats && !isLoadingProspects && prospects.length === 0 && (
+            <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-4 py-3 text-sm">
+               <AlertCircle className="w-5 h-5 flex-shrink-0" />
+               <span>Some data could not be loaded. Check your connection and refresh.</span>
+            </div>
+         )}
+
          <div className="flex justify-between items-center">
             <div>
                <h1 className="text-2xl font-bold text-gray-900">Personal Dashboard</h1>

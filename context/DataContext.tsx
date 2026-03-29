@@ -37,6 +37,10 @@ interface DataContextType {
   isLoadingCoaching: boolean;
   isLoadingDashboardStats: boolean;
 
+  // Error states
+  eventsError: boolean;
+  coachingError: boolean;
+
   // Coaching Methods
   coachingSessions: CoachingSession[];
   addCoachingSession: (session: Partial<CoachingSession>) => Promise<void>;
@@ -62,6 +66,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoadingProspects, setIsLoadingProspects] = useState(false);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [isLoadingCoaching, setIsLoadingCoaching] = useState(false);
+  const [eventsError, setEventsError] = useState(false);
+  const [coachingError, setCoachingError] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [groupStats, setGroupStats] = useState<GroupStats[]>([]);
   const [isLoadingDashboardStats, setIsLoadingDashboardStats] = useState(false);
@@ -86,8 +92,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoadingProspects(true);
     try {
       const res = await apiCall('/prospects');
-      const raw: any[] = Array.isArray(res.data) ? res.data : [];
-      setProspects(raw);
+      const raw: unknown[] = Array.isArray(res.data) ? res.data : [];
+      setProspects(raw as Prospect[]);
     } catch (e) { console.error('[DataContext] fetchProspects:', e); } finally {
       setIsLoadingProspects(false);
     }
@@ -99,13 +105,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
+    setEventsError(false);
     setIsLoadingEvents(true);
     try {
       const res = await apiCall('/events');
-      const raw: any[] = Array.isArray(res.data) ? res.data : [];
-      setEvents(raw);
+      const raw: unknown[] = Array.isArray(res.data) ? res.data : [];
+      setEvents(raw as Event[]);
     } catch (e) {
       console.error('[DataContext] fetchEvents:', e);
+      setEventsError(true);
       setEvents([]);
     } finally {
       setIsLoadingEvents(false);
@@ -118,9 +126,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
+    setCoachingError(false);
     // Simulated Backend Storage Key (Global across all users for accurate simulation)
     const DB_KEY = 'mock_coaching_db';
-    let raw: any[] = [];
+    let raw: unknown[] = [];
 
     try {
       const storedDb = localStorage.getItem(DB_KEY);
@@ -128,6 +137,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         raw = JSON.parse(storedDb);
       }
     } catch (e) {
+      console.error('[DataContext] fetchCoachingSessions:', e);
+      setCoachingError(true);
       raw = [];
     }
 
@@ -161,7 +172,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!localStorage.getItem('authToken')) return;
     try {
       const res = await apiCall('/groups/stats');
-      const raw: GroupStats[] = Array.isArray(res.data) ? res.data : [];
+      const raw = Array.isArray(res.data) ? res.data as GroupStats[] : [];
       setGroupStats(raw);
     } catch (e) { console.error('[DataContext] fetchGroupStats:', e); }
   };
@@ -356,10 +367,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   };
 
-  const addEvent = async (evt: any) => {
-    const { date, time: startTimeUtc } = toUtcDateTime(evt.date, evt.startTime);
-    const { time: endTimeUtc } = toUtcDateTime(evt.date, evt.endTime);
-    const payload: Record<string, any> = {
+  const addEvent = async (evt: Partial<Event>) => {
+    const { date, time: startTimeUtc } = toUtcDateTime((evt as any).date, (evt as any).startTime);
+    const { time: endTimeUtc } = toUtcDateTime((evt as any).date, (evt as any).endTime);
+    const payload: Record<string, unknown> = {
       title: evt.event_title || 'New Event',
       date,
       description: evt.description || '',
@@ -375,8 +386,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await fetchEvents();
   };
 
-  const updateEvent = async (id: string, evt: any) => {
-    const payload: Record<string, any> = {};
+  const updateEvent = async (id: string, evt: Partial<Event>) => {
+    const payload: Record<string, unknown> = {};
     if (evt.event_title) payload.title = evt.event_title;
     if (evt.date) {
       const { date, time: startTimeUtc } = toUtcDateTime(evt.date, evt.startTime);
@@ -529,6 +540,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <DataContext.Provider value={{
       prospects, badgeTiers, pointConfig, events,
       isLoadingProspects, isLoadingEvents, isLoadingCoaching,
+      eventsError, coachingError,
       addProspect, updateProspect, importProspects, deleteProspect,
       getProspectsByScope, getGroupProspects, updateBadgeTiers, updatePointConfig,
       addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents,
