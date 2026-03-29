@@ -3,10 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, Prospect, ProspectStage } from '../types';
-import { Plus, Search, ChevronRight, User, Download, Eye, LayoutList, LayoutGrid, Phone, Calendar, Loader2 } from 'lucide-react';
+import { Plus, Search, ChevronRight, User, Download, Eye, LayoutList, LayoutGrid, Phone, Calendar, Loader2, AlertCircle } from 'lucide-react';
 import { apiCall } from '../services/apiClient';
 import ProspectCard from '../components/ProspectCard';
-import * as XLSX from 'xlsx';
+import { exportProspectsToExcel } from '../utils/exportUtils';
 
 const Prospects: React.FC = () => {
   const { currentUser } = useAuth();
@@ -17,6 +17,7 @@ const Prospects: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProspect, setSelectedProspect] = useState<Prospect | Partial<Prospect> | null>(null);
   const [loadingProspect, setLoadingProspect] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // View Mode State
   const [viewMode, setViewMode] = useState<'list' | 'card'>('list');
@@ -50,16 +51,22 @@ const Prospects: React.FC = () => {
 
   const handleViewProspect = async (prospect: Prospect) => {
     setLoadingProspect(true);
+    setFetchError(null);
     try {
       const res = await apiCall(`/prospects/${prospect.id}`);
       const raw = res.data || prospect;
       const normalized: Prospect = {
         ...raw,
-        products_sold: (raw.products_sold || []).map((p: any, i: number) => ({ ...p, id: p.id || `prod_${i}` })),
+        products_sold: (raw.products_sold || []).map((p: any, i: number) => ({
+          ...p,
+          id: p.id || `prod_${raw.id || 'unknown'}_${i}`,
+        })),
       };
       setSelectedProspect(normalized);
       setIsModalOpen(true);
-    } catch (_e) {
+    } catch (e: any) {
+      console.error('[Prospects] handleViewProspect failed:', e);
+      setFetchError(e?.message || 'Failed to load prospect details. Please try again.');
       setSelectedProspect(prospect);
       setIsModalOpen(true);
     } finally {
@@ -73,43 +80,7 @@ const Prospects: React.FC = () => {
   };
 
   const handleExportExcel = () => {
-    const rows = filteredProspects.map(p => {
-      let outcomeLabel = 'Ongoing';
-      if (p.sales_outcome === 'successful') outcomeLabel = 'Won';
-      else if (p.sales_outcome === 'unsuccessful') outcomeLabel = 'Lost';
-      else if (p.sales_outcome === 'kiv') outcomeLabel = 'KIV';
-
-      const totalAce = p.sales_outcome === 'successful'
-        ? (p.products_sold || []).reduce((sum, prod) => sum + (prod.amount || 0), 0)
-        : 0;
-      const productNames = (p.products_sold || []).map(prod => prod.productName).filter(Boolean).join(', ');
-      const formatTS = (val: any) => {
-        if (!val) return '';
-        const d = val._seconds ? new Date(val._seconds * 1000) : new Date(val);
-        return !isNaN(d.getTime()) ? d.toLocaleDateString() : '';
-      };
-
-      return {
-        'Prospect ID': p.id,
-        'Name': p.prospect_name,
-        'Email': p.prospect_email || '',
-        'Phone': p.prospect_phone || '',
-        'Stage': p.current_stage || '',
-        'Appointment Status': p.appointment_status || '',
-        'Appointment Date': formatTS(p.appointment_date),
-        'Sales Outcome': outcomeLabel,
-        'Lost Reason': p.unsuccessful_reason || '',
-        'Products': productNames,
-        'ACE Amount (MYR)': totalAce,
-        'Created': formatTS(p.created_at),
-        'Last Updated': formatTS(p.updated_at),
-      };
-    });
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Prospects');
-    XLSX.writeFile(wb, `VistaQ_Prospects_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    exportProspectsToExcel(filteredProspects);
   };
 
   const getStageBadge = (prospect: Prospect) => {
@@ -160,6 +131,13 @@ const Prospects: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {fetchError && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{fetchError}</span>
+          <button onClick={() => setFetchError(null)} className="ml-auto text-red-500 hover:text-red-700 font-bold">×</button>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Prospect Management</h1>
         <div className="flex flex-wrap items-center gap-2">

@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useData } from '../context/DataContext';
 import { Prospect, ProspectStage } from '../types';
 import { Upload, FileText, CheckCircle, AlertCircle, FileSpreadsheet } from 'lucide-react';
+import { parseCSV } from '../utils/exportUtils';
 
 const Import: React.FC = () => {
   const { importProspects } = useData();
@@ -38,8 +39,8 @@ const Import: React.FC = () => {
     reader.onload = (e) => {
         try {
             const text = e.target?.result as string;
-            const lines = text.split('\n');
-            if (lines.length < 2) {
+            const allRows = parseCSV(text);
+            if (allRows.length < 2) {
                  setStatus({ msg: 'File is empty or missing headers.', type: 'error' });
                  return;
             }
@@ -47,14 +48,10 @@ const Import: React.FC = () => {
             const parsedData: Prospect[] = [];
             let successCount = 0;
 
-            // Start from index 1 to skip header
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-                
-                // Handle basic CSV parsing
-                const cols = line.split(',');
-                if (cols.length < 4) continue; 
+            // Start from index 1 to skip header row
+            for (let i = 1; i < allRows.length; i++) {
+                const cols = allRows[i];
+                if (cols.length < 4) continue;
 
                 // Mapping based on TEMPLATE_HEADERS order
                 // ['ID', 'Name', 'Phone', 'Group/Agent', 'Outcome', 'Reason', 'Product', 'Amount', 'Date']
@@ -105,9 +102,9 @@ const Import: React.FC = () => {
                 setStatus({ msg: 'No valid records found to import.', type: 'error' });
             }
 
-        } catch (err) {
-            console.error(err);
-            setStatus({ msg: 'Error parsing CSV file.', type: 'error' });
+        } catch (err: any) {
+            console.error('[Import] processFile error:', err);
+            setStatus({ msg: `Error parsing CSV file: ${err?.message || 'Unknown error'}`, type: 'error' });
         }
     };
     reader.readAsText(file);

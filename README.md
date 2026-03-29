@@ -2,7 +2,7 @@
 
 ## 1. System Architecture
 **Architecture Style:** Modular Monolith (Logical) / Microservices (Physical scaling).
-**Frontend:** React 18 SPA with TypeScript and Tailwind CSS.
+**Frontend:** React 19 SPA with TypeScript and Tailwind CSS.
 **Backend (Simulated):** The current implementation uses React Context + LocalStorage to simulate a RESTful backend behavior.
 **AI Layer:** Google Gemini API for intelligent coaching, market insights, and data analysis.
 

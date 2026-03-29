@@ -67,8 +67,8 @@ const buildOccupiedSlots = (
     // --- 3. Prospect Appointments ---
     userProspects.forEach(p => {
         if (!p.appointment_date) return;
-        // Only block times that are actively scheduled/rescheduled
-        if (p.appointment_status !== 'scheduled' && p.appointment_status !== 'rescheduled' && p.appointment_status !== 'not_done') return;
+        // Only block times that are actively scheduled/rescheduled — not_done means the slot was missed, not occupied
+        if (p.appointment_status !== 'scheduled' && p.appointment_status !== 'rescheduled') return;
         try {
             const base = new Date(p.appointment_date);
             if (isNaN(base.getTime())) return;

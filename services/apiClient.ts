@@ -22,8 +22,10 @@ export interface ApiError {
 export const apiCall = async (endpoint: string, options: any = {}): Promise<any> => {
   const token = localStorage.getItem('authToken');
 
+  const slug = getTenantSlug();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    ...(slug ? { 'X-Tenant-Slug': slug } : {}),
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers
   };

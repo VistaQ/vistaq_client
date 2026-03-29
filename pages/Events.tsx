@@ -5,7 +5,7 @@ import { UserRole, Event, Group, User } from '../types';
 import { apiCall } from '../services/apiClient';
 import {
     CalendarDays, Plus, MapPin, User as UserIcon, Users, X, Clock, Link as LinkIcon,
-    Edit2, ExternalLink, LayoutGrid, ChevronLeft, ChevronRight, Archive, Search, Check
+    Edit2, ExternalLink, LayoutGrid, ChevronLeft, ChevronRight, Archive, Search, Check, Loader2
 } from 'lucide-react';
 
 /* ─── Helpers ─────────────────────────────────────────────── */
@@ -409,7 +409,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
 
 const Events: React.FC = () => {
     const { currentUser } = useAuth();
-    const { addEvent, deleteEvent, updateEvent, getEventsForUser, refetchEvents } = useData();
+    const { addEvent, deleteEvent, updateEvent, getEventsForUser, refetchEvents, isLoadingEvents } = useData();
 
     const [groups, setGroups] = useState<Group[]>([]);
     const [users, setUsers] = useState<User[]>([]);
@@ -446,6 +446,12 @@ const Events: React.FC = () => {
     const [agentSearch, setAgentSearch] = useState('');
 
     if (!currentUser) return null;
+    if (isLoadingEvents) return (
+        <div className="flex items-center justify-center py-32 text-gray-400">
+            <Loader2 className="w-8 h-8 animate-spin mr-3" />
+            <span className="text-sm font-medium">Loading events...</span>
+        </div>
+    );
 
     const isAdmin = currentUser.role === UserRole.ADMIN;
     const canManage = isAdmin ||

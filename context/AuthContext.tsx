@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Notification } from '../types';
+import { User, UserRole, Notification } from '../types';
 import { apiCall, getTenantSlug } from '../services/apiClient';
 
 interface AuthContextType {
@@ -89,7 +89,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.setItem('authUser', JSON.stringify(user));
       setCurrentUser(user);
       return true;
-    } catch (_e) {
+    } catch (e) {
+      console.error('[AuthContext] login failed:', e);
       return false;
     }
   };
@@ -154,7 +155,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const fresh = normalizeUser(res.data);
       setCurrentUser(fresh);
       localStorage.setItem('authUser', JSON.stringify(fresh));
-    } catch (_e) {}
+    } catch (e) {
+      console.error('[AuthContext] refreshCurrentUser failed:', e);
+    }
   };
 
   const updateProfile = async (updates: Partial<User>) => {

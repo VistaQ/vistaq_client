@@ -18,6 +18,32 @@ import {
   Globe
 } from 'lucide-react';
 
+/** Generate a secure temporary password with guaranteed mixed-character entropy. */
+const generateTempPassword = (): string => {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghjkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const special = '@#$!';
+  const all = upper + lower + digits + special;
+  const arr = new Uint32Array(12);
+  crypto.getRandomValues(arr);
+  const required = [
+    upper[arr[0] % upper.length],
+    lower[arr[1] % lower.length],
+    digits[arr[2] % digits.length],
+    special[arr[3] % special.length],
+  ];
+  const rest = Array.from(arr.slice(4), n => all[n % all.length]);
+  const combined = [...required, ...rest];
+  const shuffleArr = new Uint32Array(combined.length);
+  crypto.getRandomValues(shuffleArr);
+  return combined
+    .map((v, i) => ({ v, sort: shuffleArr[i] }))
+    .sort((a, b) => a.sort - b.sort)
+    .map(x => x.v)
+    .join('');
+};
+
 const AdminUsers: React.FC = () => {
   const { addUser, updateUser, deleteUser } = useAuth();
 
@@ -40,7 +66,8 @@ const AdminUsers: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Partial<User> | null>(null);
-  
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   // Local state for temporary password
   const [tempPassword, setTempPassword] = useState('');
 
@@ -57,7 +84,7 @@ const AdminUsers: React.FC = () => {
       setTempPassword(''); // Don't show password on edit usually
     } else {
       // New User Default
-      const randomPass = Math.random().toString(36).slice(-8);
+      const randomPass = generateTempPassword();
       setTempPassword(randomPass);
       setEditingUser({
         name: '',
@@ -86,10 +113,9 @@ const AdminUsers: React.FC = () => {
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      await deleteUser(id);
-      fetchData();
-    }
+    await deleteUser(id);
+    setConfirmDeleteId(null);
+    fetchData();
   };
 
   return (
@@ -189,7 +215,7 @@ const AdminUsers: React.FC = () => {
                        <button onClick={() => handleOpenModal(user)} className="text-blue-600 hover:text-blue-800">
                           <Edit2 className="w-4 h-4" />
                        </button>
-                       <button onClick={() => handleDeleteUser(user.id)} className="text-red-600 hover:text-red-800">
+                       <button onClick={() => setConfirmDeleteId(user.id)} className="text-red-600 hover:text-red-800">
                           <Trash2 className="w-4 h-4" />
                        </button>
                     </td>
@@ -200,6 +226,25 @@ const AdminUsers: React.FC = () => {
       </div>
 
       {/* Add/Edit Modal */}
+      {/* Delete Confirmation Modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label="Confirm Delete">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="px-6 py-4 bg-red-600 flex justify-between items-center">
+              <h3 className="font-semibold text-white">Delete User</h3>
+              <button onClick={() => setConfirmDeleteId(null)} aria-label="Close" className="text-white/70 hover:text-white p-1 rounded-full hover:bg-white/20 transition-colors"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-gray-700">Are you sure you want to delete this user? This action cannot be undone.</p>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium">Cancel</button>
+                <button onClick={() => handleDeleteUser(confirmDeleteId)} className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 font-bold">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isModalOpen && editingUser && (
          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label={editingUser.id ? 'Edit User' : 'Add New User'}>
             <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -211,20 +256,22 @@ const AdminUsers: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4">
                      <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Name</label>
-                        <input 
-                           type="text" 
-                           className="w-full bg-gray-50 border border-gray-300 text-gray-900 p-2 rounded" 
+                        <input
+                           type="text"
+                           className="w-full bg-gray-50 border border-gray-300 text-gray-900 p-2 rounded"
                            value={editingUser.name}
                            onChange={e => setEditingUser({...editingUser, name: e.target.value})}
+                           required
                         />
                      </div>
                      <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
-                        <input 
-                           type="email" 
-                           className="w-full bg-gray-50 border border-gray-300 text-gray-900 p-2 rounded" 
+                        <input
+                           type="email"
+                           className="w-full bg-gray-50 border border-gray-300 text-gray-900 p-2 rounded"
                            value={editingUser.email}
                            onChange={e => setEditingUser({...editingUser, email: e.target.value})}
+                           required
                         />
                      </div>
                   </div>

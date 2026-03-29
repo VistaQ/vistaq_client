@@ -4,7 +4,7 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, Group, User } from '../types';
 import { apiCall } from '../services/apiClient';
-import { MessageSquarePlus, CalendarDays, MapPin, Users, CheckCircle2, ChevronRight, Clock, XCircle, Info, AlignLeft, Edit2, LogIn } from 'lucide-react';
+import { MessageSquarePlus, CalendarDays, MapPin, Users, CheckCircle2, ChevronRight, Clock, XCircle, Info, AlignLeft, Edit2, LogIn, Loader2 } from 'lucide-react';
 import CreateCoachingModal from '../components/CreateCoachingModal';
 import { CoachingSession } from '../types';
 
@@ -39,7 +39,7 @@ const isSessionOngoing = (session: CoachingSession) => {
 
 const Coaching: React.FC = () => {
     const { currentUser } = useAuth();
-    const { getCoachingSessionsForUser, updateCoachingSession, joinCoachingSession, refetchCoachingSessions } = useData();
+    const { getCoachingSessionsForUser, updateCoachingSession, joinCoachingSession, refetchCoachingSessions, isLoadingCoaching } = useData();
 
     const [groups, setGroups] = useState<Group[]>([]);
     const [users, setUsers] = useState<User[]>([]);
@@ -142,7 +142,12 @@ const Coaching: React.FC = () => {
                 )}
             </div>
 
-            {sessions.length === 0 ? (
+            {isLoadingCoaching ? (
+                <div className="flex items-center justify-center py-20 text-gray-400">
+                    <Loader2 className="w-8 h-8 animate-spin mr-3" />
+                    <span className="text-sm font-medium">Loading sessions...</span>
+                </div>
+            ) : sessions.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm">
                     <div className="inline-flex items-center justify-center p-4 bg-indigo-50 text-indigo-500 rounded-full mb-4">
                         <MessageSquarePlus className="w-8 h-8" />
