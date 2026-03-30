@@ -44,12 +44,14 @@ export const MODAL_HEADER_GRADIENTS = {
 // Badge Tier Colors (default fallback — real tiers come from AdminRewards config)
 // ---------------------------------------------------------------------------
 export const DEFAULT_BADGE_TIERS = [
-  { id: 'b1', name: 'Rookie',           threshold: 0,     color: 'text-gray-400',   bg: 'bg-gray-100'  },
-  { id: 'b2', name: 'Rising Star',      threshold: 1000,  color: 'text-blue-500',   bg: 'bg-blue-100'  },
-  { id: 'b3', name: 'Bronze Achiever',  threshold: 3000,  color: 'text-amber-700',  bg: 'bg-amber-100' },
-  { id: 'b4', name: 'Silver Elite',     threshold: 8000,  color: 'text-gray-400',   bg: 'bg-gray-100'  },
-  { id: 'b5', name: 'Gold Master',      threshold: 15000, color: 'text-yellow-500', bg: 'bg-yellow-100'},
-  { id: 'b6', name: 'Platinum Legend',  threshold: 25000, color: 'text-indigo-500', bg: 'bg-indigo-100'},
+  { id: 'b1', name: 'Foundation', level: 1, threshold: 0,     color: 'text-gray-500',   bg: 'bg-gray-100'   },
+  { id: 'b2', name: 'Momentum',   level: 2, threshold: 1000,  color: 'text-blue-500',   bg: 'bg-blue-100'   },
+  { id: 'b3', name: 'Bronze',     level: 3, threshold: 2500,  color: 'text-amber-700',  bg: 'bg-amber-100'  },
+  { id: 'b4', name: 'Silver',     level: 4, threshold: 5000,  color: 'text-slate-400',  bg: 'bg-slate-100'  },
+  { id: 'b5', name: 'Gold',       level: 5, threshold: 9000,  color: 'text-yellow-500', bg: 'bg-yellow-100' },
+  { id: 'b6', name: 'Platinum',   level: 6, threshold: 14000, color: 'text-indigo-400', bg: 'bg-indigo-100' },
+  { id: 'b7', name: 'Pinnacle',   level: 7, threshold: 20000, color: 'text-purple-600', bg: 'bg-purple-100' },
+  { id: 'b8', name: 'Achiever',   level: 8, threshold: 28000, color: 'text-yellow-600', bg: 'bg-gray-900'   },
 ];
 
 // ---------------------------------------------------------------------------

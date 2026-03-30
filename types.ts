@@ -67,6 +67,7 @@ export interface Notification {
 export interface BadgeTier {
   id: string;
   name: string;
+  level: number;        // Numeric level (1 = Foundation, 8 = Achiever)
   threshold: number;
   color: string;
   bg: string;
@@ -74,10 +75,16 @@ export interface BadgeTier {
 }
 
 export interface PointConfig {
+  // Category 1: Prospect Management
   prospectBasicInfo: number;      // default 2
   appointmentCompleted: number;   // default 3
   salesMeetingCompleted: number;  // default 6
   salesSuccessful: number;        // default 15
+  // Category 2: Sales Completion (frontend-ready; backend TBD)
+  salesIssuanceCertificate: number; // default 30 per certificate
+  salesFYCt: number;                // default 30 per RM1,000
+  salesACE: number;                 // default 30 per RM1,000
+  // Category 3: Personal Development
   coachingIndividual: number;     // default 10
   coachingGroup: number;          // default 10
   coachingPeerCircles: number;    // default 10
@@ -88,7 +95,7 @@ export interface PointConfig {
 export interface PointEntry {
   id: string;
   date: string;
-  category: 'prospect' | 'coaching';
+  category: 'prospect' | 'sales' | 'coaching';
   action: string;
   subject: string;
   points: number;
