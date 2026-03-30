@@ -1,9 +1,9 @@
 name: Deploy to Vercel (Production)
 
-# Production deployments are MANUAL ONLY.
-# Never push directly to main. Merge staging → main via PR, then trigger this workflow.
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   deploy:
