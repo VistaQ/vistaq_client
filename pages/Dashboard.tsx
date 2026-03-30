@@ -197,7 +197,7 @@ const Dashboard: React.FC = () => {
                            <div className="mt-1 flex justify-between items-end w-full">
                               <div>
                                  <h3 className="text-xl font-bold text-gray-900 truncate">{groupRankings[0]?.name || 'N/A'}</h3>
-                                 <p className="text-sm font-mono text-green-600 font-bold">RM {groupRankings[0]?.fyc.toLocaleString() || '0'}</p>
+                                 <p className="text-sm font-mono text-green-600 font-bold">RM {groupRankings[0]?.fyc.toLocaleString() || '0'} <span className="text-xs font-sans font-semibold text-gray-400">ACE</span></p>
                               </div>
                               <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg"><Crown className="w-5 h-5" /></div>
                            </div>
@@ -220,7 +220,14 @@ const Dashboard: React.FC = () => {
                <BarChart2 className="w-5 h-5 mr-2 text-gray-500" />
                Performance Metrics (YTD)
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects</p>
+                  <h3 className="text-3xl font-bold text-gray-900">{ytd?.prospects ?? 0}</h3>
+                  <p className="text-xs text-gray-400 mt-1">Year to Date</p>
+               </div>
+
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Calendar className="w-5 h-5" /></div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Total Appointments</p>
