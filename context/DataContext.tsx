@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, PointConfig, Group, DashboardStats, GroupStats } from '../types';
+import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, CoachingAttendance, PointConfig, Group, DashboardStats, GroupStats } from '../types';
 import { apiCall } from '../services/apiClient';
 import { DEFAULT_POINT_CONFIG } from '../services/points';
 
@@ -47,6 +47,7 @@ interface DataContextType {
   updateCoachingSession: (id: string, updates: Partial<CoachingSession>) => Promise<void>;
   deleteCoachingSession: (id: string) => Promise<void>;
   joinCoachingSession: (sessionId: string, user: User) => Promise<void>;
+  markNonAttendees: (sessionId: string) => Promise<void>;
   getCoachingSessionsForUser: (user: User) => CoachingSession[];
   refetchCoachingSessions: () => Promise<void>;
 }
@@ -509,6 +510,30 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await fetchCoachingSessions();
   };
 
+  // Mark any 'pending' attendance records as 'did_not_attend' for a closed session
+  const markNonAttendees = async (sessionId: string) => {
+    const db = getMockDb();
+    const index = db.findIndex(s => s.id === sessionId);
+    if (index < 0) return;
+
+    const session = db[index];
+    let changed = false;
+
+    const updatedAttendance = session.attendance.map((a: CoachingAttendance) => {
+      if (a.status === 'pending') {
+        changed = true;
+        return { ...a, status: 'did_not_attend' as const };
+      }
+      return a;
+    });
+
+    if (changed) {
+      db[index] = { ...session, attendance: updatedAttendance, updatedAt: new Date().toISOString() };
+      setMockDb(db);
+      await fetchCoachingSessions();
+    }
+  };
+
   const getCoachingSessionsForUser = (user: User): CoachingSession[] => {
     if (!user) return [];
 
@@ -545,7 +570,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       getProspectsByScope, getGroupProspects, updateBadgeTiers, updatePointConfig,
       addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents,
       coachingSessions, addCoachingSession, updateCoachingSession, deleteCoachingSession,
-      joinCoachingSession, getCoachingSessionsForUser, refetchCoachingSessions: fetchCoachingSessions,
+      joinCoachingSession, markNonAttendees, getCoachingSessionsForUser, refetchCoachingSessions: fetchCoachingSessions,
       dashboardStats, groupStats, isLoadingDashboardStats,
       refetchDashboardStats: fetchDashboardStats, refetchGroupStats: fetchGroupStats
     }}>

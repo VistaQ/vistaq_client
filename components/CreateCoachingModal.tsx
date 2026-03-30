@@ -1,13 +1,15 @@
 import React, { useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole, CoachingType, CoachingSession } from '../types';
+import { UserRole, CoachingType, CoachingSession, Group, User } from '../types';
 import { X, Calendar as CalendarIcon, MapPin, Link as LinkIcon, Users, Check, Clock, AlertTriangle, Info } from 'lucide-react';
 import { useCalendarConflicts, checkConflict } from '../hooks/useCalendarConflicts';
 
 interface CreateCoachingModalProps {
     onClose: () => void;
     editSession?: CoachingSession;
+    groups: Group[];
+    users: User[];
 }
 
 // ─── Coaching type options by role ───────────────────────────────────────────
@@ -25,8 +27,8 @@ const LEADER_TYPES: TypeOption[] = [
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
-const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, editSession }) => {
-    const { currentUser, groups, users } = useAuth();
+const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, editSession, groups, users }) => {
+    const { currentUser } = useAuth();
     const { addCoachingSession, updateCoachingSession } = useData();
     const { occupiedSlots } = useCalendarConflicts();
 
@@ -35,7 +37,9 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
     const isMasterTrainer = currentUser?.role === UserRole.MASTER_TRAINER;
     const isTrainer = currentUser?.role === UserRole.TRAINER; // Group Trainer
 
-    const typeOptions = isGroupLeader ? LEADER_TYPES : MANAGEMENT_TYPES;
+    // All management roles (Admin, Master Trainer, Trainer, Group Leader) can create any session type.
+    // Only Agents cannot create sessions (handled by the parent page not showing the Create button).
+    const typeOptions = MANAGEMENT_TYPES;
 
     // Default to editSession values if available
     const [coachingType, setCoachingType] = useState<CoachingType>(editSession?.coachingType || typeOptions[0].value);
@@ -173,9 +177,9 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                 durationEnd,
                 venue,
                 link: link || undefined,
-                created_by: currentUser?.id,
-                created_by_name: currentUser?.name,
-                created_by_role: currentUser?.role,
+                createdBy: currentUser?.id,
+                createdByName: currentUser?.name,
+                createdByRole: currentUser?.role,
                 targetGroupIds: tGroups,
                 targetAgentIds: tAgents,
             };

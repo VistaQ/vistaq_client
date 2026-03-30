@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, Group, User } from '../types';
@@ -8,38 +8,62 @@ import { MessageSquarePlus, CalendarDays, MapPin, Users, CheckCircle2, ChevronRi
 import CreateCoachingModal from '../components/CreateCoachingModal';
 import { CoachingSession } from '../types';
 
-const isSessionOver = (session: CoachingSession) => {
+// ─── Timing helpers (±15 min window) ──────────────────────────────────────────
+
+/** Returns the exact moment the Join button opens: 15 minutes before start */
+const getJoinWindowStart = (session: CoachingSession): Date => {
+    const d = new Date(session.date);
+    const [sh, sm] = session.durationStart.split(':').map(Number);
+    d.setHours(sh, sm, 0, 0);
+    return new Date(d.getTime() - 15 * 60 * 1000);
+};
+
+/** Returns the exact moment the Join button closes: 15 minutes after end */
+const getJoinWindowEnd = (session: CoachingSession): Date => {
+    const d = new Date(session.date);
+    const [eh, em] = session.durationEnd.split(':').map(Number);
+    d.setHours(eh, em, 0, 0);
+    return new Date(d.getTime() + 15 * 60 * 1000);
+};
+
+/** True while the Join button should be active (15 min before start → 15 min after end) */
+const isJoinWindowOpen = (session: CoachingSession): boolean => {
     try {
-        const sessionDate = new Date(session.date);
-        if (isNaN(sessionDate.getTime())) return false;
-        const [eh, em] = session.durationEnd.split(':').map(Number);
-        sessionDate.setHours(eh, em, 0, 0);
-        return new Date() > sessionDate;
+        const now = new Date();
+        return now >= getJoinWindowStart(session) && now < getJoinWindowEnd(session);
     } catch {
         return false;
     }
 };
 
-const isSessionOngoing = (session: CoachingSession) => {
+/** True once the Join window has permanently closed (now ≥ end + 15 min) */
+const isSessionEnded = (session: CoachingSession): boolean => {
     try {
-        const sessionDate = new Date(session.date);
-        if (isNaN(sessionDate.getTime())) return false;
-        const [sh, sm] = session.durationStart.split(':').map(Number);
-        const [eh, em] = session.durationEnd.split(':').map(Number);
-        const startDate = new Date(sessionDate);
-        startDate.setHours(sh, sm, 0, 0);
-        const endDate = new Date(sessionDate);
-        endDate.setHours(eh, em, 0, 0);
-        const now = new Date();
-        return now >= startDate && now < endDate;
+        return new Date() >= getJoinWindowEnd(session);
     } catch {
         return false;
     }
 };
+
+/** Dynamic card status: Ended / On-going / Upcoming */
+const getDisplayStatus = (session: CoachingSession): { label: string; cls: string } => {
+    if (session.status === 'cancelled') return { label: '✕ CANCELLED', cls: 'bg-red-100 text-red-600' };
+    if (isSessionEnded(session)) return { label: 'Ended', cls: 'bg-gray-100 text-gray-500' };
+    if (isJoinWindowOpen(session)) return { label: 'On-going', cls: 'bg-emerald-50 text-emerald-600' };
+    return { label: 'Upcoming', cls: 'bg-blue-50 text-blue-600' };
+};
+
+/** Friendly display time for when the Join button opens */
+const formatJoinWindowStart = (session: CoachingSession): string => {
+    const d = getJoinWindowStart(session);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
 
 const Coaching: React.FC = () => {
     const { currentUser } = useAuth();
-    const { getCoachingSessionsForUser, updateCoachingSession, joinCoachingSession, refetchCoachingSessions, isLoadingCoaching, coachingError } = useData();
+    const { getCoachingSessionsForUser, updateCoachingSession, joinCoachingSession, markNonAttendees, refetchCoachingSessions, isLoadingCoaching, coachingError } = useData();
 
     const [groups, setGroups] = useState<Group[]>([]);
     const [users, setUsers] = useState<User[]>([]);
@@ -57,6 +81,21 @@ const Coaching: React.FC = () => {
     if (!currentUser) return null;
 
     const sessions = getCoachingSessionsForUser(currentUser);
+
+    // ─── Auto-mark non-attendees once per session, per page load ──────────────
+    const processedEndedSessions = useRef<Set<string>>(new Set());
+    useEffect(() => {
+        sessions.forEach(session => {
+            if (
+                isSessionEnded(session) &&
+                session.status !== 'cancelled' &&
+                !processedEndedSessions.current.has(session.id)
+            ) {
+                processedEndedSessions.current.add(session.id);
+                markNonAttendees(session.id);
+            }
+        });
+    }, [sessions]);
 
     // Handler for agents/group leaders to self-register attendance
     const handleJoinSession = async (sessionId: string) => {
@@ -79,7 +118,7 @@ const Coaching: React.FC = () => {
     // Who can manage a given session:
     // - Admin / Master Trainer: full control over ALL sessions
     // - Group Trainer: only sessions THEY created
-    // - Group Leader: only Peer Circle sessions THEY created
+    // - Group Leader: only sessions THEY created
     const canManageSession = (sessionCreatorId: string) => {
         if (currentUser.role === UserRole.ADMIN) return true;
         if (currentUser.role === UserRole.MASTER_TRAINER) return true;
@@ -131,9 +170,7 @@ const Coaching: React.FC = () => {
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Coaching & Attendance</h1>
                     <p className="text-gray-500 mt-1">
-                        {currentUser.role === UserRole.GROUP_LEADER
-                            ? 'Schedule Peer Circle sessions and track attendance for your team.'
-                            : isManagement
+                        {isManagement
                             ? 'Manage coaching sessions and track attendance.'
                             : 'View your assigned coaching sessions below.'}
                     </p>
@@ -162,9 +199,7 @@ const Coaching: React.FC = () => {
                     </div>
                     <h3 className="text-lg font-bold text-gray-900">No Coaching Sessions</h3>
                     <p className="text-gray-500 max-w-sm mx-auto mt-2">
-                        {currentUser.role === UserRole.GROUP_LEADER
-                            ? "No sessions yet. Click 'Create Session' to run a Peer Circle with your agents."
-                            : isManagement
+                        {isManagement
                             ? "You haven't scheduled any coaching sessions yet. Click the button above to create one."
                             : "You don't have any upcoming coaching sessions assigned right now."}
                     </p>
@@ -177,13 +212,15 @@ const Coaching: React.FC = () => {
 
                         {sessions.map(session => {
                             const isCancelled = session.status === 'cancelled';
-                            const sessionOver = isSessionOver(session);
-                            const sessionOngoing = isSessionOngoing(session);
+                            const sessionEnded = isSessionEnded(session);
+                            const joinWindowOpen = isJoinWindowOpen(session);
+                            const displayStatus = getDisplayStatus(session);
                             // isParticipant: agents always, group leaders when they didn't create the session
                             const isParticipant = currentUser.role === UserRole.AGENT ||
                                 (currentUser.role === UserRole.GROUP_LEADER && session.createdBy !== currentUser.id);
                             const myAttendance = session.attendance.find(a => a.agentId === currentUser.id);
                             const hasJoined = isParticipant && myAttendance?.status === 'joined';
+                            const didNotAttend = isParticipant && myAttendance?.status === 'did_not_attend';
 
                             let cardClass = 'bg-white border-gray-200 hover:border-indigo-300 hover:shadow-sm';
                             if (isCancelled) {
@@ -191,7 +228,7 @@ const Coaching: React.FC = () => {
                             } else if (isParticipant) {
                                 if (hasJoined) {
                                     cardClass = 'bg-emerald-50 border-emerald-500 shadow-sm';
-                                } else if (sessionOver) {
+                                } else if (sessionEnded || didNotAttend) {
                                     cardClass = 'bg-amber-50 border-amber-500 shadow-sm text-amber-900';
                                 } else if (selectedSessionId === session.id) {
                                     cardClass = 'bg-white border-indigo-500 shadow-md ring-1 ring-indigo-500';
@@ -222,11 +259,8 @@ const Coaching: React.FC = () => {
                                             <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg ${typeBadgeClass}`}>
                                                 {session.coachingType}
                                             </span>
-                                            <span className={`px-2 py-1 text-xs font-bold rounded-lg ${isCancelled ? 'bg-red-100 text-red-600'
-                                                : session.status === 'upcoming' ? 'bg-blue-50 text-blue-600'
-                                                    : 'bg-emerald-50 text-emerald-600'
-                                                }`}>
-                                                {isCancelled ? '✕ CANCELLED' : session.status.toUpperCase()}
+                                            <span className={`px-2 py-1 text-xs font-bold rounded-lg ${displayStatus.cls}`}>
+                                                {displayStatus.label}
                                             </span>
                                         </div>
                                     </div>
@@ -279,7 +313,7 @@ const Coaching: React.FC = () => {
                                         <div className={`mt-3 pt-3 border-t flex items-center justify-between gap-2 ${
                                             hasJoined
                                                 ? 'border-emerald-200'
-                                                : sessionOver
+                                                : sessionEnded || didNotAttend
                                                     ? 'border-amber-200'
                                                     : 'border-gray-100'
                                         }`}>
@@ -288,20 +322,24 @@ const Coaching: React.FC = () => {
                                                     <CheckCircle2 className="w-4 h-4" />
                                                     Attendance Logged — {myAttendance?.joinedAt ? formatDateTime(myAttendance.joinedAt) : ''}
                                                 </span>
-                                            ) : sessionOngoing ? (
+                                            ) : didNotAttend ? (
+                                                <span className="flex items-center gap-1.5 text-xs font-bold text-amber-700">
+                                                    <Info className="w-4 h-4" /> Did Not Attend
+                                                </span>
+                                            ) : joinWindowOpen ? (
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleJoinSession(session.id); }}
                                                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
                                                 >
                                                     <LogIn className="w-3.5 h-3.5" /> Join Session
                                                 </button>
-                                            ) : sessionOver ? (
+                                            ) : sessionEnded ? (
                                                 <span className="flex items-center gap-1.5 text-xs font-bold text-amber-700">
                                                     <Info className="w-4 h-4" /> Did Not Attend
                                                 </span>
                                             ) : (
                                                 <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400">
-                                                    <Clock className="w-4 h-4" /> Join button available at {session.durationStart}
+                                                    <Clock className="w-4 h-4" /> Join button available at {formatJoinWindowStart(session)}
                                                 </span>
                                             )}
                                         </div>
@@ -360,7 +398,7 @@ const Coaching: React.FC = () => {
                                 const notAttendedAgents = invitedAgents.filter(u =>
                                     !sel.attendance.find(a => a.agentId === u.id && a.status === 'joined')
                                 );
-                                const selOver = isSessionOver(sel);
+                                const selEnded = isSessionEnded(sel);
 
                                 return (
                                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -413,22 +451,22 @@ const Coaching: React.FC = () => {
 
                                                     {/* Did Not Attend Section */}
                                                     <div className="p-5">
-                                                        <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${selOver ? 'text-amber-600' : 'text-gray-400'}`}>
+                                                        <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${selEnded ? 'text-amber-600' : 'text-gray-400'}`}>
                                                             <Info className="w-3.5 h-3.5" />
-                                                            {selOver ? `Did Not Attend (${notAttendedAgents.length})` : `Not Yet Joined (${notAttendedAgents.length})`}
+                                                            {selEnded ? `Did Not Attend (${notAttendedAgents.length})` : `Not Yet Joined (${notAttendedAgents.length})`}
                                                         </h4>
                                                         {notAttendedAgents.length === 0 ? (
                                                             <p className="text-sm text-gray-400 italic">All invited agents attended.</p>
                                                         ) : (
                                                             <div className="space-y-2">
                                                                 {notAttendedAgents.map(agent => (
-                                                                    <div key={agent.id} className={`flex items-center justify-between py-2 px-3 border rounded-xl ${selOver ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
+                                                                    <div key={agent.id} className={`flex items-center justify-between py-2 px-3 border rounded-xl ${selEnded ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
                                                                         <div>
                                                                             <p className="text-sm font-semibold text-gray-900">{agent.name || agent.email}</p>
                                                                             <p className="text-xs text-gray-500">{agent.group_id ? groups.find(g => g.id === agent.group_id)?.name || '' : 'No Group'}</p>
                                                                         </div>
-                                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${selOver ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-gray-500'}`}>
-                                                                            {selOver ? 'Did Not Attend' : 'Invited'}
+                                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${selEnded ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-gray-500'}`}>
+                                                                            {selEnded ? 'Did Not Attend' : 'Invited'}
                                                                         </span>
                                                                     </div>
                                                                 ))}
@@ -455,6 +493,8 @@ const Coaching: React.FC = () => {
                 <CreateCoachingModal
                     onClose={() => { setIsCreateModalOpen(false); setEditingSession(null); }}
                     editSession={editingSession || undefined}
+                    groups={groups}
+                    users={users}
                 />
             )}
         </div>

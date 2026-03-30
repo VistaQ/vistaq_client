@@ -121,7 +121,7 @@ export interface CoachingAttendance {
   agentEmail?: string;
   groupId?: string; // Group the agent belongs to
   groupName?: string;
-  status: 'pending' | 'joined';
+  status: 'pending' | 'joined' | 'did_not_attend';
   joinedAt?: string; // ISO String when agent clicks "Join" — this is the attendance log timestamp
 }
 
