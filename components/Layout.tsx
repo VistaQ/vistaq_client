@@ -125,7 +125,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           {/* Management Views for Admin, Master Trainer, Trainer & Leaders */}
           {isManagement && (
             <>
-              <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Performance</div>
+              <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Group</div>
               <NavItem id="group" label="Group Progress" icon={TrendingUp} />
             </>
           )}
@@ -230,7 +230,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {/* Management */}
                 {isManagement && (
                   <>
-                    <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Performance</div>
+                    <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Group</div>
                     <NavItem id="group" label="Group Progress" icon={TrendingUp} />
                   </>
                 )}
