@@ -27,7 +27,7 @@ const PLACEHOLDER_METRICS: string[] = ['noc', 'ace', 'fyct', 'fyc', 'acs'];
 
 const Leaderboard: React.FC = () => {
   const { currentUser } = useAuth();
-  const { pointConfig, badgeTiers } = useData();
+  const { badgeTiers } = useData();
 
   const [tab, setTab] = useState<Tab>('individual');
   const [metric, setMetric] = useState<Metric>('points');
@@ -60,43 +60,34 @@ const Leaderboard: React.FC = () => {
     return reversed.find(b => pts >= b.threshold) || sortedBadges[0];
   };
 
-  const computeScore = (entry: IndividualEntry | GroupEntry): number => {
-    if (metric === 'prospects') return entry.prospects_added;
-    return (
-      entry.prospects_added * pointConfig.prospectBasicInfo +
-      entry.appointments_completed * pointConfig.appointmentCompleted +
-      entry.sales_meetings * pointConfig.salesMeetingCompleted +
-      entry.sales_successful * pointConfig.salesSuccessful
-    );
-  };
+  const getScore = (entry: IndividualEntry | GroupEntry): number =>
+    metric === 'prospects' ? entry.prospects_added : entry.total_points;
 
   // ── Individual tab rankings ──────────────────────────────────────────────
   const individualRanked = useMemo(() => {
     if (!statsData) return [];
     return statsData.individual
       .map(entry => {
-        const score = computeScore(entry);
+        const score = getScore(entry);
         return { entry, score, badge: getCurrentBadge(score) };
       })
       .sort((a, b) => b.score - a.score);
-  }, [statsData, metric, pointConfig, sortedBadges]);
+  }, [statsData, metric, sortedBadges]);
 
   // ── Group tab rankings ───────────────────────────────────────────────────
   const groupRanked = useMemo(() => {
     if (!statsData) return [];
     return statsData.groups
       .map(group => {
-        const totalScore = computeScore(group);
-        // Find top individual member by score within this group
+        const totalScore = getScore(group);
         const members = statsData.individual.filter(i => i.group_id === group.group_id);
-        const topMember = members.reduce<IndividualEntry | null>((best, m) => {
-          const s = computeScore(m);
-          return !best || s > computeScore(best) ? m : best;
-        }, null);
+        const topMember = members.reduce<IndividualEntry | null>((best, m) =>
+          !best || m.total_points > best.total_points ? m : best
+        , null);
         return { group, totalScore, topMemberName: topMember?.name ?? '—' };
       })
       .sort((a, b) => b.totalScore - a.totalScore);
-  }, [statsData, metric, pointConfig]);
+  }, [statsData, metric]);
 
   const ranked = tab === 'individual' ? individualRanked : groupRanked;
   const top3 = ranked.slice(0, 3);
