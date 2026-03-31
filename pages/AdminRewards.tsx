@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { BadgeTier, PointConfig } from '../types';
+import { BadgeTier, PointConfig, UserRole } from '../types';
 import type { components } from '../types.generated';
 
 type PointConfigObject = components['schemas']['PointConfigObject'];
@@ -25,6 +26,9 @@ const FIELD_TO_ACTIVITY: Partial<Record<keyof PointConfig, ActivityKey>> = {
 };
 
 const AdminRewards: React.FC = () => {
+  const { currentUser } = useAuth();
+  if (!currentUser || currentUser.role !== UserRole.ADMIN) return null;
+
   const { badgeTiers, updateBadgeTiers } = useData();
   const [tiers, setTiers] = useState<BadgeTier[]>(badgeTiers);
   const [hasTierChanges, setHasTierChanges] = useState(false);
@@ -129,6 +133,12 @@ const AdminRewards: React.FC = () => {
   };
 
   const handleSaveTiers = () => {
+    const thresholds = tiers.map(t => t.threshold);
+    const hasDuplicates = thresholds.length !== new Set(thresholds).size;
+    if (hasDuplicates) {
+      alert('Each badge tier must have a unique points threshold. Please fix duplicate values before saving.');
+      return;
+    }
     const sorted = [...tiers].sort((a, b) => a.threshold - b.threshold);
     updateBadgeTiers(sorted);
     setTiers(sorted);

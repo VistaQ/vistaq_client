@@ -22,10 +22,13 @@ const Card: React.FC<CardProps> = ({
 }) => (
   <div
     onClick={onClick}
+    role={onClick ? 'button' : undefined}
+    tabIndex={onClick ? 0 : undefined}
+    onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
     className={[
       'bg-white rounded-xl shadow-sm border border-gray-100',
       paddingClasses[padding],
-      onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : '',
+      onClick ? 'cursor-pointer hover:shadow-md transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1' : '',
       className,
     ].join(' ')}
   >

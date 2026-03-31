@@ -144,9 +144,9 @@ const Reports: React.FC = () => {
             className="bg-gray-50 border border-gray-300 text-gray-900 rounded-md shadow-sm text-sm p-2 focus-visible:ring-blue-500 focus-visible:border-blue-500"
          >
             <option value="all">All Outcomes</option>
-            <option value="SUCCESSFUL">Won (Successful)</option>
-            <option value="UNSUCCESSFUL">Lost (Unsuccessful)</option>
-            <option value="KIV">KIV</option>
+            <option value="successful">Won (Successful)</option>
+            <option value="unsuccessful">Lost (Unsuccessful)</option>
+            <option value="kiv">KIV</option>
          </select>
       </div>
 

@@ -27,7 +27,7 @@ const toLocalISOString = (date: Date): string => {
 
 const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   const { updateProspect, addProspect, deleteProspect } = useData();
-  const { currentUser } = useAuth();
+  const { currentUser, showNotification } = useAuth();
   const { occupiedSlots } = useCalendarConflicts();
   const [formData, setFormData] = useState<Partial<Prospect>>(prospect);
 
@@ -155,6 +155,8 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
           products_sold: productRows,
         });
         setFormData(newProspect);
+      } catch {
+        showNotification('Error', 'Failed to create prospect. Please try again.', 'error');
       } finally {
         setIsSubmitting(false);
       }
@@ -164,9 +166,14 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   const handleDelete = async () => {
     if (isReadOnly) return;
     if (isNew || !formData.id) return;
-    await deleteProspect(formData.id);
-    setShowDeleteConfirm(false);
-    onClose();
+    try {
+      await deleteProspect(formData.id);
+      setShowDeleteConfirm(false);
+      onClose();
+    } catch {
+      setShowDeleteConfirm(false);
+      showNotification('Error', 'Failed to delete prospect. Please try again.', 'error');
+    }
   };
 
   const handleSaveAndClose = async () => {
@@ -207,7 +214,12 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
         payload.appointmentDate = dateInput; // YYYY-MM-DD
       }
 
-      await updateProspect(formData.id, payload);
+      try {
+        await updateProspect(formData.id, payload);
+      } catch {
+        showNotification('Error', 'Failed to save changes. Please try again.', 'error');
+        return;
+      }
     }
 
     onClose();

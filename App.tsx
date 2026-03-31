@@ -6,6 +6,8 @@ import { DataProvider } from './context/DataContext';
 import Layout from './components/Layout';
 import GlobalNotification from './components/GlobalNotification';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
+import Spinner from './components/ui/Spinner';
 
 // Lazy-load all page components so Vite splits them into separate chunks.
 // Only the chunk for the active page is downloaded and parsed.
@@ -34,7 +36,7 @@ const AddToHomeScreen = React.lazy(() => import('./pages/AddToHomeScreen'));
 
 const PageSpinner: React.FC = () => (
   <div className="flex h-full min-h-[60vh] items-center justify-center">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+    <Spinner size="lg" />
   </div>
 );
 
@@ -74,9 +76,9 @@ const App: React.FC = () => {
                       <Route path="tutorials" element={<Tutorials />} />
                       <Route path="add-to-home-screen" element={<AddToHomeScreen />} />
                       <Route path="privacy-policy" element={<PrivacyPolicy />} />
-                      <Route path="users" element={<AdminUsers />} />
-                      <Route path="admin-groups" element={<AdminGroups />} />
-                      <Route path="admin-rewards" element={<AdminRewards />} />
+                      <Route path="users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+                      <Route path="admin-groups" element={<AdminRoute><AdminGroups /></AdminRoute>} />
+                      <Route path="admin-rewards" element={<AdminRoute><AdminRewards /></AdminRoute>} />
                       {/* Catch-all: unknown protected paths redirect to dashboard */}
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>

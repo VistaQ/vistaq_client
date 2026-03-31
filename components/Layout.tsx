@@ -215,7 +215,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <NavItem id="prospects" label="Prospects" icon={Users} />
                 )}
 
-                <NavItem id="events" label="My Calendar" icon={CalendarDays} />
+                <NavItem id="events" label="Calendar" icon={CalendarDays} />
                 <NavItem id="coaching" label="Coaching" icon={GraduationCap} />
                 <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
 

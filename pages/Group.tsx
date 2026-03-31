@@ -41,7 +41,6 @@ const Group: React.FC = () => {
   const { currentUser } = useAuth();
   const { groupStats, refetchGroupStats, isLoadingProspects, prospects } = useData();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "sales">("overview");
   const [searchTerm, setSearchTerm] = useState("");
 
   // Trainer/Admin Logic: Allow selecting a group

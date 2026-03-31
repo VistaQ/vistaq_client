@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 
 const AdminGroups: React.FC = () => {
-  const { addGroup, updateGroup, deleteGroup } = useAuth();
+  const { currentUser, addGroup, updateGroup, deleteGroup } = useAuth();
+  if (!currentUser || currentUser.role !== UserRole.ADMIN) return null;
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [users, setUsers] = useState<User[]>([]);

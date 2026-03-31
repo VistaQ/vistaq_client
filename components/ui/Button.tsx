@@ -1,4 +1,5 @@
 import React from 'react';
+import Spinner from './Spinner';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type ButtonSize = 'sm' | 'md' | 'lg';
@@ -47,9 +48,7 @@ const Button: React.FC<ButtonProps> = ({
       ].join(' ')}
       {...props}
     >
-      {loading && (
-        <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-current border-t-transparent" />
-      )}
+      {loading && <Spinner size="sm" className="border-current border-t-transparent" />}
       {children}
     </button>
   );

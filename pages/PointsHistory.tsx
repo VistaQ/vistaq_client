@@ -70,11 +70,11 @@ const PointsHistory: React.FC = () => {
   const totalPoints = pointsData.total;
   const sortedBadges = [...badgeTiers].sort((a, b) => a.threshold - b.threshold);
 
-  // Determine current badge and next milestone
-  const currentBadgeIndex = [...sortedBadges].reverse().findIndex(m => totalPoints >= m.threshold);
-  const originalIndex = currentBadgeIndex === -1 ? 0 : sortedBadges.length - 1 - currentBadgeIndex;
-  const currentBadge = sortedBadges[originalIndex];
-  const nextBadge = sortedBadges[originalIndex + 1];
+  // Determine current badge (highest tier the user qualifies for) and next milestone
+  const currentBadgeIndex = sortedBadges.reduce((best, tier, i) =>
+    totalPoints >= tier.threshold ? i : best, 0);
+  const currentBadge = sortedBadges[currentBadgeIndex];
+  const nextBadge = sortedBadges[currentBadgeIndex + 1] ?? null;
 
   const progressToNext = nextBadge
     ? Math.min(100, Math.max(0, ((totalPoints - currentBadge.threshold) / (nextBadge.threshold - currentBadge.threshold)) * 100))

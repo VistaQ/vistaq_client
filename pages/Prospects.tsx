@@ -117,11 +117,11 @@ const Prospects: React.FC = () => {
   // Logic: 
   // Agent -> Add
   // Leader -> Add (own)
-  // Admin -> Add (any)
-  // Trainer -> View Only (Cannot Add)
+  // Admin -> Add (any), can view/edit all
+  // Trainer / Master Trainer -> View Only (Cannot Add or Edit)
   const canAddProspect = currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER;
   const isAdmin = currentUser?.role === UserRole.ADMIN;
-  const isViewOnly = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.MASTER_TRAINER;
+  const isViewOnly = currentUser?.role === UserRole.MASTER_TRAINER || currentUser?.role === UserRole.TRAINER;
 
   const formatDate = (val: any) => {
     if (!val) return 'N/A';
