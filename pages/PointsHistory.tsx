@@ -1,29 +1,71 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { Award, Star, Lock, CheckCircle, Users, Target, DollarSign, X, TrendingUp } from 'lucide-react';
+import { Award, Star, Lock, CheckCircle, Users, Target, DollarSign, X, TrendingUp, Loader2 } from 'lucide-react';
 import { Player } from '@lottiefiles/react-lottie-player';
-import { computeUserPoints } from '../services/points';
+import { apiCall } from '../services/apiClient';
+import type { AgentPointsData, AgentPointsResponse } from '../types';
 
 type HistoryCategory = 'prospect' | 'coaching' | null;
 
 const PointsHistory: React.FC = () => {
   const { currentUser } = useAuth();
-  const { getProspectsByScope, badgeTiers, coachingSessions, pointConfig } = useData();
+  const { badgeTiers } = useData();
   const [historyCategory, setHistoryCategory] = useState<HistoryCategory>(null);
+  const [pointsData, setPointsData] = useState<AgentPointsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    setLoading(true);
+    setError(null);
+    const params = new URLSearchParams({ userId: currentUser.id, limit: '100' });
+    apiCall<AgentPointsResponse>(`/agent-points?${params.toString()}`)
+      .then(res => {
+        if (res.success) setPointsData(res.data);
+        else setError('Failed to load points data.');
+      })
+      .catch(err => setError(err.message || 'Failed to load points data.'))
+      .finally(() => setLoading(false));
+  }, [currentUser?.id]);
 
   if (!currentUser) return null;
 
-  const sortedBadges = [...badgeTiers].sort((a, b) => a.threshold - b.threshold);
-  const prospects = getProspectsByScope(currentUser);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+      </div>
+    );
+  }
 
-  const { total: totalPoints, breakdown } = computeUserPoints(
-    currentUser.id,
-    prospects,
-    coachingSessions,
-    pointConfig
-  );
+  if (error || !pointsData) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 text-gray-500">
+        <TrendingUp className="w-8 h-8 mb-3 text-gray-400" />
+        <p className="font-medium">{error ?? 'No data available.'}</p>
+        <button
+          onClick={() => {
+            setError(null);
+            setLoading(true);
+            const params = new URLSearchParams({ userId: currentUser.id, limit: '100' });
+            apiCall<AgentPointsResponse>(`/agent-points?${params.toString()}`)
+              .then(res => { if (res.success) setPointsData(res.data); else setError('Failed to load points data.'); })
+              .catch(err => setError(err.message || 'Failed to load points data.'))
+              .finally(() => setLoading(false));
+          }}
+          className="mt-3 text-sm text-blue-600 font-medium hover:underline"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const totalPoints = pointsData.total;
+  const sortedBadges = [...badgeTiers].sort((a, b) => a.threshold - b.threshold);
 
   // Determine current badge and next milestone
   const currentBadgeIndex = [...sortedBadges].reverse().findIndex(m => totalPoints >= m.threshold);
@@ -40,8 +82,8 @@ const PointsHistory: React.FC = () => {
     return !isNaN(d.getTime()) ? d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
   };
 
-  const prospectEntries = breakdown.filter(e => e.category === 'prospect');
-  const coachingEntries = breakdown.filter(e => e.category === 'coaching');
+  const prospectEntries = pointsData.breakdown.filter(e => e.category === 'prospect');
+  const coachingEntries = pointsData.breakdown.filter(e => e.category === 'coaching');
 
   const historyEntries = historyCategory === 'prospect' ? prospectEntries : coachingEntries;
   const historyTitle = historyCategory === 'prospect' ? 'Prospect Management History' : 'Personal Development History';
@@ -123,7 +165,7 @@ const PointsHistory: React.FC = () => {
             </div>
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase">Prospect Management</p>
-              <p className="text-2xl font-bold text-gray-900">{prospectEntries.reduce((s, e) => s + e.points, 0).toLocaleString()} pts</p>
+              <p className="text-2xl font-bold text-gray-900">{pointsData.categories.prospect.toLocaleString()} pts</p>
             </div>
           </div>
           <p className="text-xs text-gray-400 mb-4">{prospectEntries.length} activities recorded</p>
@@ -143,7 +185,7 @@ const PointsHistory: React.FC = () => {
             </div>
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase">Sales Completion</p>
-              <p className="text-2xl font-bold text-gray-900">0 pts</p>
+              <p className="text-2xl font-bold text-gray-900">{pointsData.categories.sales.toLocaleString()} pts</p>
             </div>
           </div>
           <p className="text-xs text-gray-400 mb-4 flex items-center gap-1">
@@ -165,7 +207,7 @@ const PointsHistory: React.FC = () => {
             </div>
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase">Personal Development</p>
-              <p className="text-2xl font-bold text-gray-900">{coachingEntries.reduce((s, e) => s + e.points, 0).toLocaleString()} pts</p>
+              <p className="text-2xl font-bold text-gray-900">{pointsData.categories.coaching.toLocaleString()} pts</p>
             </div>
           </div>
           <p className="text-xs text-gray-400 mb-4">{coachingEntries.length} confirmed sessions</p>

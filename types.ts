@@ -26,6 +26,9 @@ export type DashboardStatsPeriod = components['schemas']['DashboardStatsPeriod']
 export type GroupStats = components['schemas']['GroupStatsObject'];
 export type GroupDetailStats = components['schemas']['GroupDetailStatsObject'];
 export type AgentStats = components['schemas']['AgentStats'];
+export type AgentPointsData = components['schemas']['AgentPointsObject'];
+export type AgentPointsBreakdownItem = components['schemas']['AgentPointsBreakdownItem'];
+export type AgentPointsResponse = { success: boolean; data: AgentPointsData };
 
 export type User = Omit<components['schemas']['UserObject'], 'role'> & {
   role: UserRole;         // keep enum compatibility across the codebase
