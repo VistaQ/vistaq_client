@@ -2,133 +2,104 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { User, UserRole, Group } from '../types';
-import { Trophy, Medal, Award, Crown, AlertCircle, Users, ChevronDown } from 'lucide-react';
-import { computeUserPoints } from '../services/points';
+import { Trophy, Medal, Award, Crown, AlertCircle, Users, ChevronDown, Loader2 } from 'lucide-react';
 import { apiCall } from '../services/apiClient';
+import type { components } from '../types.generated';
 
 type Tab = 'individual' | 'group';
 type Metric = 'points' | 'prospects';
 type Period = 'mtd' | 'ytd';
 
+type IndividualEntry = components['schemas']['LeaderboardStatsIndividualObject'];
+type GroupEntry = components['schemas']['LeaderboardStatsGroupObject'];
+type StatsResponse = {
+  success: boolean;
+  data: {
+    period: 'mtd' | 'ytd';
+    generated_at: string;
+    individual: IndividualEntry[];
+    groups: GroupEntry[];
+  };
+};
+
 // Metrics that are future/placeholder — not yet backed by real data
 const PLACEHOLDER_METRICS: string[] = ['noc', 'ace', 'fyct', 'fyc', 'acs'];
 
-const isCurrentMonth = (dateStr: string | undefined | null): boolean => {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-};
-
-const isCurrentYear = (dateStr: string | undefined | null): boolean => {
-  if (!dateStr) return false;
-  return new Date(dateStr).getFullYear() === new Date().getFullYear();
-};
-
 const Leaderboard: React.FC = () => {
   const { currentUser } = useAuth();
-  const { prospects, coachingSessions, pointConfig, badgeTiers, refetchCoachingSessions, isLoadingProspects } = useData();
+  const { pointConfig, badgeTiers } = useData();
 
-  const [users, setUsers] = useState<User[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
   const [tab, setTab] = useState<Tab>('individual');
   const [metric, setMetric] = useState<Metric>('points');
   const [period, setPeriod] = useState<Period>('mtd');
 
-  useEffect(() => {
-    refetchCoachingSessions();
-    apiCall('/users').then(res => setUsers(Array.isArray(res.data) ? res.data : [])).catch(() => {});
-    apiCall('/groups').then(res => setGroups(Array.isArray(res.data) ? res.data : [])).catch(() => {});
-  }, []);
+  const [statsData, setStatsData] = useState<StatsResponse['data'] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStats = (p: Period) => {
+    setLoading(true);
+    setError(null);
+    apiCall<StatsResponse>(`/leaderboard/stats?period=${p}`)
+      .then(res => {
+        if (res.success) setStatsData(res.data);
+        else setError('Failed to load leaderboard data.');
+      })
+      .catch(err => setError(err.message || 'Failed to load leaderboard data.'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchStats(period); }, [period]);
 
   if (!currentUser) return null;
 
-  const eligibleRoles = [UserRole.AGENT, UserRole.GROUP_LEADER];
-
-  const allUsers: User[] = useMemo(
-    () => users.filter(u => eligibleRoles.includes(u.role)),
-    [users]
-  );
-
-  const sortedBadges = useMemo(
-    () => [...badgeTiers].sort((a, b) => a.threshold - b.threshold),
-    [badgeTiers]
-  );
+  const sortedBadges = [...badgeTiers].sort((a, b) => a.threshold - b.threshold);
 
   const getCurrentBadge = (pts: number) => {
     const reversed = [...sortedBadges].reverse();
     return reversed.find(b => pts >= b.threshold) || sortedBadges[0];
   };
 
-  // Date filter
-  const inPeriod = (dateStr: string | undefined | null) =>
-    period === 'mtd' ? isCurrentMonth(dateStr) : isCurrentYear(dateStr);
-
-  // Period-filtered prospects and coaching sessions
-  const filteredProspects = useMemo(
-    () => prospects.filter(p => inPeriod(p.created_at)),
-    [prospects, period]
-  );
-
-  const filteredSessions = useMemo(
-    () => coachingSessions.filter(s => inPeriod(s.date)),
-    [coachingSessions, period]
-  );
+  const computeScore = (entry: IndividualEntry | GroupEntry): number => {
+    if (metric === 'prospects') return entry.prospects_added;
+    return (
+      entry.prospects_added * pointConfig.prospectBasicInfo +
+      entry.appointments_completed * pointConfig.appointmentCompleted +
+      entry.sales_meetings * pointConfig.salesMeetingCompleted +
+      entry.sales_successful * pointConfig.salesSuccessful
+    );
+  };
 
   // ── Individual tab rankings ──────────────────────────────────────────────
   const individualRanked = useMemo(() => {
-    return allUsers
-      .map(user => {
-        let score = 0;
-        if (metric === 'points') {
-          const { total } = computeUserPoints(user.id, filteredProspects, filteredSessions, pointConfig);
-          score = total;
-        } else {
-          score = filteredProspects.filter(p => p.agent_id === user.id).length;
-        }
-        const badge = getCurrentBadge(score);
-        return { user, score, badge };
+    if (!statsData) return [];
+    return statsData.individual
+      .map(entry => {
+        const score = computeScore(entry);
+        return { entry, score, badge: getCurrentBadge(score) };
       })
       .sort((a, b) => b.score - a.score);
-  }, [allUsers, filteredProspects, filteredSessions, pointConfig, metric, sortedBadges]);
+  }, [statsData, metric, pointConfig, sortedBadges]);
 
   // ── Group tab rankings ───────────────────────────────────────────────────
   const groupRanked = useMemo(() => {
-    return groups
+    if (!statsData) return [];
+    return statsData.groups
       .map(group => {
-        const members = allUsers.filter(u => u.group_id === group.id);
-        let totalScore = 0;
-        let topMemberName = '—';
-        let topMemberScore = -1;
-
-        members.forEach(user => {
-          let score = 0;
-          if (metric === 'points') {
-            const { total } = computeUserPoints(user.id, filteredProspects, filteredSessions, pointConfig);
-            score = total;
-          } else {
-            score = filteredProspects.filter(p => p.agent_id === user.id).length;
-          }
-          totalScore += score;
-          if (score > topMemberScore) {
-            topMemberScore = score;
-            topMemberName = user.name;
-          }
-        });
-
-        return { group, memberCount: members.length, totalScore, topMemberName };
+        const totalScore = computeScore(group);
+        // Find top individual member by score within this group
+        const members = statsData.individual.filter(i => i.group_id === group.group_id);
+        const topMember = members.reduce<IndividualEntry | null>((best, m) => {
+          const s = computeScore(m);
+          return !best || s > computeScore(best) ? m : best;
+        }, null);
+        return { group, totalScore, topMemberName: topMember?.name ?? '—' };
       })
-      .filter(g => g.memberCount > 0)
       .sort((a, b) => b.totalScore - a.totalScore);
-  }, [groups, allUsers, filteredProspects, filteredSessions, pointConfig, metric]);
+  }, [statsData, metric, pointConfig]);
 
   const ranked = tab === 'individual' ? individualRanked : groupRanked;
-
-  const top3 = tab === 'individual'
-    ? (individualRanked as typeof individualRanked).slice(0, 3)
-    : (groupRanked as typeof groupRanked).slice(0, 3);
-
+  const top3 = ranked.slice(0, 3);
   const podiumOrder = top3.length === 3 ? [top3[1], top3[0], top3[2]] : top3;
   const podiumHeights = ['h-24', 'h-36', 'h-20'];
   const podiumRanks = [2, 1, 3];
@@ -143,14 +114,6 @@ const Leaderboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Error banner */}
-      {!isLoadingProspects && prospects.length === 0 && (
-        <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span>Leaderboard data could not be loaded. Check your connection and refresh.</span>
-        </div>
-      )}
-
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center">
@@ -162,7 +125,6 @@ const Leaderboard: React.FC = () => {
 
       {/* Filter bar */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 flex flex-wrap items-center gap-3">
-        {/* Individual / Group tab */}
         <div className="flex items-center bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setTab('individual')}
@@ -178,7 +140,6 @@ const Leaderboard: React.FC = () => {
           </button>
         </div>
 
-        {/* Metric dropdown */}
         <div className="relative">
           <select
             value={metric}
@@ -195,7 +156,6 @@ const Leaderboard: React.FC = () => {
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
         </div>
 
-        {/* MTD / YTD toggle */}
         <div className="flex items-center bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setPeriod('mtd')}
@@ -216,37 +176,55 @@ const Leaderboard: React.FC = () => {
         </span>
       </div>
 
-      {ranked.length === 0 ? (
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        </div>
+      )}
+
+      {/* Error */}
+      {!loading && error && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <span>{error}</span>
+          <button onClick={() => fetchStats(period)} className="ml-auto font-medium hover:underline">Retry</button>
+        </div>
+      )}
+
+      {!loading && !error && ranked.length === 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-16 text-center">
           <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <p className="font-medium text-gray-500">No rankings yet</p>
           <p className="text-sm text-gray-400 mt-1">No activity recorded for this period.</p>
         </div>
-      ) : (
+      )}
+
+      {!loading && !error && ranked.length > 0 && (
         <>
           {/* ── Podium ── */}
           {top3.length > 0 && (
             <div className="bg-gradient-to-br from-sidebar-primary to-sidebar-border rounded-2xl p-8 shadow-xl">
               <h2 className="text-center text-white font-bold text-lg mb-8 tracking-wide uppercase opacity-70">Top Performers</h2>
               <div className="flex items-end justify-center gap-4 md:gap-8">
-                {(top3.length === 3 ? podiumOrder : top3).map((entry, podiumIdx) => {
+                {(top3.length === 3 ? podiumOrder : top3).map((item, podiumIdx) => {
                   const rank = top3.length === 3 ? podiumRanks[podiumIdx] : podiumIdx + 1;
                   const isFirst = rank === 1;
 
                   if (tab === 'individual') {
-                    const e = entry as typeof individualRanked[0];
-                    const isCurrentUserEntry = e.user.id === currentUser.id;
+                    const e = item as typeof individualRanked[0];
+                    const isMe = e.entry.user_id === currentUser.id;
                     return (
-                      <div key={e.user.id} className="flex flex-col items-center">
+                      <div key={e.entry.user_id} className="flex flex-col items-center">
                         <div className={`flex flex-col items-center mb-3 ${isFirst ? 'scale-110' : ''}`}>
                           {top3.length === 3 && podiumIcons[podiumIdx]}
                           <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg mt-1 ${isFirst ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 ring-4 ring-yellow-300' : 'bg-gradient-to-br from-slate-500 to-slate-700'}`}>
-                            {e.user.name.charAt(0)}
+                            {e.entry.name.charAt(0)}
                           </div>
                           <p className="text-white font-bold text-sm mt-2 max-w-[100px] text-center truncate">
-                            {e.user.name} {isCurrentUserEntry && <span className="opacity-60 text-xs">(you)</span>}
+                            {e.entry.name} {isMe && <span className="opacity-60 text-xs">(you)</span>}
                           </p>
-                          <p className="text-slate-400 text-xs truncate max-w-[100px] text-center">{e.user.groupName || '—'}</p>
+                          <p className="text-slate-400 text-xs truncate max-w-[100px] text-center">{e.entry.group_name || '—'}</p>
                           <p className={`font-extrabold mt-1 ${isFirst ? 'text-yellow-400 text-lg' : 'text-blue-300 text-base'}`}>
                             {metric === 'points' ? `${e.score.toLocaleString()} pts` : `${e.score} prospects`}
                           </p>
@@ -260,16 +238,16 @@ const Leaderboard: React.FC = () => {
                       </div>
                     );
                   } else {
-                    const g = entry as typeof groupRanked[0];
+                    const g = item as typeof groupRanked[0];
                     return (
-                      <div key={g.group.id} className="flex flex-col items-center">
+                      <div key={g.group.group_id} className="flex flex-col items-center">
                         <div className={`flex flex-col items-center mb-3 ${isFirst ? 'scale-110' : ''}`}>
                           {top3.length === 3 && podiumIcons[podiumIdx]}
                           <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg mt-1 ${isFirst ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 ring-4 ring-yellow-300' : 'bg-gradient-to-br from-slate-500 to-slate-700'}`}>
                             <Users className="w-6 h-6" />
                           </div>
-                          <p className="text-white font-bold text-sm mt-2 max-w-[100px] text-center truncate">{g.group.name}</p>
-                          <p className="text-slate-400 text-xs truncate max-w-[100px] text-center">{g.memberCount} members</p>
+                          <p className="text-white font-bold text-sm mt-2 max-w-[100px] text-center truncate">{g.group.group_name}</p>
+                          <p className="text-slate-400 text-xs truncate max-w-[100px] text-center">{g.group.member_count} members</p>
                           <p className={`font-extrabold mt-1 ${isFirst ? 'text-yellow-400 text-lg' : 'text-blue-300 text-base'}`}>
                             {metric === 'points' ? `${g.totalScore.toLocaleString()} pts` : `${g.totalScore} prospects`}
                           </p>
@@ -293,22 +271,22 @@ const Leaderboard: React.FC = () => {
                 <h3 className="font-bold text-gray-800">Top 10</h3>
               </div>
               <div className="divide-y divide-gray-100">
-                {(tab === 'individual' ? individualRanked : groupRanked).slice(3, 10).map((entry, idx) => {
+                {ranked.slice(3, 10).map((item, idx) => {
                   const displayRank = idx + 4;
                   if (tab === 'individual') {
-                    const e = entry as typeof individualRanked[0];
-                    const isCurrentUserEntry = e.user.id === currentUser.id;
+                    const e = item as typeof individualRanked[0];
+                    const isMe = e.entry.user_id === currentUser.id;
                     return (
-                      <div key={e.user.id} className={`flex items-center px-6 py-3 transition-colors ${isCurrentUserEntry ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50'}`}>
+                      <div key={e.entry.user_id} className={`flex items-center px-6 py-3 transition-colors ${isMe ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50'}`}>
                         <span className="w-8 text-center text-sm font-bold text-gray-400 flex-shrink-0">#{displayRank}</span>
                         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center text-white font-bold text-sm mx-3 flex-shrink-0">
-                          {e.user.name.charAt(0)}
+                          {e.entry.name.charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className={`font-semibold truncate text-sm ${isCurrentUserEntry ? 'text-blue-800' : 'text-gray-900'}`}>
-                            {e.user.name} {isCurrentUserEntry && <span className="text-xs font-normal text-blue-500">(you)</span>}
+                          <p className={`font-semibold truncate text-sm ${isMe ? 'text-blue-800' : 'text-gray-900'}`}>
+                            {e.entry.name} {isMe && <span className="text-xs font-normal text-blue-500">(you)</span>}
                           </p>
-                          <p className="text-xs text-gray-400 truncate">{e.user.groupName || '—'}</p>
+                          <p className="text-xs text-gray-400 truncate">{e.entry.group_name || '—'}</p>
                         </div>
                         <span className={`hidden md:inline-flex text-xs px-2 py-0.5 rounded-full font-semibold mr-4 ${e.badge.bg} ${e.badge.color}`}>
                           {e.badge.name}
@@ -320,16 +298,16 @@ const Leaderboard: React.FC = () => {
                       </div>
                     );
                   } else {
-                    const g = entry as typeof groupRanked[0];
+                    const g = item as typeof groupRanked[0];
                     return (
-                      <div key={g.group.id} className="flex items-center px-6 py-3 hover:bg-gray-50 transition-colors">
+                      <div key={g.group.group_id} className="flex items-center px-6 py-3 hover:bg-gray-50 transition-colors">
                         <span className="w-8 text-center text-sm font-bold text-gray-400 flex-shrink-0">#{displayRank}</span>
                         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center text-white mx-3 flex-shrink-0">
                           <Users className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold truncate text-sm text-gray-900">{g.group.name}</p>
-                          <p className="text-xs text-gray-400">{g.memberCount} members · Top: {g.topMemberName}</p>
+                          <p className="font-semibold truncate text-sm text-gray-900">{g.group.group_name}</p>
+                          <p className="text-xs text-gray-400">{g.group.member_count} members · Top: {g.topMemberName}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
                           <p className="font-bold text-gray-900 text-sm">{g.totalScore.toLocaleString()}</p>
@@ -344,6 +322,7 @@ const Leaderboard: React.FC = () => {
           )}
 
           {/* ── Full Rankings ── */}
+          {ranked.length > 10 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-6 py-4 bg-gray-50 border-b flex items-center">
               <Trophy className="w-5 h-5 text-gray-500 mr-2" />
@@ -353,42 +332,30 @@ const Leaderboard: React.FC = () => {
               </span>
             </div>
             <div className="divide-y divide-gray-100">
-              {(tab === 'individual' ? individualRanked : groupRanked).map((entry, idx) => {
-                const displayRank = idx + 1;
+              {ranked.slice(10).map((item, idx) => {
+                const displayRank = idx + 11;
                 if (tab === 'individual') {
-                  const e = entry as typeof individualRanked[0];
-                  const isCurrentUserEntry = e.user.id === currentUser.id;
+                  const e = item as typeof individualRanked[0];
+                  const isMe = e.entry.user_id === currentUser.id;
                   return (
-                    <div key={e.user.id} className={`flex items-center px-6 py-4 transition-colors ${isCurrentUserEntry ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50'}`}>
+                    <div key={e.entry.user_id} className={`flex items-center px-6 py-4 transition-colors ${isMe ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50'}`}>
                       <div className="w-10 flex-shrink-0 text-center">
-                        {displayRank === 1 ? (
-                          <Crown className="w-5 h-5 text-yellow-500 mx-auto" />
-                        ) : displayRank === 2 ? (
-                          <Medal className="w-5 h-5 text-slate-400 mx-auto" />
-                        ) : displayRank === 3 ? (
-                          <Award className="w-5 h-5 text-amber-600 mx-auto" />
-                        ) : (
-                          <span className="text-sm font-bold text-gray-400">#{displayRank}</span>
-                        )}
+                        <span className="text-sm font-bold text-gray-400">#{displayRank}</span>
                       </div>
-
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center text-white font-bold text-sm mx-4 flex-shrink-0">
-                        {e.user.name.charAt(0)}
+                        {e.entry.name.charAt(0)}
                       </div>
-
                       <div className="flex-1 min-w-0">
-                        <p className={`font-semibold truncate ${isCurrentUserEntry ? 'text-blue-800' : 'text-gray-900'}`}>
-                          {e.user.name} {isCurrentUserEntry && <span className="text-xs font-normal text-blue-500">(you)</span>}
+                        <p className={`font-semibold truncate ${isMe ? 'text-blue-800' : 'text-gray-900'}`}>
+                          {e.entry.name} {isMe && <span className="text-xs font-normal text-blue-500">(you)</span>}
                         </p>
-                        <p className="text-xs text-gray-500 truncate">{e.user.groupName || '—'}</p>
+                        <p className="text-xs text-gray-500 truncate">{e.entry.group_name || '—'}</p>
                       </div>
-
                       <div className="hidden md:block mx-4">
                         <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${e.badge.bg} ${e.badge.color}`}>
                           {e.badge.name}
                         </span>
                       </div>
-
                       <div className="text-right flex-shrink-0">
                         <p className="font-extrabold text-gray-900">{e.score.toLocaleString()}</p>
                         <p className="text-xs text-gray-400">{metric === 'points' ? 'points' : 'prospects'}</p>
@@ -396,30 +363,19 @@ const Leaderboard: React.FC = () => {
                     </div>
                   );
                 } else {
-                  const g = entry as typeof groupRanked[0];
+                  const g = item as typeof groupRanked[0];
                   return (
-                    <div key={g.group.id} className="flex items-center px-6 py-4 hover:bg-gray-50 transition-colors">
+                    <div key={g.group.group_id} className="flex items-center px-6 py-4 hover:bg-gray-50 transition-colors">
                       <div className="w-10 flex-shrink-0 text-center">
-                        {displayRank === 1 ? (
-                          <Crown className="w-5 h-5 text-yellow-500 mx-auto" />
-                        ) : displayRank === 2 ? (
-                          <Medal className="w-5 h-5 text-slate-400 mx-auto" />
-                        ) : displayRank === 3 ? (
-                          <Award className="w-5 h-5 text-amber-600 mx-auto" />
-                        ) : (
-                          <span className="text-sm font-bold text-gray-400">#{displayRank}</span>
-                        )}
+                        <span className="text-sm font-bold text-gray-400">#{displayRank}</span>
                       </div>
-
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center text-white mx-4 flex-shrink-0">
                         <Users className="w-5 h-5" />
                       </div>
-
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate text-gray-900">{g.group.name}</p>
-                        <p className="text-xs text-gray-500">{g.memberCount} members · Top: {g.topMemberName}</p>
+                        <p className="font-semibold truncate text-gray-900">{g.group.group_name}</p>
+                        <p className="text-xs text-gray-500">{g.group.member_count} members · Top: {g.topMemberName}</p>
                       </div>
-
                       <div className="text-right flex-shrink-0">
                         <p className="font-extrabold text-gray-900">{g.totalScore.toLocaleString()}</p>
                         <p className="text-xs text-gray-400">{metric === 'points' ? 'points' : 'prospects'}</p>
@@ -430,6 +386,7 @@ const Leaderboard: React.FC = () => {
               })}
             </div>
           </div>
+          )}
         </>
       )}
     </div>
