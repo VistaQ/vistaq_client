@@ -3547,6 +3547,11 @@ export interface components {
              * @example 2
              */
             sales_successful: number;
+            /**
+             * @description Pre-computed total points for this agent in the period, calculated server-side using the tenant's current point config.
+             * @example 26
+             */
+            total_points: number;
         };
         LeaderboardStatsGroupObject: {
             /**
@@ -3586,6 +3591,11 @@ export interface components {
              * @example 8
              */
             sales_successful: number;
+            /**
+             * @description Aggregated total points for all members of this group in the period, calculated server-side using the tenant's current point config.
+             * @example 52
+             */
+            total_points: number;
         };
         AgentPointsObject: {
             /**
