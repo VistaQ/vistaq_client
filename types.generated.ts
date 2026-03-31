@@ -3636,7 +3636,7 @@ export interface components {
             category: string;
             /**
              * @description Human-readable label for the action that triggered the award.
-             * @example Appointment Completed
+             * @example Appointment Set
              */
             action: string;
             /**
