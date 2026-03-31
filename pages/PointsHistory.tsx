@@ -5,7 +5,10 @@ import { useData } from '../context/DataContext';
 import { Award, Star, Lock, CheckCircle, Users, Target, DollarSign, X, TrendingUp, Loader2 } from 'lucide-react';
 import { Player } from '@lottiefiles/react-lottie-player';
 import { apiCall } from '../services/apiClient';
-import type { AgentPointsData, AgentPointsResponse } from '../types';
+import type { components } from '../types.generated';
+
+type AgentPointsData = components['schemas']['AgentPointsObject'];
+type AgentPointsResponse = { success: boolean; data: AgentPointsData };
 
 type HistoryCategory = 'prospect' | 'coaching' | null;
 
