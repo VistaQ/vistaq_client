@@ -1,15 +1,107 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { BadgeTier, PointConfig } from '../types';
-import { Gift, Plus, Trash2, Save, Award, Target, Users, DollarSign } from 'lucide-react';
+import type { components } from '../types.generated';
+
+type PointConfigObject = components['schemas']['PointConfigObject'];
+import { Gift, Plus, Trash2, Save, Award, Target, Users, DollarSign, Loader2, AlertCircle } from 'lucide-react';
 import { DEFAULT_POINT_CONFIG } from '../services/points';
+import { apiCall } from '../services/apiClient';
+
+type ActivityKey = 'prospect_created' | 'appointment_set' | 'sales_meeting' | 'sale_closed';
+
+const ACTIVITY_TO_FIELD: Record<ActivityKey, keyof PointConfig> = {
+  prospect_created: 'prospectBasicInfo',
+  appointment_set: 'appointmentCompleted',
+  sales_meeting: 'salesMeetingCompleted',
+  sale_closed: 'salesSuccessful',
+};
+
+const FIELD_TO_ACTIVITY: Partial<Record<keyof PointConfig, ActivityKey>> = {
+  prospectBasicInfo: 'prospect_created',
+  appointmentCompleted: 'appointment_set',
+  salesMeetingCompleted: 'sales_meeting',
+  salesSuccessful: 'sale_closed',
+};
 
 const AdminRewards: React.FC = () => {
-  const { badgeTiers, updateBadgeTiers, pointConfig, updatePointConfig } = useData();
+  const { badgeTiers, updateBadgeTiers } = useData();
   const [tiers, setTiers] = useState<BadgeTier[]>(badgeTiers);
-  const [points, setPoints] = useState<PointConfig>(pointConfig);
   const [hasTierChanges, setHasTierChanges] = useState(false);
-  const [hasPointChanges, setHasPointChanges] = useState(false);
+
+  // Prospect Management — from API
+  const [prospectPoints, setProspectPoints] = useState<Pick<PointConfig, 'prospectBasicInfo' | 'appointmentCompleted' | 'salesMeetingCompleted' | 'salesSuccessful'>>({
+    prospectBasicInfo: DEFAULT_POINT_CONFIG.prospectBasicInfo,
+    appointmentCompleted: DEFAULT_POINT_CONFIG.appointmentCompleted,
+    salesMeetingCompleted: DEFAULT_POINT_CONFIG.salesMeetingCompleted,
+    salesSuccessful: DEFAULT_POINT_CONFIG.salesSuccessful,
+  });
+  const [savedProspectPoints, setSavedProspectPoints] = useState({ ...prospectPoints });
+  const [prospectLoading, setProspectLoading] = useState(true);
+  const [prospectError, setProspectError] = useState<string | null>(null);
+  const [isSavingPoints, setIsSavingPoints] = useState(false);
+
+  // Sales + Coaching — local defaults only (not yet in DB)
+  const [otherPoints, setOtherPoints] = useState<Omit<PointConfig, 'prospectBasicInfo' | 'appointmentCompleted' | 'salesMeetingCompleted' | 'salesSuccessful'>>({
+    salesIssuanceCertificate: DEFAULT_POINT_CONFIG.salesIssuanceCertificate,
+    salesFYCt: DEFAULT_POINT_CONFIG.salesFYCt,
+    salesACE: DEFAULT_POINT_CONFIG.salesACE,
+    coachingIndividual: DEFAULT_POINT_CONFIG.coachingIndividual,
+    coachingGroup: DEFAULT_POINT_CONFIG.coachingGroup,
+    coachingPeerCircles: DEFAULT_POINT_CONFIG.coachingPeerCircles,
+    coachingFullDays: DEFAULT_POINT_CONFIG.coachingFullDays,
+    coachingOnlineSeminar: DEFAULT_POINT_CONFIG.coachingOnlineSeminar,
+  });
+
+  const fetchPointConfigs = () => {
+    setProspectLoading(true);
+    setProspectError(null);
+    apiCall<{ success: boolean; data: PointConfigObject[] }>('/point-configs')
+      .then(res => {
+        if (!res.success) { setProspectError('Failed to load point configs.'); return; }
+        const mapped = { ...prospectPoints };
+        for (const item of res.data) {
+          const field = ACTIVITY_TO_FIELD[item.activity as ActivityKey];
+          if (field) (mapped as Record<string, number>)[field] = item.points;
+        }
+        setProspectPoints(mapped);
+        setSavedProspectPoints(mapped);
+      })
+      .catch(err => setProspectError(err.message || 'Failed to load point configs.'))
+      .finally(() => setProspectLoading(false));
+  };
+
+  useEffect(() => { fetchPointConfigs(); }, []);
+
+  const hasProspectChanges =
+    prospectPoints.prospectBasicInfo !== savedProspectPoints.prospectBasicInfo ||
+    prospectPoints.appointmentCompleted !== savedProspectPoints.appointmentCompleted ||
+    prospectPoints.salesMeetingCompleted !== savedProspectPoints.salesMeetingCompleted ||
+    prospectPoints.salesSuccessful !== savedProspectPoints.salesSuccessful;
+
+  const handleUpdateProspectPoint = (key: keyof typeof prospectPoints, value: number) => {
+    setProspectPoints(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSavePoints = async () => {
+    setIsSavingPoints(true);
+    try {
+      const keys = Object.keys(prospectPoints) as (keyof typeof prospectPoints)[];
+      await Promise.all(
+        keys
+          .filter(key => prospectPoints[key] !== savedProspectPoints[key])
+          .map(key => {
+            const activity = FIELD_TO_ACTIVITY[key]!;
+            return apiCall(`/point-configs/${activity}`, { method: 'PUT', data: { points: prospectPoints[key] } });
+          })
+      );
+      setSavedProspectPoints({ ...prospectPoints });
+    } catch {
+      setProspectError('Failed to save some point values. Please try again.');
+    } finally {
+      setIsSavingPoints(false);
+    }
+  };
 
   const handleUpdateTier = (id: string, field: keyof BadgeTier, value: string | number) => {
     setTiers(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
@@ -43,34 +135,26 @@ const AdminRewards: React.FC = () => {
     setHasTierChanges(false);
   };
 
-  const handleUpdatePoint = (key: keyof PointConfig, value: number) => {
-    setPoints(prev => ({ ...prev, [key]: value }));
-    setHasPointChanges(true);
-  };
-
-  const handleSavePoints = () => {
-    updatePointConfig(points);
-    setHasPointChanges(false);
-  };
-
-  const POINT_FIELDS: { key: keyof PointConfig; label: string; category: 'prospect' | 'sales' | 'coaching' }[] = [
-    { key: 'prospectBasicInfo', label: 'Add Prospect Basic Info', category: 'prospect' },
-    { key: 'appointmentCompleted', label: 'Appointment Completed', category: 'prospect' },
-    { key: 'salesMeetingCompleted', label: 'Sales Meeting Completed', category: 'prospect' },
-    { key: 'salesSuccessful', label: 'Sale: Successful', category: 'prospect' },
-    { key: 'salesIssuanceCertificate', label: 'Issuance Certificate (per cert)', category: 'sales' },
-    { key: 'salesFYCt', label: 'FYCt (per RM1,000)', category: 'sales' },
-    { key: 'salesACE', label: 'ACE (per RM1,000)', category: 'sales' },
-    { key: 'coachingIndividual', label: 'Individual Coaching', category: 'coaching' },
-    { key: 'coachingGroup', label: 'Group Coaching', category: 'coaching' },
-    { key: 'coachingPeerCircles', label: 'Peer Circles', category: 'coaching' },
-    { key: 'coachingFullDays', label: '2 Full Days Seminar', category: 'coaching' },
-    { key: 'coachingOnlineSeminar', label: '2 Hours Online Seminar', category: 'coaching' },
+  const PROSPECT_FIELDS: { key: keyof typeof prospectPoints; label: string }[] = [
+    { key: 'prospectBasicInfo', label: 'Add Prospect Basic Info' },
+    { key: 'appointmentCompleted', label: 'Appointment Completed' },
+    { key: 'salesMeetingCompleted', label: 'Sales Meeting Completed' },
+    { key: 'salesSuccessful', label: 'Sale: Successful' },
   ];
 
-  const prospectFields = POINT_FIELDS.filter(f => f.category === 'prospect');
-  const salesFields = POINT_FIELDS.filter(f => f.category === 'sales');
-  const coachingFields = POINT_FIELDS.filter(f => f.category === 'coaching');
+  const SALES_FIELDS: { key: keyof typeof otherPoints; label: string }[] = [
+    { key: 'salesIssuanceCertificate', label: 'Issuance Certificate (per cert)' },
+    { key: 'salesFYCt', label: 'FYCt (per RM1,000)' },
+    { key: 'salesACE', label: 'ACE (per RM1,000)' },
+  ];
+
+  const COACHING_FIELDS: { key: keyof typeof otherPoints; label: string }[] = [
+    { key: 'coachingIndividual', label: 'Individual Coaching' },
+    { key: 'coachingGroup', label: 'Group Coaching' },
+    { key: 'coachingPeerCircles', label: 'Peer Circles' },
+    { key: 'coachingFullDays', label: '2 Full Days Seminar' },
+    { key: 'coachingOnlineSeminar', label: '2 Hours Online Seminar' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -90,16 +174,16 @@ const AdminRewards: React.FC = () => {
           </h3>
           <button
             onClick={handleSavePoints}
-            disabled={!hasPointChanges}
+            disabled={!hasProspectChanges || isSavingPoints || prospectLoading}
             className="bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center text-sm shadow-sm"
           >
-            <Save className="w-4 h-4 mr-1.5" />
+            {isSavingPoints ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
             Save Points
           </button>
         </div>
 
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Prospect Activity */}
+          {/* Prospect Management */}
           <div>
             <div className="flex items-center mb-3">
               <div className="p-1.5 bg-blue-50 rounded mr-2">
@@ -107,23 +191,35 @@ const AdminRewards: React.FC = () => {
               </div>
               <h4 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Prospect Management</h4>
             </div>
-            <div className="space-y-3">
-              {prospectFields.map(({ key, label }) => (
-                <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <label className="text-sm text-gray-700 flex-1">{label}</label>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="number"
-                      min={0}
-                      value={points[key]}
-                      onChange={e => handleUpdatePoint(key, Number(e.target.value))}
-                      className="w-20 text-center bg-white border border-gray-300 rounded p-1.5 text-sm font-bold"
-                    />
-                    <span className="text-xs text-gray-500">pts</span>
+            {prospectLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+              </div>
+            ) : prospectError ? (
+              <div className="flex flex-col items-center py-6 text-sm text-red-600">
+                <AlertCircle className="w-5 h-5 mb-2" />
+                <p className="text-center">{prospectError}</p>
+                <button onClick={fetchPointConfigs} className="mt-2 text-blue-600 font-medium hover:underline text-xs">Retry</button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {PROSPECT_FIELDS.map(({ key, label }) => (
+                  <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <label className="text-sm text-gray-700 flex-1">{label}</label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="number"
+                        min={1}
+                        value={prospectPoints[key]}
+                        onChange={e => handleUpdateProspectPoint(key, Number(e.target.value))}
+                        className="w-20 text-center bg-white border border-gray-300 rounded p-1.5 text-sm font-bold"
+                      />
+                      <span className="text-xs text-gray-500">pts</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Sales Completion */}
@@ -135,15 +231,15 @@ const AdminRewards: React.FC = () => {
               <h4 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Sales Completion</h4>
             </div>
             <div className="space-y-3">
-              {salesFields.map(({ key, label }) => (
+              {SALES_FIELDS.map(({ key, label }) => (
                 <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <label className="text-sm text-gray-700 flex-1">{label}</label>
                   <div className="flex items-center space-x-2">
                     <input
                       type="number"
                       min={0}
-                      value={points[key]}
-                      onChange={e => handleUpdatePoint(key, Number(e.target.value))}
+                      value={otherPoints[key]}
+                      onChange={e => setOtherPoints(prev => ({ ...prev, [key]: Number(e.target.value) }))}
                       className="w-20 text-center bg-white border border-gray-300 rounded p-1.5 text-sm font-bold"
                     />
                     <span className="text-xs text-gray-500">pts</span>
@@ -156,7 +252,7 @@ const AdminRewards: React.FC = () => {
             </div>
           </div>
 
-          {/* Coaching */}
+          {/* Personal Development */}
           <div>
             <div className="flex items-center mb-3">
               <div className="p-1.5 bg-purple-50 rounded mr-2">
@@ -165,15 +261,15 @@ const AdminRewards: React.FC = () => {
               <h4 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Personal Development</h4>
             </div>
             <div className="space-y-3">
-              {coachingFields.map(({ key, label }) => (
+              {COACHING_FIELDS.map(({ key, label }) => (
                 <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <label className="text-sm text-gray-700 flex-1">{label}</label>
                   <div className="flex items-center space-x-2">
                     <input
                       type="number"
                       min={0}
-                      value={points[key]}
-                      onChange={e => handleUpdatePoint(key, Number(e.target.value))}
+                      value={otherPoints[key]}
+                      onChange={e => setOtherPoints(prev => ({ ...prev, [key]: Number(e.target.value) }))}
                       className="w-20 text-center bg-white border border-gray-300 rounded p-1.5 text-sm font-bold"
                     />
                     <span className="text-xs text-gray-500">pts</span>
