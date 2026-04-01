@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole, CoachingType, CoachingSession, Group, User } from '../types';
+import { UserRole, CoachingType, TrainingMode, CoachingSession, CoachingSessionCreateBody, CoachingSessionUpdateBody, Group, User, COACHING_TYPE_LABELS, TRAINING_MODE_LABELS } from '../types';
 import { X, Calendar as CalendarIcon, MapPin, Link as LinkIcon, Users, Check, Clock, AlertTriangle, Info } from 'lucide-react';
 import { useCalendarConflicts, checkConflict } from '../hooks/useCalendarConflicts';
 
@@ -16,14 +16,14 @@ interface CreateCoachingModalProps {
 type TypeOption = { value: CoachingType; label: string; description: string };
 
 const MANAGEMENT_TYPES: TypeOption[] = [
-    { value: 'Individual Coaching', label: 'Individual Coaching', description: 'One-on-one or small group coaching with selected agents.' },
-    { value: 'Group Coaching', label: 'Group Coaching', description: 'Coaching targeting one or more full groups.' },
-    { value: '2 Full Days Seminar', label: '2 Full Days Seminar', description: 'Two-day training seminar for selected groups or agents.' },
-    { value: '2 Hours Online Seminar', label: '2 Hours Online Seminar', description: 'Short online seminar for selected groups or agents.' },
+    { value: 'individual_coaching', label: COACHING_TYPE_LABELS.individual_coaching, description: 'One-on-one or small group coaching with selected agents.' },
+    { value: 'group_coaching', label: COACHING_TYPE_LABELS.group_coaching, description: 'Coaching targeting one or more full groups.' },
+    { value: '2_full_days_seminar', label: COACHING_TYPE_LABELS['2_full_days_seminar'], description: 'Two-day training seminar for selected groups or agents.' },
+    { value: '2_hours_online_seminar', label: COACHING_TYPE_LABELS['2_hours_online_seminar'], description: 'Short online seminar for selected groups or agents.' },
 ];
 
 const LEADER_TYPES: TypeOption[] = [
-    { value: 'Peer Circles', label: 'Peer Circles', description: 'Group leader-led peer session for your agents.' },
+    { value: 'peer_circles', label: COACHING_TYPE_LABELS.peer_circles, description: 'Group leader-led peer session for your agents.' },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -42,23 +42,21 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
     const typeOptions = MANAGEMENT_TYPES;
 
     // Default to editSession values if available
-    const [coachingType, setCoachingType] = useState<CoachingType>(editSession?.coachingType || typeOptions[0].value);
+    const [coachingType, setCoachingType] = useState<CoachingType>(editSession?.coaching_type || typeOptions[0].value);
     const [title, setTitle] = useState(editSession?.title || '');
     const [description, setDescription] = useState(editSession?.description || '');
-    const [date, setDate] = useState(() => {
-        if (!editSession?.date) return '';
-        const d = new Date(editSession.date);
-        return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
-    });
-    const [durationStart, setDurationStart] = useState(editSession?.durationStart || '10:00');
-    const [durationEnd, setDurationEnd] = useState(editSession?.durationEnd || '11:00');
-    const [venue, setVenue] = useState<'Online' | 'Face to Face'>(editSession?.venue || 'Online');
+    const toLocalDate = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const toHHMM = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+    const [date, setDate] = useState(editSession?.start_date ? toLocalDate(editSession.start_date) : '');
+    const [startTime, setStartTime] = useState(editSession?.start_date ? toHHMM(editSession.start_date) : '10:00');
+    const [endTime, setEndTime] = useState(editSession?.end_date ? toHHMM(editSession.end_date) : '11:00');
+    const [trainingMode, setTrainingMode] = useState<TrainingMode>(editSession?.training_mode || 'online');
     const [link, setLink] = useState(editSession?.link || '');
 
     // Participant selection defaults based on editSession array lengths
     const determineParticipantMode = (session?: CoachingSession) => {
         if (!session) return 'all';
-        if (session.coachingType === 'Individual Coaching') return 'specific_agents';
+        if (session.coaching_type === 'individual_coaching') return 'specific_agents';
         if (session.targetAgentIds?.length && session.targetGroupIds?.length) return 'mixed';
         if (session.targetGroupIds?.length) return 'specific_groups';
         if (session.targetAgentIds?.length) return 'specific_agents';
@@ -85,9 +83,10 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
 
     const availableAgents = React.useMemo(() => {
         if (!currentUser) return [];
-        if (isAdmin || isMasterTrainer) return users.filter(u => u.role === UserRole.AGENT);
-        if (isTrainer) return users.filter(u => u.role === UserRole.AGENT && currentUser.managedGroupIds?.includes(u.group_id || ''));
-        if (isGroupLeader) return users.filter(u => u.role === UserRole.AGENT && u.group_id === currentUser.group_id);
+        const isParticipantRole = (u: User) => u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER;
+        if (isAdmin || isMasterTrainer) return users.filter(isParticipantRole);
+        if (isTrainer) return users.filter(u => isParticipantRole(u) && currentUser.managedGroupIds?.includes(u.group_id || ''));
+        if (isGroupLeader) return users.filter(u => isParticipantRole(u) && u.group_id === currentUser.group_id);
         return [];
     }, [currentUser, users, isAdmin, isMasterTrainer, isTrainer, isGroupLeader]);
 
@@ -102,13 +101,13 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
         setCoachingType(type);
         setSelectedGroupIds([]);
         setSelectedAgentIds([]);
-        if (type === 'Individual Coaching') setParticipantMode('specific_agents');
-        else if (type === 'Peer Circles') setParticipantMode('all');
-        else if (type === 'Group Coaching') {
+        if (type === 'individual_coaching') setParticipantMode('specific_agents');
+        else if (type === 'peer_circles') setParticipantMode('all');
+        else if (type === 'group_coaching') {
             // Admin/Master Trainer can pick groups; Trainer auto-selects all managed groups
             setParticipantMode((isAdmin || isMasterTrainer) ? 'specific_groups' : 'all');
         } else {
-            // Seminar types default to mixed selection
+            // Seminar types default to group selection
             setParticipantMode('specific_groups');
         }
     }, [isAdmin, isMasterTrainer]);
@@ -116,25 +115,25 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
     // Auto-calculate end time 1 hour after start time
     const handleStartTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newStart = e.target.value;
-        setDurationStart(newStart);
+        setStartTime(newStart);
         if (newStart) {
             const [h, m] = newStart.split(':').map(Number);
             const endH = (h + 1) % 24;
-            setDurationEnd(`${endH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+            setEndTime(`${endH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
         }
     };
 
     // ── Submit ────────────────────────────────────────────────────────────────
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!title || !date || !durationStart || !durationEnd) return;
+        if (!title || !date || !startTime || !endTime) return;
 
         try {
             setError('');
             setIsSubmitting(true);
 
             // Pass title as excludeLabel when editing
-            const { hasConflict, conflictWith } = checkConflict(occupiedSlots, date, durationStart, durationEnd, editSession ? title : undefined);
+            const { hasConflict, conflictWith } = checkConflict(occupiedSlots, date, startTime, endTime, editSession ? title : undefined);
             if (hasConflict) {
                 setError(`Time slot conflicts with "${conflictWith}" in your calendar. Please choose a different date or time.`);
                 setIsSubmitting(false);
@@ -144,16 +143,16 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
             let tGroups: string[] = [];
             let tAgents: string[] = [];
 
-            if (coachingType === 'Individual Coaching') {
+            if (coachingType === 'individual_coaching') {
                 tAgents = selectedAgentIds;
-            } else if (coachingType === 'Group Coaching') {
+            } else if (coachingType === 'group_coaching') {
                 if (participantMode === 'specific_groups') {
                     tGroups = selectedGroupIds;
                 } else {
                     // Auto-select all available groups for trainer/admin
                     tGroups = availableGroups.map(g => g.id);
                 }
-            } else if (coachingType === 'Peer Circles') {
+            } else if (coachingType === 'peer_circles') {
                 if (participantMode === 'specific_agents') {
                     tAgents = selectedAgentIds;
                 } else {
@@ -165,29 +164,35 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                 tAgents = selectedAgentIds;
             }
 
-            const dateObj = new Date(date);
-            if (isNaN(dateObj.getTime())) throw new Error('Invalid date selected');
-
-            const sessionPayload = {
+            const sessionPayload: CoachingSessionCreateBody = {
                 coachingType,
                 title,
-                description,
-                date: dateObj.toISOString(),
-                durationStart,
-                durationEnd,
-                venue,
+                description: description || undefined,
+                date,
+                startTime,
+                endTime,
+                trainingMode,
                 link: link || undefined,
-                createdBy: currentUser?.id,
-                createdByName: currentUser?.name,
-                createdByRole: currentUser?.role,
-                targetGroupIds: tGroups,
-                targetAgentIds: tAgents,
+                groupIds: tGroups,
+                agentIds: tAgents,
             };
 
             if (editSession) {
-                await updateCoachingSession(editSession.id, sessionPayload);
+                const updatePayload: CoachingSessionUpdateBody = {
+                    coachingType,
+                    title,
+                    description: description || undefined,
+                    date,
+                    startTime,
+                    endTime,
+                    trainingMode,
+                    link: link || undefined,
+                    groupIds: tGroups,
+                    agentIds: tAgents,
+                };
+                await updateCoachingSession(editSession.id, updatePayload);
             } else {
-                await addCoachingSession({ ...sessionPayload, status: 'upcoming' });
+                await addCoachingSession(sessionPayload);
             }
             onClose();
         } catch (err: any) {
@@ -200,7 +205,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
 
     // ── Current type info ─────────────────────────────────────────────────────
     const currentTypeInfo = typeOptions.find(t => t.value === coachingType);
-    const isSeminar = coachingType === '2 Full Days Seminar' || coachingType === '2 Hours Online Seminar';
+    const isSeminar = coachingType === '2_full_days_seminar' || coachingType === '2_hours_online_seminar';
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label={editSession ? 'Edit Coaching Session' : 'Create Coaching Session'}>
@@ -300,12 +305,12 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Start Time <span className="text-red-500">*</span></label>
-                                <input type="time" required value={durationStart} onChange={handleStartTimeChange}
+                                <input type="time" required value={startTime} onChange={handleStartTimeChange}
                                     className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 p-2.5 text-sm" />
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">End Time <span className="text-red-500">*</span></label>
-                                <input type="time" required value={durationEnd} onChange={e => setDurationEnd(e.target.value)}
+                                <input type="time" required value={endTime} onChange={e => setEndTime(e.target.value)}
                                     className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 p-2.5 text-sm" />
                             </div>
                         </div>
@@ -314,19 +319,19 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Training Mode <span className="text-red-500">*</span></label>
                             <div className="flex gap-3">
                                 <button type="button"
-                                    onClick={() => setVenue('Online')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${venue === 'Online' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
-                                    <LinkIcon className="w-4 h-4" /> Online
+                                    onClick={() => setTrainingMode('online')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${trainingMode === 'online' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                                    <LinkIcon className="w-4 h-4" /> {TRAINING_MODE_LABELS.online}
                                 </button>
                                 <button type="button"
-                                    onClick={() => setVenue('Face to Face')}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${venue === 'Face to Face' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
-                                    <MapPin className="w-4 h-4" /> Face to Face
+                                    onClick={() => setTrainingMode('face_to_face')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${trainingMode === 'face_to_face' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                                    <MapPin className="w-4 h-4" /> {TRAINING_MODE_LABELS.face_to_face}
                                 </button>
                             </div>
                         </div>
 
-                        {venue === 'Online' && (
+                        {trainingMode === 'online' && (
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Meeting URL</label>
                                 <div className="relative">
@@ -338,7 +343,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                             </div>
                         )}
 
-                        {venue === 'Face to Face' && (
+                        {trainingMode === 'face_to_face' && (
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Venue / Google Maps or Waze Direction</label>
                                 <div className="relative">
@@ -361,7 +366,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                         </h3>
 
                         {/* INDIVIDUAL COACHING — select specific agents */}
-                        {coachingType === 'Individual Coaching' && (
+                        {coachingType === 'individual_coaching' && (
                             <div>
                                 <p className="text-xs text-gray-500 mb-3">Select the agents to invite to this individual coaching session.</p>
                                 <AgentChecklist agents={availableAgents} selected={selectedAgentIds} onToggle={toggleAgent} />
@@ -369,7 +374,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                         )}
 
                         {/* GROUP COACHING */}
-                        {coachingType === 'Group Coaching' && (
+                        {coachingType === 'group_coaching' && (
                             <div className="space-y-3">
                                 {(isAdmin || isMasterTrainer) ? (
                                     <>
@@ -392,7 +397,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                         )}
 
                         {/* PEER CIRCLES — Group Leader only */}
-                        {coachingType === 'Peer Circles' && (
+                        {coachingType === 'peer_circles' && (
                             <div className="space-y-3">
                                 <div className="flex gap-2">
                                     <ModeBtn active={participantMode === 'all'} onClick={() => setParticipantMode('all')}>All My Agents</ModeBtn>
@@ -441,15 +446,15 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                     <button
                         onClick={handleSubmit}
                         disabled={
-                            isSubmitting || !title || !date || !durationStart || !durationEnd ||
+                            isSubmitting || !title || !date || !startTime || !endTime ||
                             (isSeminar && selectedGroupIds.length === 0 && selectedAgentIds.length === 0) ||
-                            (coachingType === 'Individual Coaching' && selectedAgentIds.length === 0)
+                            (coachingType === 'individual_coaching' && selectedAgentIds.length === 0)
                         }
                         className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed">
                         {isSubmitting
                             ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             : <Check className="w-5 h-5" />}
-                        Create Session
+                        {editSession ? 'Save Changes' : 'Create Session'}
                     </button>
                 </div>
             </div>

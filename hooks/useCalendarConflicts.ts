@@ -36,16 +36,11 @@ const buildOccupiedSlots = (
     allCoachingSessions
         .filter(s => s.status !== 'cancelled')
         .forEach(s => {
-            if (!s.date || !s.durationStart || !s.durationEnd) return;
+            if (!s.start_date) return;
             try {
-                const base = new Date(s.date);
-                if (isNaN(base.getTime())) return;
-                const [sh, sm] = s.durationStart.split(':').map(Number);
-                const [eh, em] = s.durationEnd.split(':').map(Number);
-                const start = new Date(base);
-                start.setHours(sh, sm, 0, 0);
-                const end = new Date(base);
-                end.setHours(eh, em, 0, 0);
+                const start = new Date(s.start_date);
+                if (isNaN(start.getTime())) return;
+                const end = s.end_date ? new Date(s.end_date) : new Date(start.getTime() + 60 * 60 * 1000);
                 slots.push({ start, end, label: s.title, type: 'coaching' });
             } catch { }
         });

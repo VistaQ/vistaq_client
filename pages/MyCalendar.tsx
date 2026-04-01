@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole, Event, CoachingSession, Prospect, Group, User } from '../types';
+import { UserRole, Event, CoachingSession, Prospect, Group, User, TRAINING_MODE_LABELS } from '../types';
 import { apiCall } from '../services/apiClient';
 import {
     CalendarDays, Plus, MapPin, User as UserIcon, Users, X, Clock, Link as LinkIcon,
@@ -61,9 +61,9 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
     // Standardised time & venue extraction per type
     const timeDisplay = (() => {
         if (item.type === 'coaching' && session) {
-            return session.durationStart && session.durationEnd
-                ? `${session.durationStart} – ${session.durationEnd}`
-                : session.durationStart || (valid ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '');
+            const startStr = valid ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
+            const endStr = session.end_date ? new Date(session.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
+            return endStr ? `${startStr} – ${endStr}` : startStr;
         }
         if (item.type === 'appointment' && prospect) {
             return prospect.appointment_start_time
@@ -79,7 +79,7 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
     })();
 
     const venueDisplay = (() => {
-        if (item.type === 'coaching' && session) return session.venue || '';
+        if (item.type === 'coaching' && session) return session.training_mode ? TRAINING_MODE_LABELS[session.training_mode] : '';
         if (item.type === 'appointment' && prospect) return prospect.appointment_location || '';
         return evt?.venue || '';
     })();
@@ -146,10 +146,10 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
                         </div>
                     )}
 
-                    {session?.createdByName && (
+                    {session?.created_by_name && (
                         <div className="flex items-start gap-3 text-sm text-gray-700">
                             <UserIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                            <span>Organizer: <span className="font-medium">{session.createdByName}</span></span>
+                            <span>Organizer: <span className="font-medium">{session.created_by_name}</span></span>
                         </div>
                     )}
 
@@ -510,7 +510,7 @@ const CardList: React.FC<CardListProps> = ({ items, isAdminOrCreator, onSelect, 
 /* ─── Main Page ──────────────────────────────────────────── */
 const MyCalendar: React.FC = () => {
     const { currentUser } = useAuth();
-    const { addEvent, deleteEvent, updateEvent, getEventsForUser, refetchEvents, getCoachingSessionsForUser, refetchCoachingSessions, prospects } = useData();
+    const { addEvent, deleteEvent, updateEvent, getEventsForUser, coachingSessions, refetchEvents, refetchCoachingSessions, prospects } = useData();
     const { occupiedSlots } = useCalendarConflicts();
 
     const [groups, setGroups] = useState<Group[]>([]);
@@ -579,28 +579,16 @@ const MyCalendar: React.FC = () => {
             });
         });
 
-        // 2. Coaching Sessions (all roles — filtered by getCoachingSessionsForUser)
-        const mySessions = getCoachingSessionsForUser(currentUser);
-        mySessions.forEach(s => {
-            // Build datetime from date + durationStart
-            let sessionDate = s.date;
-            try {
-                const base = new Date(s.date);
-                if (!isNaN(base.getTime()) && s.durationStart) {
-                    const [h, m] = s.durationStart.split(':').map(Number);
-                    base.setHours(h, m, 0, 0);
-                    sessionDate = base.toISOString();
-                }
-            } catch (_) { }
-
+        // 2. Coaching Sessions (RLS-scoped from API)
+        coachingSessions.forEach(s => {
             result.push({
                 id: `coaching_${s.id}`,
                 title: s.title,
-                date: sessionDate,
+                date: s.start_date,
                 type: 'coaching',
-                subType: s.venue,
-                endTime: s.durationEnd,
-                link: s.venue === 'Online' ? s.link : undefined,
+                subType: TRAINING_MODE_LABELS[s.training_mode],
+                endTime: s.end_date ? new Date(s.end_date).toTimeString().slice(0, 5) : undefined,
+                link: s.training_mode === 'online' ? s.link : undefined,
                 cancelled: s.status === 'cancelled',
                 raw: s,
             });
@@ -646,7 +634,7 @@ const MyCalendar: React.FC = () => {
         }
 
         return result;
-    }, [currentUser, prospects, showArchived, getEventsForUser, getCoachingSessionsForUser]);
+    }, [currentUser, prospects, showArchived, getEventsForUser, coachingSessions]);
 
     const sortedItems = [...calItems].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 

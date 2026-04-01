@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole, Prospect, ProspectStage, CoachingSession, User } from '../types';
+import { UserRole, Prospect, ProspectStage, CoachingSession, User, TRAINING_MODE_LABELS } from '../types';
 import { apiCall } from '../services/apiClient';
 import {
    Calendar,
@@ -36,7 +36,7 @@ const COLORS = CHART_COLORS;
 const Dashboard: React.FC = () => {
    const navigate = useNavigate();
    const { currentUser } = useAuth();
-   const { prospects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats, isLoadingProspects } = useData();
+   const { prospects, coachingSessions, getEventsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats, isLoadingProspects } = useData();
 
    const [users, setUsers] = useState<User[]>([]);
 
@@ -113,35 +113,34 @@ const Dashboard: React.FC = () => {
       const mgmtNow = new Date();
       const sevenDaysFromNow = new Date(mgmtNow.getTime() + 7 * 24 * 60 * 60 * 1000);
       const mgmtEvents = currentUser ? getEventsForUser(currentUser) : [];
-      const mgmtSessions = currentUser ? getCoachingSessionsForUser(currentUser) : [];
+      const mgmtSessions = coachingSessions;
 
-      type ScheduleItem = { id: string; title: string; date: string; type: 'event' | 'coaching'; meta?: string; link?: string; isOwned: boolean; };
+      type ScheduleItem = { id: string; title: string; date: string; endDate?: string; type: 'event' | 'coaching'; meta?: string; link?: string; isOwned: boolean; };
 
       const mgmtScheduleItems: ScheduleItem[] = [
          ...mgmtEvents
             .filter(e => e.status !== 'cancelled')
             .map(e => ({
-               id: `evt_${e.id}`, title: e.event_title, date: e.start_date,
+               id: `evt_${e.id}`, title: e.event_title, date: e.start_date, endDate: e.end_date || undefined,
                type: 'event' as const, meta: e.venue, link: e.meeting_link || undefined,
                isOwned: e.created_by === currentUser?.id
             })),
          ...mgmtSessions
             .filter(s => s.status !== 'cancelled')
             .map(s => {
-               let sessionDate = s.date;
-               try {
-                  const b = new Date(s.date);
-                  if (s.durationStart) { const [h, m] = s.durationStart.split(':').map(Number); b.setHours(h, m, 0, 0); sessionDate = b.toISOString(); }
-               } catch { }
+               const startD = new Date(s.start_date);
+               const meta = `${startD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}${s.end_date ? ` – ${new Date(s.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}` : ''} · ${TRAINING_MODE_LABELS[s.training_mode]}`;
                return {
-                  id: `cs_${s.id}`, title: s.title, date: sessionDate, type: 'coaching' as const,
-                  meta: `${s.durationStart || ''} – ${s.durationEnd || ''} · ${s.venue}`,
-                  link: s.link || undefined,
-                  isOwned: s.createdBy === currentUser?.id
+                  id: `cs_${s.id}`, title: s.title, date: s.start_date, endDate: s.end_date || undefined, type: 'coaching' as const,
+                  meta, link: s.link || undefined, isOwned: s.created_by === currentUser?.id
                };
             })
       ]
-         .filter(i => { const d = new Date(i.date); return !isNaN(d.getTime()) && d >= mgmtNow && d <= sevenDaysFromNow; })
+         .filter(i => {
+            const start = new Date(i.date);
+            const end = i.endDate ? new Date(i.endDate) : start;
+            return !isNaN(start.getTime()) && end >= mgmtNow && start <= sevenDaysFromNow;
+         })
          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
          .slice(0, 5);
 
@@ -458,23 +457,17 @@ const Dashboard: React.FC = () => {
          meta: e.venue, link: e.meeting_link || undefined, isOwned: e.created_by === currentUser?.id
       }));
 
-   const myCoachingSessions = currentUser ? getCoachingSessionsForUser(currentUser) : [];
-   const upcomingCoachingSessions: ScheduleItem[] = myCoachingSessions
+   const upcomingCoachingSessions: ScheduleItem[] = coachingSessions
       .filter(s => s.status !== 'cancelled')
       .map(s => {
-         let sessionDate = s.date;
-         try {
-            const base = new Date(s.date);
-            if (s.durationStart) { const [h, m] = s.durationStart.split(':').map(Number); base.setHours(h, m, 0, 0); sessionDate = base.toISOString(); }
-         } catch { }
+         const startD = new Date(s.start_date);
+         const meta = `${startD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}${s.end_date ? ` – ${new Date(s.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}` : ''} · ${TRAINING_MODE_LABELS[s.training_mode]}`;
          return {
-            id: s.id, title: s.title, date: sessionDate, type: 'coaching' as const,
-            meta: `${s.durationStart || ''} – ${s.durationEnd || ''} · ${s.venue}`,
-            link: s.link || undefined,
-            isOwned: s.createdBy === currentUser?.id
+            id: s.id, title: s.title, date: s.start_date, type: 'coaching' as const,
+            meta, link: s.link || undefined, isOwned: s.created_by === currentUser?.id
          };
       })
-      .filter(i => { const d = new Date(i.date); return d >= now && d <= sevenDaysFromNow; });
+      .filter(i => { const end = new Date(i.date); return end >= now && end <= sevenDaysFromNow; });
 
    // Take the 5 soonest upcoming items across all 3 types
    const combinedSchedule = useMemo(
