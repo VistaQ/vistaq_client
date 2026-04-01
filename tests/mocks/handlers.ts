@@ -192,6 +192,11 @@ export const handlers = [
 
   // ─── Coaching sessions ───
   http.get(`${BASE}/coaching-sessions`, () => HttpResponse.json({ data: [] })),
+  http.post(`${BASE}/coaching-sessions`, () => HttpResponse.json({ data: { id: 'new-session-id' } }, { status: 201 })),
+  http.put(`${BASE}/coaching-sessions/:id`, () => HttpResponse.json({ data: {} })),
+  http.delete(`${BASE}/coaching-sessions/:id`, () => HttpResponse.json({ success: true })),
+  http.post(`${BASE}/coaching-sessions/:id/join`, () => HttpResponse.json({ data: {} })),
+  http.post(`${BASE}/coaching-sessions/:id/mark-non-attendees`, () => HttpResponse.json({ success: true })),
 
   // ─── Prospects ───
   http.get(`${BASE}/prospects`, ({ request }) => {
