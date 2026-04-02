@@ -2037,21 +2037,17 @@ export interface paths {
                          */
                         title: string;
                         /**
-                         * Format: date
-                         * @description Date of the event in YYYY-MM-DD format. Cannot be a past date.
-                         * @example 2026-04-15
+                         * Format: date-time
+                         * @description Start datetime as an ISO 8601 timestamp with timezone offset. Cannot be in the past.
+                         * @example 2026-04-15T09:00:00+08:00
                          */
-                        date: string;
+                        startDate: string;
                         /**
-                         * @description Start time of the event in HH:MM 24-hour format.
-                         * @example 09:00
+                         * Format: date-time
+                         * @description End datetime as an ISO 8601 timestamp with timezone offset. Must be after startDate.
+                         * @example 2026-04-15T11:00:00+08:00
                          */
-                        startTime: string;
-                        /**
-                         * @description End time of the event in HH:MM 24-hour format.
-                         * @example 11:00
-                         */
-                        endTime: string;
+                        endDate: string;
                         /**
                          * @description Status of the event. Defaults to `upcoming` when not supplied.
                          * @example upcoming
@@ -2263,21 +2259,17 @@ export interface paths {
                          */
                         title?: string;
                         /**
-                         * Format: date
-                         * @description Updated date of the event in YYYY-MM-DD format. Cannot be a past date.
-                         * @example 2026-04-20
+                         * Format: date-time
+                         * @description Start datetime as an ISO 8601 timestamp with timezone offset.
+                         * @example 2026-04-20T10:00:00+08:00
                          */
-                        date?: string;
+                        startDate?: string;
                         /**
-                         * @description Updated start time of the event in HH:MM 24-hour format.
-                         * @example 10:00
+                         * Format: date-time
+                         * @description End datetime as an ISO 8601 timestamp with timezone offset. Must be after startDate.
+                         * @example 2026-04-20T12:00:00+08:00
                          */
-                        startTime?: string;
-                        /**
-                         * @description Updated end time of the event in HH:MM 24-hour format.
-                         * @example 12:00
-                         */
-                        endTime?: string;
+                        endDate?: string;
                         /**
                          * @description Updated status of the event.
                          * @example completed
@@ -2337,7 +2329,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Bad request. Returned when the request body fails validation (e.g. no fields provided, `date` is in the past, a supplied group UUID does not exist, or a trainer supplies a group they do not manage). */
+                /** @description Bad request. Returned when the request body fails validation (e.g. no fields provided, `startDate` is in the past, `endDate` is not after `startDate`, a supplied group UUID does not exist, or a trainer supplies a group they do not manage). */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -3077,20 +3069,17 @@ export interface paths {
                         /** @example Focus on objection handling techniques */
                         description?: string;
                         /**
-                         * @description Session date in YYYY-MM-DD format. Cannot be in the past.
-                         * @example 2026-04-15
+                         * Format: date-time
+                         * @description Start datetime as an ISO 8601 timestamp with timezone offset. Cannot be in the past.
+                         * @example 2026-04-15T10:00:00+08:00
                          */
-                        date: string;
+                        startDate: string;
                         /**
-                         * @description Start time in HH:MM 24-hour format.
-                         * @example 10:00
+                         * Format: date-time
+                         * @description End datetime as an ISO 8601 timestamp with timezone offset. Must be after startDate.
+                         * @example 2026-04-15T12:00:00+08:00
                          */
-                        startTime: string;
-                        /**
-                         * @description End time in HH:MM 24-hour format.
-                         * @example 12:00
-                         */
-                        endTime: string;
+                        endDate: string;
                         trainingMode: components["schemas"]["TrainingModeEnum"];
                         /**
                          * @description Meeting link (e.g. Zoom, Google Meet).
@@ -3290,14 +3279,17 @@ export interface paths {
                         /** @example Updated description */
                         description?: string;
                         /**
-                         * @description Session date in YYYY-MM-DD format. Cannot be in the past.
-                         * @example 2026-04-20
+                         * Format: date-time
+                         * @description Start datetime as an ISO 8601 timestamp with timezone offset.
+                         * @example 2026-04-20T14:00:00+08:00
                          */
-                        date?: string;
-                        /** @example 14:00 */
-                        startTime?: string;
-                        /** @example 16:00 */
-                        endTime?: string;
+                        startDate?: string;
+                        /**
+                         * Format: date-time
+                         * @description End datetime as an ISO 8601 timestamp with timezone offset. Must be after startDate.
+                         * @example 2026-04-20T16:00:00+08:00
+                         */
+                        endDate?: string;
                         trainingMode?: components["schemas"]["TrainingModeEnum"];
                         /** @example https://zoom.us/j/987654321 */
                         link?: string;
@@ -3323,19 +3315,13 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Validation failed, invalid group IDs, invalid agent IDs, or unauthorized group access. */
+                /** @description Validation failed, invalid group IDs, invalid agent IDs, unauthorized group access, or `endDate` is not after `startDate`. */
                 400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        /**
-                         * @example {
-                         *       "message": "Validation failed",
-                         *       "errors": []
-                         *     }
-                         */
-                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                        "application/json": components["schemas"]["ValidationErrorResponse"] | components["schemas"]["ErrorResponse"];
                     };
                 };
                 /** @description Unauthorized. No token or invalid token supplied. */
@@ -4101,13 +4087,13 @@ export interface components {
             event_title: string;
             /**
              * Format: date-time
-             * @description Start date and time of the event stored as a TIMESTAMPTZ value. Formed by combining the `date` and `startTime` fields supplied on create/update into a single ISO 8601 timestamp.
+             * @description Start date and time of the event stored as a TIMESTAMPTZ value. Value of the `startDate` field supplied in the request.
              * @example 2026-04-15T09:00:00.000Z
              */
             start_date: string;
             /**
              * Format: date-time
-             * @description End date and time of the event stored as a TIMESTAMPTZ value. Formed by combining the `date` and `endTime` fields supplied on create/update into a single ISO 8601 timestamp.
+             * @description End date and time of the event stored as a TIMESTAMPTZ value. Value of the `endDate` field supplied in the request.
              * @example 2026-04-15T11:00:00.000Z
              */
             end_date?: string | null;
@@ -4464,13 +4450,13 @@ export interface components {
             description?: string | null;
             /**
              * Format: date-time
-             * @description Start date and time of the session stored as a TIMESTAMPTZ value. Formed by combining the `date` and `startTime` fields supplied on create/update into a single ISO 8601 timestamp.
+             * @description Start date and time of the session stored as a TIMESTAMPTZ value. Value of the `startDate` field supplied in the request.
              * @example 2026-04-15T10:00:00.000Z
              */
             start_date: string;
             /**
              * Format: date-time
-             * @description End date and time of the session stored as a TIMESTAMPTZ value. Formed by combining the `date` and `endTime` fields supplied on create/update into a single ISO 8601 timestamp.
+             * @description End date and time of the session stored as a TIMESTAMPTZ value. Value of the `endDate` field supplied in the request.
              * @example 2026-04-15T12:00:00.000Z
              */
             end_date?: string | null;
