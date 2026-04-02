@@ -278,7 +278,7 @@ const Signup: React.FC = () => {
               {groupError
                 ? <p className="text-xs text-red-500 mt-1">{groupError}</p>
                 : groupsLoadError
-                  ? <p className="text-xs text-amber-600 mt-1">Could not load groups. <button type="button" onClick={fetchPublicGroups} className="underline font-medium">Retry</button></p>
+                  ? <p className="text-xs text-amber-600 mt-1">Groups could not be loaded. Please contact your administrator or trainer to complete registration.</p>
                   : <p className="text-xs text-gray-400 mt-1">Select the group assigned by your trainer.</p>
               }
             </div>
