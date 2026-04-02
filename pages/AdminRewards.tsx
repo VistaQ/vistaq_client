@@ -9,13 +9,20 @@ import { Gift, Plus, Trash2, Save, Award, Target, Users, DollarSign, Loader2, Al
 import { DEFAULT_POINT_CONFIG } from '../services/points';
 import { apiCall } from '../services/apiClient';
 
-type ActivityKey = 'prospect_created' | 'appointment_set' | 'sales_meeting' | 'sale_closed';
+type ProspectActivityKey = 'prospect_created' | 'appointment_set' | 'sales_meeting' | 'sale_closed';
+type CoachingActivityKey = 'coaching_individual_attended' | 'coaching_group_attended' | 'coaching_peer_circles_attended' | 'coaching_2_full_days_attended' | 'coaching_2_hours_online_attended';
+type ActivityKey = ProspectActivityKey | CoachingActivityKey;
 
 const ACTIVITY_TO_FIELD: Record<ActivityKey, keyof PointConfig> = {
   prospect_created: 'prospectBasicInfo',
   appointment_set: 'appointmentCompleted',
   sales_meeting: 'salesMeetingCompleted',
   sale_closed: 'salesSuccessful',
+  coaching_individual_attended: 'coachingIndividual',
+  coaching_group_attended: 'coachingGroup',
+  coaching_peer_circles_attended: 'coachingPeerCircles',
+  coaching_2_full_days_attended: 'coachingFullDays',
+  coaching_2_hours_online_attended: 'coachingOnlineSeminar',
 };
 
 const FIELD_TO_ACTIVITY: Partial<Record<keyof PointConfig, ActivityKey>> = {
@@ -23,6 +30,11 @@ const FIELD_TO_ACTIVITY: Partial<Record<keyof PointConfig, ActivityKey>> = {
   appointmentCompleted: 'appointment_set',
   salesMeetingCompleted: 'sales_meeting',
   salesSuccessful: 'sale_closed',
+  coachingIndividual: 'coaching_individual_attended',
+  coachingGroup: 'coaching_group_attended',
+  coachingPeerCircles: 'coaching_peer_circles_attended',
+  coachingFullDays: 'coaching_2_full_days_attended',
+  coachingOnlineSeminar: 'coaching_2_hours_online_attended',
 };
 
 const AdminRewards: React.FC = () => {
@@ -41,20 +53,26 @@ const AdminRewards: React.FC = () => {
     salesSuccessful: DEFAULT_POINT_CONFIG.salesSuccessful,
   });
   const [savedProspectPoints, setSavedProspectPoints] = useState({ ...prospectPoints });
-  const [prospectLoading, setProspectLoading] = useState(true);
-  const [prospectError, setProspectError] = useState<string | null>(null);
-  const [isSavingPoints, setIsSavingPoints] = useState(false);
 
-  // Sales + Coaching — local defaults only (not yet in DB)
-  const [otherPoints, setOtherPoints] = useState<Omit<PointConfig, 'prospectBasicInfo' | 'appointmentCompleted' | 'salesMeetingCompleted' | 'salesSuccessful'>>({
-    salesIssuanceCertificate: DEFAULT_POINT_CONFIG.salesIssuanceCertificate,
-    salesFYCt: DEFAULT_POINT_CONFIG.salesFYCt,
-    salesACE: DEFAULT_POINT_CONFIG.salesACE,
+  // Personal Development (Coaching) — from API
+  const [coachingPoints, setCoachingPoints] = useState<Pick<PointConfig, 'coachingIndividual' | 'coachingGroup' | 'coachingPeerCircles' | 'coachingFullDays' | 'coachingOnlineSeminar'>>({
     coachingIndividual: DEFAULT_POINT_CONFIG.coachingIndividual,
     coachingGroup: DEFAULT_POINT_CONFIG.coachingGroup,
     coachingPeerCircles: DEFAULT_POINT_CONFIG.coachingPeerCircles,
     coachingFullDays: DEFAULT_POINT_CONFIG.coachingFullDays,
     coachingOnlineSeminar: DEFAULT_POINT_CONFIG.coachingOnlineSeminar,
+  });
+  const [savedCoachingPoints, setSavedCoachingPoints] = useState({ ...coachingPoints });
+
+  const [prospectLoading, setProspectLoading] = useState(true);
+  const [prospectError, setProspectError] = useState<string | null>(null);
+  const [isSavingPoints, setIsSavingPoints] = useState(false);
+
+  // Sales — local defaults only (not yet in DB)
+  const [otherPoints, setOtherPoints] = useState<Pick<PointConfig, 'salesIssuanceCertificate' | 'salesFYCt' | 'salesACE'>>({
+    salesIssuanceCertificate: DEFAULT_POINT_CONFIG.salesIssuanceCertificate,
+    salesFYCt: DEFAULT_POINT_CONFIG.salesFYCt,
+    salesACE: DEFAULT_POINT_CONFIG.salesACE,
   });
 
   const fetchPointConfigs = () => {
@@ -63,13 +81,18 @@ const AdminRewards: React.FC = () => {
     apiCall<{ success: boolean; data: PointConfigObject[] }>('/point-configs')
       .then(res => {
         if (!res.success) { setProspectError('Failed to load point configs.'); return; }
-        const mapped = { ...prospectPoints };
+        const mappedProspect = { ...prospectPoints };
+        const mappedCoaching = { ...coachingPoints };
         for (const item of res.data) {
           const field = ACTIVITY_TO_FIELD[item.activity as ActivityKey];
-          if (field) (mapped as Record<string, number>)[field] = item.points;
+          if (!field) continue;
+          if (field in mappedProspect) (mappedProspect as Record<string, number>)[field] = item.points;
+          if (field in mappedCoaching) (mappedCoaching as Record<string, number>)[field] = item.points;
         }
-        setProspectPoints(mapped);
-        setSavedProspectPoints(mapped);
+        setProspectPoints(mappedProspect);
+        setSavedProspectPoints(mappedProspect);
+        setCoachingPoints(mappedCoaching);
+        setSavedCoachingPoints(mappedCoaching);
       })
       .catch(err => setProspectError(err.message || 'Failed to load point configs.'))
       .finally(() => setProspectLoading(false));
@@ -83,23 +106,42 @@ const AdminRewards: React.FC = () => {
     prospectPoints.salesMeetingCompleted !== savedProspectPoints.salesMeetingCompleted ||
     prospectPoints.salesSuccessful !== savedProspectPoints.salesSuccessful;
 
+  const hasCoachingChanges =
+    coachingPoints.coachingIndividual !== savedCoachingPoints.coachingIndividual ||
+    coachingPoints.coachingGroup !== savedCoachingPoints.coachingGroup ||
+    coachingPoints.coachingPeerCircles !== savedCoachingPoints.coachingPeerCircles ||
+    coachingPoints.coachingFullDays !== savedCoachingPoints.coachingFullDays ||
+    coachingPoints.coachingOnlineSeminar !== savedCoachingPoints.coachingOnlineSeminar;
+
   const handleUpdateProspectPoint = (key: keyof typeof prospectPoints, value: number) => {
     setProspectPoints(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleUpdateCoachingPoint = (key: keyof typeof coachingPoints, value: number) => {
+    setCoachingPoints(prev => ({ ...prev, [key]: value }));
   };
 
   const handleSavePoints = async () => {
     setIsSavingPoints(true);
     try {
-      const keys = Object.keys(prospectPoints) as (keyof typeof prospectPoints)[];
-      await Promise.all(
-        keys
+      const prospectKeys = Object.keys(prospectPoints) as (keyof typeof prospectPoints)[];
+      const coachingKeys = Object.keys(coachingPoints) as (keyof typeof coachingPoints)[];
+      const allChanges = [
+        ...prospectKeys
           .filter(key => prospectPoints[key] !== savedProspectPoints[key])
-          .map(key => {
-            const activity = FIELD_TO_ACTIVITY[key]!;
-            return apiCall(`/point-configs/${activity}`, { method: 'PUT', data: { points: prospectPoints[key] } });
-          })
+          .map(key => ({ field: key as keyof PointConfig, points: prospectPoints[key] })),
+        ...coachingKeys
+          .filter(key => coachingPoints[key] !== savedCoachingPoints[key])
+          .map(key => ({ field: key as keyof PointConfig, points: coachingPoints[key] })),
+      ];
+      await Promise.all(
+        allChanges.map(({ field, points }) => {
+          const activity = FIELD_TO_ACTIVITY[field]!;
+          return apiCall(`/point-configs/${activity}`, { method: 'PUT', data: { points } });
+        })
       );
       setSavedProspectPoints({ ...prospectPoints });
+      setSavedCoachingPoints({ ...coachingPoints });
     } catch {
       setProspectError('Failed to save some point values. Please try again.');
     } finally {
@@ -158,7 +200,7 @@ const AdminRewards: React.FC = () => {
     { key: 'salesACE', label: 'ACE (per RM1,000)' },
   ];
 
-  const COACHING_FIELDS: { key: keyof typeof otherPoints; label: string }[] = [
+  const COACHING_FIELDS: { key: keyof typeof coachingPoints; label: string }[] = [
     { key: 'coachingIndividual', label: 'Individual Coaching' },
     { key: 'coachingGroup', label: 'Group Coaching' },
     { key: 'coachingPeerCircles', label: 'Peer Circles' },
@@ -184,7 +226,7 @@ const AdminRewards: React.FC = () => {
           </h3>
           <button
             onClick={handleSavePoints}
-            disabled={!hasProspectChanges || isSavingPoints || prospectLoading}
+            disabled={(!hasProspectChanges && !hasCoachingChanges) || isSavingPoints || prospectLoading}
             className="bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center text-sm shadow-sm"
           >
             {isSavingPoints ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
@@ -270,23 +312,34 @@ const AdminRewards: React.FC = () => {
               </div>
               <h4 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Personal Development</h4>
             </div>
-            <div className="space-y-3">
-              {COACHING_FIELDS.map(({ key, label }) => (
-                <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <label className="text-sm text-gray-700 flex-1">{label}</label>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="number"
-                      min={0}
-                      value={otherPoints[key]}
-                      onChange={e => setOtherPoints(prev => ({ ...prev, [key]: Number(e.target.value) }))}
-                      className="w-20 text-center bg-white border border-gray-300 rounded p-1.5 text-sm font-bold"
-                    />
-                    <span className="text-xs text-gray-500">pts</span>
+            {prospectLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 text-purple-500 animate-spin" />
+              </div>
+            ) : prospectError ? (
+              <div className="flex flex-col items-center py-6 text-sm text-red-600">
+                <AlertCircle className="w-5 h-5 mb-2" />
+                <p className="text-center">{prospectError}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {COACHING_FIELDS.map(({ key, label }) => (
+                  <div key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <label className="text-sm text-gray-700 flex-1">{label}</label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="number"
+                        min={1}
+                        value={coachingPoints[key]}
+                        onChange={e => handleUpdateCoachingPoint(key, Number(e.target.value))}
+                        className="w-20 text-center bg-white border border-gray-300 rounded p-1.5 text-sm font-bold"
+                      />
+                      <span className="text-xs text-gray-500">pts</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
