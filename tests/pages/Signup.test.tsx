@@ -125,7 +125,7 @@ describe('Signup — API error mapping', () => {
     );
     // Override groups to allow group selection
     server.use(
-      http.get('/api/groups', () =>
+      http.get('/api/public/groups', () =>
         HttpResponse.json({ data: [{ id: 'g1', name: 'Test Group' }] })
       )
     );
@@ -151,7 +151,7 @@ describe('Signup — API error mapping', () => {
       http.post('/api/auth/register', () =>
         HttpResponse.json({ message: 'Too many requests. Try again later.' }, { status: 429 })
       ),
-      http.get('/api/groups', () =>
+      http.get('/api/public/groups', () =>
         HttpResponse.json({ data: [{ id: 'g1', name: 'Test Group' }] })
       )
     );

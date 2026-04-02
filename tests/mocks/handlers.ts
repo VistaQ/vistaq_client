@@ -130,6 +130,11 @@ export const handlers = [
 
   http.patch(`${BASE}/users/me/password`, () => HttpResponse.json({ success: true })),
 
+  // ─── Public groups (unauthenticated, for signup) ───
+  http.get(`${BASE}/public/groups`, () =>
+    HttpResponse.json({ data: allGroups.map(g => ({ id: g.id, name: g.name })) })
+  ),
+
   // ─── Groups ───
   http.get(`${BASE}/groups`, ({ request }) => {
     const user = getCurrentUser(request);
