@@ -4,6 +4,7 @@ import { useData } from '../context/DataContext';
 import { UserRole, CoachingType, TrainingMode, CoachingSession, CoachingSessionCreateBody, CoachingSessionUpdateBody, Group, User, COACHING_TYPE_LABELS, TRAINING_MODE_LABELS } from '../types';
 import { X, Calendar as CalendarIcon, MapPin, Link as LinkIcon, Users, Check, Clock, AlertTriangle, Info } from 'lucide-react';
 import { useCalendarConflicts, checkConflict } from '../hooks/useCalendarConflicts';
+import { toLocalISO } from '../utils/dateUtils';
 
 interface CreateCoachingModalProps {
     onClose: () => void;
@@ -168,9 +169,8 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                 coachingType,
                 title,
                 description: description || undefined,
-                date,
-                startTime,
-                endTime,
+                startDate: toLocalISO(date, startTime),
+                endDate: toLocalISO(date, endTime),
                 trainingMode,
                 link: link || undefined,
                 groupIds: tGroups,
@@ -182,9 +182,8 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                     coachingType,
                     title,
                     description: description || undefined,
-                    date,
-                    startTime,
-                    endTime,
+                    startDate: toLocalISO(date, startTime),
+                    endDate: toLocalISO(date, endTime),
                     trainingMode,
                     link: link || undefined,
                     groupIds: tGroups,

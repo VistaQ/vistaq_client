@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, CoachingSessionCreateBody, CoachingSessionUpdateBody, PointConfig, Group, DashboardStats, GroupStats } from '../types';
 import { apiCall } from '../services/apiClient';
+import { toLocalISO } from '../utils/dateUtils';
 import { DEFAULT_POINT_CONFIG } from '../services/points';
 
 interface DataContextType {
@@ -338,30 +339,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // --- EVENTS ---
-  // Convert local date+time to UTC date+time before sending to the backend.
-  // new Date('YYYY-MM-DDTHH:MM') is parsed as local time by JS, so toISOString() gives UTC.
-  const toUtcDateTime = (date: string, time?: string): { date: string; time?: string } => {
-    if (!date) return { date };
-    const local = new Date(time ? `${date}T${time}` : `${date}T00:00`);
-    if (isNaN(local.getTime())) return { date, time };
-    const iso = local.toISOString();
-    return {
-      date: iso.slice(0, 10),            // YYYY-MM-DD in UTC
-      time: time ? iso.slice(11, 16) : undefined, // HH:MM in UTC
-    };
-  };
-
   const addEvent = async (evt: Partial<Event>) => {
-    const { date, time: startTimeUtc } = toUtcDateTime((evt as any).date, (evt as any).startTime);
-    const { time: endTimeUtc } = toUtcDateTime((evt as any).date, (evt as any).endTime);
+    const date: string = (evt as any).date;
+    const startTime: string = (evt as any).startTime;
+    const endTime: string = (evt as any).endTime;
     const payload: Record<string, unknown> = {
       title: evt.event_title || 'New Event',
-      date,
       description: evt.description || '',
       groupIds: evt.groupIds || [],
+      startDate: toLocalISO(date, startTime),
     };
-    if (startTimeUtc) payload.startTime = startTimeUtc;
-    if (endTimeUtc) payload.endTime = endTimeUtc;
+    if (endTime) payload.endDate = toLocalISO(date, endTime);
     if (evt.type) payload.type = evt.type;
     if (evt.meeting_link) payload.link = evt.meeting_link;
     if (evt.venue) payload.venue = evt.venue;
@@ -373,12 +361,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateEvent = async (id: string, evt: Partial<Event>) => {
     const payload: Record<string, unknown> = {};
     if (evt.event_title) payload.title = evt.event_title;
-    if (evt.date) {
-      const { date, time: startTimeUtc } = toUtcDateTime(evt.date, evt.startTime);
-      const { time: endTimeUtc } = toUtcDateTime(evt.date, evt.endTime);
-      payload.date = date;
-      if (startTimeUtc) payload.startTime = startTimeUtc;
-      if (endTimeUtc) payload.endTime = endTimeUtc;
+    const date: string = (evt as any).date;
+    const startTime: string = (evt as any).startTime;
+    const endTime: string = (evt as any).endTime;
+    if (date && startTime) {
+      payload.startDate = toLocalISO(date, startTime);
+      if (endTime) payload.endDate = toLocalISO(date, endTime);
     }
     if (evt.description) payload.description = evt.description;
     if (evt.type) payload.type = evt.type;
@@ -402,20 +390,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // --- COACHING SESSIONS ---
   const addCoachingSession = async (session: CoachingSessionCreateBody) => {
-    const { date, time: startTimeUtc } = toUtcDateTime(session.date, session.startTime);
-    const { time: endTimeUtc } = toUtcDateTime(session.date, session.endTime);
-    await apiCall('/coaching-sessions', { method: 'POST', data: { ...session, date, startTime: startTimeUtc, endTime: endTimeUtc } });
+    await apiCall('/coaching-sessions', { method: 'POST', data: session });
     await fetchCoachingSessions();
   };
 
   const updateCoachingSession = async (id: string, updates: CoachingSessionUpdateBody) => {
-    let payload: CoachingSessionUpdateBody = { ...updates };
-    if (updates.date) {
-      const { date, time: startTimeUtc } = toUtcDateTime(updates.date, updates.startTime);
-      const { time: endTimeUtc } = toUtcDateTime(updates.date, updates.endTime);
-      payload = { ...payload, date, startTime: startTimeUtc, endTime: endTimeUtc };
-    }
-    await apiCall(`/coaching-sessions/${id}`, { method: 'PUT', data: payload });
+    await apiCall(`/coaching-sessions/${id}`, { method: 'PUT', data: updates });
     await fetchCoachingSessions();
   };
 
