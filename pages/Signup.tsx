@@ -12,10 +12,6 @@ const Signup: React.FC = () => {
   const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const [publicGroups, setPublicGroups] = useState<Group[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -47,6 +43,10 @@ const Signup: React.FC = () => {
   useEffect(() => {
     fetchPublicGroups();
   }, []);
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const clearErrors = () => {
     setNameError('');
