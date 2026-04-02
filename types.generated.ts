@@ -2464,6 +2464,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/point-activity-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all point activity types
+         * @description Returns all available point activity types from the system. These values are used when creating point configurations via `POST /point-configs`. Restricted to authenticated users.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Point activity types retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["PointActivityTypeObject"][];
+                        };
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/point-configs": {
         parameters: {
             query?: never;
@@ -2538,11 +2590,10 @@ export interface paths {
                 content: {
                     "application/json": {
                         /**
-                         * @description The activity type to configure points for.
-                         * @example prospect_created
-                         * @enum {string}
+                         * @description The activity type to configure points for. Must match a value returned by `GET /point-activity-types`.
+                         * @example coaching_session_attended
                          */
-                        activity: "prospect_created" | "appointment_set" | "sales_meeting" | "sale_closed";
+                        activity: string;
                         /**
                          * @description Points awarded for the activity. Must be a positive integer.
                          * @example 10
@@ -2622,8 +2673,8 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    /** @description The activity type whose point config should be updated. Must be one of the four valid activity values. */
-                    activity: "prospect_created" | "appointment_set" | "sales_meeting" | "sale_closed";
+                    /** @description The activity type whose point config should be updated. Must match an existing point config's activity for the authenticated tenant. */
+                    activity: string;
                 };
                 cookie?: never;
             };
@@ -4186,17 +4237,41 @@ export interface components {
              */
             agents_count: number;
         };
+        PointActivityTypeObject: {
+            /**
+             * @description Unique activity key used as the identifier in point configs and transactions.
+             * @example coaching_session_attended
+             */
+            name: string;
+            /**
+             * @description Category the activity belongs to (e.g. prospect, coaching).
+             * @example coaching
+             */
+            category: string;
+            /**
+             * @description Human-readable display name for the activity.
+             * @example Session Attended
+             */
+            label: string;
+            /**
+             * @description Subject entity type associated with the activity (used internally by the points engine).
+             * @example coaching_session
+             */
+            subject_type: string;
+        };
         PointConfigObject: {
             /**
              * Format: uuid
              * @example a1b2c3d4-e5f6-7890-abcd-ef1234567890
              */
             id: string;
+            /** @example coaching_session_attended */
+            activity: string;
             /**
-             * @example prospect_created
-             * @enum {string}
+             * @description Category derived from the activity type (e.g. prospect, coaching).
+             * @example coaching
              */
-            activity: "prospect_created" | "appointment_set" | "sales_meeting" | "sale_closed";
+            category: string;
             /** @example 10 */
             points: number;
             /**
