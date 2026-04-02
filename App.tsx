@@ -53,6 +53,7 @@ const App: React.FC = () => {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/support" element={<Support />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
             {/* Protected app routes — nested inside Layout */}
             <Route
@@ -75,7 +76,6 @@ const App: React.FC = () => {
                       <Route path="profile" element={<Profile />} />
                       <Route path="tutorials" element={<Tutorials />} />
                       <Route path="add-to-home-screen" element={<AddToHomeScreen />} />
-                      <Route path="privacy-policy" element={<PrivacyPolicy />} />
                       <Route path="users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
                       <Route path="admin-groups" element={<AdminRoute><AdminGroups /></AdminRoute>} />
                       <Route path="admin-rewards" element={<AdminRoute><AdminRewards /></AdminRoute>} />
