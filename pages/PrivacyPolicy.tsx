@@ -1,10 +1,7 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Shield } from 'lucide-react';
-
-interface Props {
-  onBack?: () => void;
-}
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
   <section className="space-y-3">
@@ -21,21 +18,21 @@ const BulletList: React.FC<{ items: string[] }> = ({ items }) => (
   </ul>
 );
 
-const PrivacyPolicy: React.FC<Props> = ({ onBack }) => {
+const PrivacyPolicy: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
         {/* Header */}
         <div className="bg-sidebar-primary p-6 flex items-center text-white">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="mr-4 p-2 hover:bg-white/10 rounded-full transition-colors"
-              aria-label="Go back"
-            >
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-          )}
+          <button
+            onClick={() => navigate(-1)}
+            className="mr-4 p-2 hover:bg-white/10 rounded-full transition-colors"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
           <div className="flex items-center gap-3">
             <Shield className="w-6 h-6 text-blue-400" />
             <div>
