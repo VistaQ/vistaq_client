@@ -118,6 +118,15 @@ const Login: React.FC = () => {
               Register as a new Agent
             </Link>
           </div>
+
+          <div className="mt-6 pt-6 border-t border-gray-100 text-center">
+            <p className="text-xs text-gray-400">
+              Need help?{' '}
+              <Link to="/support" className="text-blue-500 hover:text-blue-700 hover:underline font-medium">
+                Contact Support
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
 

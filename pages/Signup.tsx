@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../services/apiClient';
 import { Group } from '../types';
@@ -295,6 +295,15 @@ const Signup: React.FC = () => {
             >
               Sign In
             </button>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-gray-100 text-center">
+            <p className="text-xs text-gray-400">
+              Need help?{' '}
+              <Link to="/support" className="text-blue-500 hover:text-blue-700 hover:underline font-medium">
+                Contact Support
+              </Link>
+            </p>
           </div>
         </div>
       </div>

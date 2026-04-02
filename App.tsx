@@ -47,11 +47,12 @@ const App: React.FC = () => {
         <GlobalNotification />
         <Suspense fallback={<PageSpinner />}>
           <Routes>
-            {/* Public auth routes */}
+            {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/support" element={<Support />} />
 
             {/* Protected app routes — nested inside Layout */}
             <Route
@@ -72,7 +73,6 @@ const App: React.FC = () => {
                       <Route path="reports" element={<Reports />} />
                       <Route path="import" element={<Import />} />
                       <Route path="profile" element={<Profile />} />
-                      <Route path="support" element={<Support />} />
                       <Route path="tutorials" element={<Tutorials />} />
                       <Route path="add-to-home-screen" element={<AddToHomeScreen />} />
                       <Route path="privacy-policy" element={<PrivacyPolicy />} />
