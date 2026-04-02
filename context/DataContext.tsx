@@ -1,7 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, CoachingAttendance, PointConfig, Group, DashboardStats, GroupStats } from '../types';
+import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, CoachingSessionCreateBody, CoachingSessionUpdateBody, PointConfig, Group, DashboardStats, GroupStats } from '../types';
 import { apiCall } from '../services/apiClient';
+import { toLocalISO } from '../utils/dateUtils';
 import { DEFAULT_POINT_CONFIG } from '../services/points';
 
 interface DataContextType {
@@ -43,12 +44,11 @@ interface DataContextType {
 
   // Coaching Methods
   coachingSessions: CoachingSession[];
-  addCoachingSession: (session: Partial<CoachingSession>) => Promise<void>;
-  updateCoachingSession: (id: string, updates: Partial<CoachingSession>) => Promise<void>;
+  addCoachingSession: (session: CoachingSessionCreateBody) => Promise<void>;
+  updateCoachingSession: (id: string, updates: CoachingSessionUpdateBody) => Promise<void>;
   deleteCoachingSession: (id: string) => Promise<void>;
-  joinCoachingSession: (sessionId: string, user: User) => Promise<void>;
+  joinCoachingSession: (sessionId: string) => Promise<void>;
   markNonAttendees: (sessionId: string) => Promise<void>;
-  getCoachingSessionsForUser: (user: User) => CoachingSession[];
   refetchCoachingSessions: () => Promise<void>;
 }
 
@@ -128,34 +128,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     setCoachingError(false);
-    // Simulated Backend Storage Key (Global across all users for accurate simulation)
-    const DB_KEY = 'mock_coaching_db';
-    let raw: unknown[] = [];
-
+    setIsLoadingCoaching(true);
     try {
-      const storedDb = localStorage.getItem(DB_KEY);
-      if (storedDb) {
-        raw = JSON.parse(storedDb);
-      }
+      const res = await apiCall('/coaching-sessions');
+      const raw: CoachingSession[] = Array.isArray(res.data) ? res.data : [];
+      setCoachingSessions(raw);
     } catch (e) {
       console.error('[DataContext] fetchCoachingSessions:', e);
       setCoachingError(true);
-      raw = [];
+      setCoachingSessions([]);
+    } finally {
+      setIsLoadingCoaching(false);
     }
-
-    setIsLoadingCoaching(true);
-    const items: CoachingSession[] = raw.map(s => ({
-      ...s,
-      coachingType: s.coachingType || 'Individual Coaching',
-      durationStart: s.durationStart || '09:00',
-      durationEnd: s.durationEnd || '10:00',
-      attendance: s.attendance || [],
-      targetGroupIds: s.targetGroupIds || [],
-      targetAgentIds: s.targetAgentIds || []
-    }));
-
-    setCoachingSessions(items);
-    setIsLoadingCoaching(false);
   };
 
   const fetchDashboardStats = async () => {
@@ -355,30 +339,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // --- EVENTS ---
-  // Convert local date+time to UTC date+time before sending to the backend.
-  // new Date('YYYY-MM-DDTHH:MM') is parsed as local time by JS, so toISOString() gives UTC.
-  const toUtcDateTime = (date: string, time?: string): { date: string; time?: string } => {
-    if (!date) return { date };
-    const local = new Date(time ? `${date}T${time}` : `${date}T00:00`);
-    if (isNaN(local.getTime())) return { date, time };
-    const iso = local.toISOString();
-    return {
-      date: iso.slice(0, 10),            // YYYY-MM-DD in UTC
-      time: time ? iso.slice(11, 16) : undefined, // HH:MM in UTC
-    };
-  };
-
   const addEvent = async (evt: Partial<Event>) => {
-    const { date, time: startTimeUtc } = toUtcDateTime((evt as any).date, (evt as any).startTime);
-    const { time: endTimeUtc } = toUtcDateTime((evt as any).date, (evt as any).endTime);
+    const date: string = (evt as any).date;
+    const startTime: string = (evt as any).startTime;
+    const endTime: string = (evt as any).endTime;
     const payload: Record<string, unknown> = {
       title: evt.event_title || 'New Event',
-      date,
       description: evt.description || '',
       groupIds: evt.groupIds || [],
+      startDate: toLocalISO(date, startTime),
     };
-    if (startTimeUtc) payload.startTime = startTimeUtc;
-    if (endTimeUtc) payload.endTime = endTimeUtc;
+    if (endTime) payload.endDate = toLocalISO(date, endTime);
     if (evt.type) payload.type = evt.type;
     if (evt.meeting_link) payload.link = evt.meeting_link;
     if (evt.venue) payload.venue = evt.venue;
@@ -390,12 +361,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateEvent = async (id: string, evt: Partial<Event>) => {
     const payload: Record<string, unknown> = {};
     if (evt.event_title) payload.title = evt.event_title;
-    if (evt.date) {
-      const { date, time: startTimeUtc } = toUtcDateTime(evt.date, evt.startTime);
-      const { time: endTimeUtc } = toUtcDateTime(evt.date, evt.endTime);
-      payload.date = date;
-      if (startTimeUtc) payload.startTime = startTimeUtc;
-      if (endTimeUtc) payload.endTime = endTimeUtc;
+    const date: string = (evt as any).date;
+    const startTime: string = (evt as any).startTime;
+    const endTime: string = (evt as any).endTime;
+    if (date && startTime) {
+      payload.startDate = toLocalISO(date, startTime);
+      if (endTime) payload.endDate = toLocalISO(date, endTime);
     }
     if (evt.description) payload.description = evt.description;
     if (evt.type) payload.type = evt.type;
@@ -417,148 +388,30 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return events;
   };
 
-  // --- COACHING SESSIONS (Mocked) ---
-  const getMockDb = (): CoachingSession[] => {
-    try {
-      const stored = localStorage.getItem('mock_coaching_db');
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const setMockDb = (data: CoachingSession[]) => {
-    localStorage.setItem('mock_coaching_db', JSON.stringify(data));
-  };
-
-  const addCoachingSession = async (session: Partial<CoachingSession>) => {
-    const newSession = {
-      ...session,
-      id: `coach_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-      coachingType: session.coachingType || 'Individual Coaching',
-      title: session.title || 'New Coaching Session',
-      durationStart: session.durationStart || '09:00',
-      durationEnd: session.durationEnd || '10:00',
-      date: session.date || new Date().toISOString(),
-      attendance: session.attendance || [],
-      targetGroupIds: session.targetGroupIds || [],
-      targetAgentIds: session.targetAgentIds || [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      status: session.status || 'upcoming'
-    } as CoachingSession;
-
-    // Write to mock DB
-    const db = getMockDb();
-    db.push(newSession);
-    setMockDb(db);
-
+  // --- COACHING SESSIONS ---
+  const addCoachingSession = async (session: CoachingSessionCreateBody) => {
+    await apiCall('/coaching-sessions', { method: 'POST', data: session });
     await fetchCoachingSessions();
   };
 
-  const updateCoachingSession = async (id: string, updates: Partial<CoachingSession>) => {
-    // Update in mock DB
-    const db = getMockDb();
-    const index = db.findIndex(s => s.id === id);
-    if (index >= 0) {
-      db[index] = { ...db[index], ...updates, updatedAt: new Date().toISOString() };
-      setMockDb(db);
-    }
-
+  const updateCoachingSession = async (id: string, updates: CoachingSessionUpdateBody) => {
+    await apiCall(`/coaching-sessions/${id}`, { method: 'PUT', data: updates });
     await fetchCoachingSessions();
   };
 
   const deleteCoachingSession = async (id: string) => {
-    // Delete from mock DB
-    const db = getMockDb();
-    const filtered = db.filter(s => s.id !== id);
-    setMockDb(filtered);
-
+    await apiCall(`/coaching-sessions/${id}`, { method: 'DELETE' });
     await fetchCoachingSessions();
   };
 
-  const joinCoachingSession = async (sessionId: string, user: User) => {
-    const db = getMockDb();
-    const index = db.findIndex(s => s.id === sessionId);
-    if (index < 0) return;
-
-    const session = db[index];
-    const existingIdx = session.attendance.findIndex((a: { agentId: string }) => a.agentId === user.id);
-
-    if (existingIdx >= 0) {
-      if (session.attendance[existingIdx].status === 'pending') {
-        session.attendance[existingIdx] = {
-          ...session.attendance[existingIdx],
-          status: 'joined',
-          joinedAt: new Date().toISOString(),
-        };
-      }
-    } else {
-      session.attendance.push({
-        agentId: user.id,
-        agentName: user.name || user.email,
-        agentEmail: user.email,
-        groupId: user.group_id,
-        status: 'joined',
-        joinedAt: new Date().toISOString(),
-      });
-    }
-
-    db[index] = { ...session, updatedAt: new Date().toISOString() };
-    setMockDb(db);
-
+  const joinCoachingSession = async (sessionId: string) => {
+    await apiCall(`/coaching-sessions/${sessionId}/join`, { method: 'POST' });
     await fetchCoachingSessions();
   };
 
-  // Mark any 'pending' attendance records as 'did_not_attend' for a closed session
   const markNonAttendees = async (sessionId: string) => {
-    const db = getMockDb();
-    const index = db.findIndex(s => s.id === sessionId);
-    if (index < 0) return;
-
-    const session = db[index];
-    let changed = false;
-
-    const updatedAttendance = session.attendance.map((a: CoachingAttendance) => {
-      if (a.status === 'pending') {
-        changed = true;
-        return { ...a, status: 'did_not_attend' as const };
-      }
-      return a;
-    });
-
-    if (changed) {
-      db[index] = { ...session, attendance: updatedAttendance, updatedAt: new Date().toISOString() };
-      setMockDb(db);
-      await fetchCoachingSessions();
-    }
-  };
-
-  const getCoachingSessionsForUser = (user: User): CoachingSession[] => {
-    if (!user) return [];
-
-    return coachingSessions.filter(s => {
-      // 1. Created by me?
-      if (s.createdBy === user.id) return true;
-
-      // 2. Is target audience "All" (empty arrays) and I am an agent/leader?
-      if (s.targetGroupIds?.length === 0 && s.targetAgentIds?.length === 0) {
-        return true;
-      }
-
-      // 3. Am I specifically targeted?
-      if (s.targetAgentIds?.includes(user.id)) return true;
-
-      // 4. Is my group targeted?
-      if (user.group_id && s.targetGroupIds?.includes(user.group_id)) return true;
-
-      // 5. Admin or Master Trainer sees all
-      if (user.role === UserRole.ADMIN || user.role === UserRole.MASTER_TRAINER) {
-        return true;
-      }
-
-      return false;
-    });
+    await apiCall(`/coaching-sessions/${sessionId}/mark-non-attendees`, { method: 'POST' });
+    await fetchCoachingSessions();
   };
 
   return (
@@ -570,7 +423,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       getProspectsByScope, getGroupProspects, updateBadgeTiers, updatePointConfig,
       addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents,
       coachingSessions, addCoachingSession, updateCoachingSession, deleteCoachingSession,
-      joinCoachingSession, markNonAttendees, getCoachingSessionsForUser, refetchCoachingSessions: fetchCoachingSessions,
+      joinCoachingSession, markNonAttendees, refetchCoachingSessions: fetchCoachingSessions,
       dashboardStats, groupStats, isLoadingDashboardStats,
       refetchDashboardStats: fetchDashboardStats, refetchGroupStats: fetchGroupStats
     }}>

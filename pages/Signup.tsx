@@ -3,8 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../services/apiClient';
-import { Group } from '../types';
 import { Lock, Mail, User, Users, AlertCircle, Loader2, IdCard, MapPin, WifiOff } from 'lucide-react';
+
+type PublicGroup = { id: string; name: string };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -40,7 +41,7 @@ const Signup: React.FC = () => {
   const navigate = useNavigate();
 
   // All hooks must be declared before any conditional return
-  const [publicGroups, setPublicGroups] = useState<Group[]>([]);
+  const [publicGroups, setPublicGroups] = useState<PublicGroup[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [agentCode, setAgentCode] = useState('');
@@ -65,8 +66,8 @@ const Signup: React.FC = () => {
 
   const fetchPublicGroups = () => {
     setGroupsLoadError(false);
-    apiCall('/groups').then((res: any) => {
-      const items: Group[] = Array.isArray(res.data) ? res.data : [];
+    apiCall('/public/groups').then((res: any) => {
+      const items: PublicGroup[] = Array.isArray(res.data) ? res.data : [];
       setPublicGroups(items);
     }).catch(() => {
       setGroupsLoadError(true);

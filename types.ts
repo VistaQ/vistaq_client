@@ -114,48 +114,26 @@ export type ProspectProduct = {
   amount: number;
 };
 
-// Coaching & Attendance Types
-export interface CoachingAttendance {
-  agentId: string;
-  agentName: string;
-  agentEmail?: string;
-  groupId?: string; // Group the agent belongs to
-  groupName?: string;
-  status: 'pending' | 'joined' | 'did_not_attend';
-  joinedAt?: string; // ISO String when agent clicks "Join" — this is the attendance log timestamp
-}
+// Coaching & Attendance Types (source of truth: openapi.yaml → types.generated.ts)
+export type CoachingSession = components['schemas']['CoachingSessionObject'];
+export type CoachingAttendance = components['schemas']['AttendanceRecordObject'];
+export type CoachingType = components['schemas']['CoachingTypeEnum'];
+export type TrainingMode = components['schemas']['TrainingModeEnum'];
+export type SessionStatus = components['schemas']['SessionStatusEnum'];
+export type AttendanceStatus = components['schemas']['AttendanceStatusEnum'];
 
-export type CoachingType =
-  | 'Individual Coaching'
-  | 'Group Coaching'
-  | 'Peer Circles'
-  | '2 Full Days Seminar'
-  | '2 Hours Online Seminar';
+export type CoachingSessionCreateBody = paths['/coaching-sessions']['post']['requestBody']['content']['application/json'];
+export type CoachingSessionUpdateBody = paths['/coaching-sessions/{sessionId}']['put']['requestBody']['content']['application/json'];
 
-export interface CoachingSession {
-  id: string;
-  coachingType: CoachingType;
-  title: string;
-  description?: string;
-  date: string; // ISO String for the selected date
-  durationStart: string; // e.g., "14:00"
-  durationEnd: string; // e.g., "15:00"
-  venue: 'Online' | 'Face to Face';
-  link?: string; // e.g. Zoom link or venue location
+export const COACHING_TYPE_LABELS: Record<CoachingType, string> = {
+  individual_coaching: 'Individual Coaching',
+  group_coaching: 'Group Coaching',
+  peer_circles: 'Peer Circles',
+  '2_full_days_seminar': '2 Full Days Seminar',
+  '2_hours_online_seminar': '2 Hours Online Seminar',
+};
 
-  // Creator Info
-  createdBy: string;
-  createdByName: string;
-  createdByRole: string; // e.g. 'master_trainer', 'trainer', 'group_leader'
-
-  // Target Audience (Assigned Groups/Agents)
-  targetGroupIds?: string[]; // Empty means all groups (for master trainer) or specific groups
-  targetAgentIds?: string[]; // Specific agents selected
-
-  // Attendance tracking
-  attendance: CoachingAttendance[];
-
-  status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
-  createdAt?: string;
-  updatedAt?: string;
-}
+export const TRAINING_MODE_LABELS: Record<TrainingMode, string> = {
+  online: 'Online',
+  face_to_face: 'Face to Face',
+};

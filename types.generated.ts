@@ -2037,21 +2037,17 @@ export interface paths {
                          */
                         title: string;
                         /**
-                         * Format: date
-                         * @description Date of the event in YYYY-MM-DD format. Cannot be a past date.
-                         * @example 2026-04-15
+                         * Format: date-time
+                         * @description Start datetime as an ISO 8601 timestamp with timezone offset. Cannot be in the past.
+                         * @example 2026-04-15T09:00:00+08:00
                          */
-                        date: string;
+                        startDate: string;
                         /**
-                         * @description Start time of the event in HH:MM 24-hour format.
-                         * @example 09:00
+                         * Format: date-time
+                         * @description End datetime as an ISO 8601 timestamp with timezone offset. Must be after startDate.
+                         * @example 2026-04-15T11:00:00+08:00
                          */
-                        startTime: string;
-                        /**
-                         * @description End time of the event in HH:MM 24-hour format.
-                         * @example 11:00
-                         */
-                        endTime: string;
+                        endDate: string;
                         /**
                          * @description Status of the event. Defaults to `upcoming` when not supplied.
                          * @example upcoming
@@ -2263,21 +2259,17 @@ export interface paths {
                          */
                         title?: string;
                         /**
-                         * Format: date
-                         * @description Updated date of the event in YYYY-MM-DD format. Cannot be a past date.
-                         * @example 2026-04-20
+                         * Format: date-time
+                         * @description Start datetime as an ISO 8601 timestamp with timezone offset.
+                         * @example 2026-04-20T10:00:00+08:00
                          */
-                        date?: string;
+                        startDate?: string;
                         /**
-                         * @description Updated start time of the event in HH:MM 24-hour format.
-                         * @example 10:00
+                         * Format: date-time
+                         * @description End datetime as an ISO 8601 timestamp with timezone offset. Must be after startDate.
+                         * @example 2026-04-20T12:00:00+08:00
                          */
-                        startTime?: string;
-                        /**
-                         * @description Updated end time of the event in HH:MM 24-hour format.
-                         * @example 12:00
-                         */
-                        endTime?: string;
+                        endDate?: string;
                         /**
                          * @description Updated status of the event.
                          * @example completed
@@ -2337,7 +2329,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Bad request. Returned when the request body fails validation (e.g. no fields provided, `date` is in the past, a supplied group UUID does not exist, or a trainer supplies a group they do not manage). */
+                /** @description Bad request. Returned when the request body fails validation (e.g. no fields provided, `startDate` is in the past, `endDate` is not after `startDate`, a supplied group UUID does not exist, or a trainer supplies a group they do not manage). */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2472,6 +2464,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/point-activity-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all point activity types
+         * @description Returns all available point activity types from the system. These values are used when creating point configurations via `POST /point-configs`. Restricted to authenticated users.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Point activity types retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["PointActivityTypeObject"][];
+                        };
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/point-configs": {
         parameters: {
             query?: never;
@@ -2546,11 +2590,10 @@ export interface paths {
                 content: {
                     "application/json": {
                         /**
-                         * @description The activity type to configure points for.
-                         * @example prospect_created
-                         * @enum {string}
+                         * @description The activity type to configure points for. Must match a value returned by `GET /point-activity-types`.
+                         * @example coaching_session_attended
                          */
-                        activity: "prospect_created" | "appointment_set" | "sales_meeting" | "sale_closed";
+                        activity: string;
                         /**
                          * @description Points awarded for the activity. Must be a positive integer.
                          * @example 10
@@ -2630,8 +2673,8 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    /** @description The activity type whose point config should be updated. Must be one of the four valid activity values. */
-                    activity: "prospect_created" | "appointment_set" | "sales_meeting" | "sale_closed";
+                    /** @description The activity type whose point config should be updated. Must match an existing point config's activity for the authenticated tenant. */
+                    activity: string;
                 };
                 cookie?: never;
             };
@@ -2974,6 +3017,750 @@ export interface paths {
                         /**
                          * @example {
                          *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/coaching-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List coaching sessions
+         * @description Returns all coaching sessions visible to the authenticated user, scoped by row-level security. The response includes target group IDs, target agent IDs, and attendance records for each session.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Coaching sessions retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["CoachingSessionObject"][];
+                        };
+                    };
+                };
+                /** @description Unauthorized. No token or invalid token supplied. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create a coaching session
+         * @description Creates a new coaching session under the authenticated user's tenant. Restricted to admin, master_trainer, trainer, and group_leader roles. Optionally targets specific groups and/or agents via `groupIds` and `agentIds`. Omitting both means the session targets all agents.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        coachingType: components["schemas"]["CoachingTypeEnum"];
+                        /** @example Weekly Group Coaching */
+                        title: string;
+                        /** @example Focus on objection handling techniques */
+                        description?: string;
+                        /**
+                         * Format: date-time
+                         * @description Start datetime as an ISO 8601 timestamp with timezone offset. Cannot be in the past.
+                         * @example 2026-04-15T10:00:00+08:00
+                         */
+                        startDate: string;
+                        /**
+                         * Format: date-time
+                         * @description End datetime as an ISO 8601 timestamp with timezone offset. Must be after startDate.
+                         * @example 2026-04-15T12:00:00+08:00
+                         */
+                        endDate: string;
+                        trainingMode: components["schemas"]["TrainingModeEnum"];
+                        /**
+                         * @description Meeting link (e.g. Zoom, Google Meet).
+                         * @example https://zoom.us/j/123456789
+                         */
+                        link?: string;
+                        status?: components["schemas"]["SessionStatusEnum"];
+                        /**
+                         * @description Target group UUIDs. Must not contain duplicates.
+                         * @example [
+                         *       "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                         *     ]
+                         */
+                        groupIds?: string[];
+                        /**
+                         * @description Target agent UUIDs. Must not contain duplicates.
+                         * @example [
+                         *       "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+                         *     ]
+                         */
+                        agentIds?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Coaching session created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["CoachingSessionObject"];
+                        };
+                    };
+                };
+                /** @description Validation failed, invalid group IDs, invalid agent IDs, or unauthorized group access. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Validation failed",
+                         *       "errors": []
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized. No token or invalid token supplied. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. The user's role does not permit this action. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/coaching-sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description UUID of the coaching session. */
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Get coaching session by ID
+         * @description Returns a single coaching session including its target groups, target agents, and attendance records.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID of the coaching session. */
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Coaching session retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["CoachingSessionObject"];
+                        };
+                    };
+                };
+                /** @description Unauthorized. No token or invalid token supplied. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Coaching session not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Coaching session not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        /**
+         * Update coaching session
+         * @description Updates an existing coaching session. At least one field must be provided. Restricted to admin, master_trainer, trainer, and group_leader roles. Non-admin users can only update sessions they created.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID of the coaching session. */
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        coachingType?: components["schemas"]["CoachingTypeEnum"];
+                        /** @example Updated Session Title */
+                        title?: string;
+                        /** @example Updated description */
+                        description?: string;
+                        /**
+                         * Format: date-time
+                         * @description Start datetime as an ISO 8601 timestamp with timezone offset.
+                         * @example 2026-04-20T14:00:00+08:00
+                         */
+                        startDate?: string;
+                        /**
+                         * Format: date-time
+                         * @description End datetime as an ISO 8601 timestamp with timezone offset. Must be after startDate.
+                         * @example 2026-04-20T16:00:00+08:00
+                         */
+                        endDate?: string;
+                        trainingMode?: components["schemas"]["TrainingModeEnum"];
+                        /** @example https://zoom.us/j/987654321 */
+                        link?: string;
+                        status?: components["schemas"]["SessionStatusEnum"];
+                        /** @description Updated target group UUIDs. */
+                        groupIds?: string[];
+                        /** @description Updated target agent UUIDs. */
+                        agentIds?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Coaching session updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["CoachingSessionObject"];
+                        };
+                    };
+                };
+                /** @description Validation failed, invalid group IDs, invalid agent IDs, unauthorized group access, or `endDate` is not after `startDate`. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationErrorResponse"] | components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized. No token or invalid token supplied. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. The user's role does not permit this action or the user is not the session creator. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Coaching session not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Coaching session not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Delete coaching session
+         * @description Deletes a coaching session. Restricted to admin, master_trainer, trainer, and group_leader roles. Non-admin users can only delete sessions they created.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID of the coaching session. */
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Coaching session deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                        };
+                    };
+                };
+                /** @description Unauthorized. No token or invalid token supplied. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. The user's role does not permit this action or the user is not the session creator. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Coaching session not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Coaching session not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/coaching-sessions/{sessionId}/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join a coaching session
+         * @description Records the authenticated user's attendance for the given coaching session. Any authenticated user can join. If the user has already joined, the existing attendance record is returned.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID of the coaching session to join. */
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Successfully joined (or already joined) the session */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["AttendanceRecordObject"];
+                        };
+                    };
+                };
+                /** @description Unauthorized. No token or invalid token supplied. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Coaching session not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Coaching session not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/coaching-sessions/{sessionId}/mark-non-attendees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk-mark non-attendees
+         * @description Marks all targeted agents who have not joined the session as "did_not_attend". Only the session creator or users with admin / master_trainer roles can perform this action.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID of the coaching session. */
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Non-attendees marked successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                        };
+                    };
+                };
+                /** @description Unauthorized. No token or invalid token supplied. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. The user is not the session creator and does not have an admin or master_trainer role. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Coaching session not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Coaching session not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List groups for a tenant
+         * @description Returns a minimal list of groups (id and name) for the tenant identified by the `X-Tenant-Slug` header. No authentication is required. Intended for use on public-facing flows such as agent registration, where the caller needs to present a group selector before a session token exists.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Slug that identifies the tenant whose groups should be returned. Returns 400 if the header is absent or not a string value, and 404 if no tenant matches the supplied slug. */
+                    "X-Tenant-Slug": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Groups retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: {
+                                /**
+                                 * Format: uuid
+                                 * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                                 */
+                                id: string;
+                                /** @example MDRT Stars */
+                                name: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Bad request. Returned when the `X-Tenant-Slug` header is missing or not a valid string value. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "X-Tenant-Slug header is required"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Tenant not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Tenant not found"
                          *     }
                          */
                         "application/json": components["schemas"]["ErrorResponse"];
@@ -3351,13 +4138,13 @@ export interface components {
             event_title: string;
             /**
              * Format: date-time
-             * @description Start date and time of the event stored as a TIMESTAMPTZ value. Formed by combining the `date` and `startTime` fields supplied on create/update into a single ISO 8601 timestamp.
+             * @description Start date and time of the event stored as a TIMESTAMPTZ value. Value of the `startDate` field supplied in the request.
              * @example 2026-04-15T09:00:00.000Z
              */
             start_date: string;
             /**
              * Format: date-time
-             * @description End date and time of the event stored as a TIMESTAMPTZ value. Formed by combining the `date` and `endTime` fields supplied on create/update into a single ISO 8601 timestamp.
+             * @description End date and time of the event stored as a TIMESTAMPTZ value. Value of the `endDate` field supplied in the request.
              * @example 2026-04-15T11:00:00.000Z
              */
             end_date?: string | null;
@@ -3450,17 +4237,41 @@ export interface components {
              */
             agents_count: number;
         };
+        PointActivityTypeObject: {
+            /**
+             * @description Unique activity key used as the identifier in point configs and transactions.
+             * @example coaching_session_attended
+             */
+            name: string;
+            /**
+             * @description Category the activity belongs to (e.g. prospect, coaching).
+             * @example coaching
+             */
+            category: string;
+            /**
+             * @description Human-readable display name for the activity.
+             * @example Session Attended
+             */
+            label: string;
+            /**
+             * @description Subject entity type associated with the activity (used internally by the points engine).
+             * @example coaching_session
+             */
+            subject_type: string;
+        };
         PointConfigObject: {
             /**
              * Format: uuid
              * @example a1b2c3d4-e5f6-7890-abcd-ef1234567890
              */
             id: string;
+            /** @example coaching_session_attended */
+            activity: string;
             /**
-             * @example prospect_created
-             * @enum {string}
+             * @description Category derived from the activity type (e.g. prospect, coaching).
+             * @example coaching
              */
-            activity: "prospect_created" | "appointment_set" | "sales_meeting" | "sale_closed";
+            category: string;
             /** @example 10 */
             points: number;
             /**
@@ -3675,6 +4486,154 @@ export interface components {
         ErrorResponse: {
             /** @example Server Error */
             message: string;
+        };
+        /**
+         * @example group_coaching
+         * @enum {string}
+         */
+        CoachingTypeEnum: "individual_coaching" | "group_coaching" | "peer_circles" | "2_full_days_seminar" | "2_hours_online_seminar";
+        /**
+         * @example online
+         * @enum {string}
+         */
+        TrainingModeEnum: "online" | "face_to_face";
+        /**
+         * @example upcoming
+         * @enum {string}
+         */
+        SessionStatusEnum: "upcoming" | "ongoing" | "completed" | "cancelled";
+        /**
+         * @example joined
+         * @enum {string}
+         */
+        AttendanceStatusEnum: "pending" | "joined" | "did_not_attend";
+        CoachingSessionObject: {
+            /**
+             * Format: uuid
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @example a1b2c3d4-e5f6-7890-abcd-ef1234567890
+             */
+            tenant_id: string;
+            coaching_type: components["schemas"]["CoachingTypeEnum"];
+            /** @example Weekly Group Coaching */
+            title: string;
+            /** @example Focus on objection handling techniques */
+            description?: string | null;
+            /**
+             * Format: date-time
+             * @description Start date and time of the session stored as a TIMESTAMPTZ value. Value of the `startDate` field supplied in the request.
+             * @example 2026-04-15T10:00:00.000Z
+             */
+            start_date: string;
+            /**
+             * Format: date-time
+             * @description End date and time of the session stored as a TIMESTAMPTZ value. Value of the `endDate` field supplied in the request.
+             * @example 2026-04-15T12:00:00.000Z
+             */
+            end_date?: string | null;
+            training_mode: components["schemas"]["TrainingModeEnum"];
+            /**
+             * @description Meeting link (e.g. Zoom, Google Meet).
+             * @example https://zoom.us/j/123456789
+             */
+            link?: string | null;
+            status: components["schemas"]["SessionStatusEnum"];
+            /**
+             * Format: uuid
+             * @description UUID of the user who created the session.
+             * @example 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+             */
+            created_by: string;
+            /**
+             * @description Display name of the session creator.
+             * @example Jane Trainer
+             */
+            created_by_name?: string;
+            /**
+             * @description Application role of the session creator.
+             * @example trainer
+             */
+            created_by_role?: string;
+            /**
+             * Format: date-time
+             * @example 2026-04-01T08:00:00.000Z
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @example 2026-04-01T08:00:00.000Z
+             */
+            updated_at: string;
+            /**
+             * @description UUIDs of groups targeted by this session. Empty array if all audiences.
+             * @example [
+             *       "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+             *     ]
+             */
+            targetGroupIds: string[];
+            /**
+             * @description UUIDs of agents individually targeted by this session. Empty array if none.
+             * @example []
+             */
+            targetAgentIds: string[];
+            /** @description Attendance records for this session. */
+            attendance: components["schemas"]["AttendanceRecordObject"][];
+        };
+        AttendanceRecordObject: {
+            /**
+             * Format: uuid
+             * @example 7c9e6679-7425-40de-944b-e07fc1f90ae7
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            session_id: string;
+            /**
+             * Format: uuid
+             * @example 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+             */
+            agent_id: string;
+            /** @example John Agent */
+            agent_name: string;
+            /**
+             * Format: email
+             * @example john.agent@example.com
+             */
+            agent_email: string;
+            /**
+             * Format: uuid
+             * @description UUID of the agent's group. Null if the agent is not in a group.
+             * @example a1b2c3d4-e5f6-7890-abcd-ef1234567890
+             */
+            group_id: string | null;
+            /**
+             * @description Name of the agent's group. Null if the agent is not in a group.
+             * @example Team Alpha
+             */
+            group_name: string | null;
+            status: components["schemas"]["AttendanceStatusEnum"];
+            /**
+             * Format: date-time
+             * @description Timestamp when the agent joined the session. Null if not yet joined.
+             * @example 2026-04-15T10:05:00.000Z
+             */
+            joined_at?: string | null;
+            /**
+             * Format: date-time
+             * @example 2026-04-15T08:00:00.000Z
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @example 2026-04-15T10:05:00.000Z
+             */
+            updated_at: string;
         };
         ValidationErrorResponse: {
             /** @example Validation failed */

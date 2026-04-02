@@ -130,6 +130,11 @@ export const handlers = [
 
   http.patch(`${BASE}/users/me/password`, () => HttpResponse.json({ success: true })),
 
+  // ─── Public groups (unauthenticated, for signup) ───
+  http.get(`${BASE}/public/groups`, () =>
+    HttpResponse.json({ data: allGroups.map(g => ({ id: g.id, name: g.name })) })
+  ),
+
   // ─── Groups ───
   http.get(`${BASE}/groups`, ({ request }) => {
     const user = getCurrentUser(request);
@@ -192,6 +197,11 @@ export const handlers = [
 
   // ─── Coaching sessions ───
   http.get(`${BASE}/coaching-sessions`, () => HttpResponse.json({ data: [] })),
+  http.post(`${BASE}/coaching-sessions`, () => HttpResponse.json({ data: { id: 'new-session-id' } }, { status: 201 })),
+  http.put(`${BASE}/coaching-sessions/:id`, () => HttpResponse.json({ data: {} })),
+  http.delete(`${BASE}/coaching-sessions/:id`, () => HttpResponse.json({ success: true })),
+  http.post(`${BASE}/coaching-sessions/:id/join`, () => HttpResponse.json({ data: {} })),
+  http.post(`${BASE}/coaching-sessions/:id/mark-non-attendees`, () => HttpResponse.json({ success: true })),
 
   // ─── Prospects ───
   http.get(`${BASE}/prospects`, ({ request }) => {

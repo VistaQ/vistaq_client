@@ -1,4 +1,4 @@
-import { Prospect, CoachingSession, PointConfig, PointEntry, CoachingType } from '../types';
+import { Prospect, CoachingSession, PointConfig, PointEntry, CoachingType, COACHING_TYPE_LABELS } from '../types';
 
 export const DEFAULT_POINT_CONFIG: PointConfig = {
   prospectBasicInfo: 2,
@@ -16,11 +16,11 @@ export const DEFAULT_POINT_CONFIG: PointConfig = {
 };
 
 const COACHING_TYPE_TO_CONFIG_KEY: Record<CoachingType, keyof PointConfig> = {
-  'Individual Coaching': 'coachingIndividual',
-  'Group Coaching': 'coachingGroup',
-  'Peer Circles': 'coachingPeerCircles',
-  '2 Full Days Seminar': 'coachingFullDays',
-  '2 Hours Online Seminar': 'coachingOnlineSeminar',
+  individual_coaching: 'coachingIndividual',
+  group_coaching: 'coachingGroup',
+  peer_circles: 'coachingPeerCircles',
+  '2_full_days_seminar': 'coachingFullDays',
+  '2_hours_online_seminar': 'coachingOnlineSeminar',
 };
 
 export function computeUserPoints(
@@ -85,18 +85,18 @@ export function computeUserPoints(
   // --- Coaching points (joined attendance) ---
   for (const session of coachingSessions) {
     const record = session.attendance.find(
-      a => a.agentId === userId && a.status === 'joined'
+      a => a.agent_id === userId && a.status === 'joined'
     );
     if (!record) continue;
 
-    const configKey = COACHING_TYPE_TO_CONFIG_KEY[session.coachingType];
+    const configKey = COACHING_TYPE_TO_CONFIG_KEY[session.coaching_type];
     if (!configKey) continue;
 
     breakdown.push({
       id: `${session.id}_coaching`,
-      date: record.joinedAt || session.date,
+      date: record.joined_at || session.start_date,
       category: 'coaching',
-      action: session.coachingType,
+      action: COACHING_TYPE_LABELS[session.coaching_type],
       subject: session.title,
       points: config[configKey],
     });
