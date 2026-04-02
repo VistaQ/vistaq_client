@@ -419,25 +419,28 @@ const Coaching: React.FC = () => {
 
                                                     {/* Did Not Attend / Pending Section */}
                                                     <div className="p-5">
-                                                        <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${selEnded ? 'text-amber-600' : 'text-gray-400'}`}>
+                                                        <h4 className="text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 text-gray-400">
                                                             <Info className="w-3.5 h-3.5" />
-                                                            {selEnded ? `Did Not Attend (${notAttendedRecords.length})` : `Not Yet Joined (${notAttendedRecords.length})`}
+                                                            {`Not Attended (${notAttendedRecords.length})`}
                                                         </h4>
                                                         {notAttendedRecords.length === 0 ? (
                                                             <p className="text-sm text-gray-400 italic">All invited agents attended.</p>
                                                         ) : (
                                                             <div className="space-y-2">
-                                                                {notAttendedRecords.map(rec => (
-                                                                    <div key={rec.id} className={`flex items-center justify-between py-2 px-3 border rounded-xl ${selEnded ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
-                                                                        <div>
-                                                                            <p className="text-sm font-semibold text-gray-900">{rec.agent_name}</p>
-                                                                            <p className="text-xs text-gray-500">{rec.group_name || 'No Group'}</p>
+                                                                {notAttendedRecords.map(rec => {
+                                                                    const didNotAttend = rec.status === 'did_not_attend';
+                                                                    return (
+                                                                        <div key={rec.id} className={`flex items-center justify-between py-2 px-3 border rounded-xl ${didNotAttend ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
+                                                                            <div>
+                                                                                <p className="text-sm font-semibold text-gray-900">{rec.agent_name}</p>
+                                                                                <p className="text-xs text-gray-500">{rec.group_name || 'No Group'}</p>
+                                                                            </div>
+                                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${didNotAttend ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-gray-500'}`}>
+                                                                                {didNotAttend ? 'Did Not Attend' : 'Invited'}
+                                                                            </span>
                                                                         </div>
-                                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${selEnded ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-gray-500'}`}>
-                                                                            {selEnded ? 'Did Not Attend' : 'Invited'}
-                                                                        </span>
-                                                                    </div>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </div>
                                                         )}
                                                     </div>
