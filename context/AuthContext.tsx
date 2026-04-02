@@ -77,22 +77,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (identifier: string, password?: string): Promise<boolean> => {
     if (!password) return false;
 
-    try {
-      const response = await apiCall('/auth/login', {
-        method: 'POST',
-        data: { email: identifier, password },
-        headers: { 'X-Tenant-Slug': getTenantSlug() }
-      });
-      const { user: rawUser, token } = response.data;
-      localStorage.setItem('authToken', token);
-      const user = normalizeUser(rawUser);
-      localStorage.setItem('authUser', JSON.stringify(user));
-      setCurrentUser(user);
-      return true;
-    } catch (e) {
-      console.error('[AuthContext] login failed:', e);
-      return false;
-    }
+    const response = await apiCall('/auth/login', {
+      method: 'POST',
+      data: { email: identifier, password },
+      headers: { 'X-Tenant-Slug': getTenantSlug() }
+    });
+    const { user: rawUser, token } = response.data;
+    localStorage.setItem('authToken', token);
+    const user = normalizeUser(rawUser);
+    localStorage.setItem('authUser', JSON.stringify(user));
+    setCurrentUser(user);
+    return true;
   };
 
   const register = async (name: string, email: string, password: string, groupId: string, agentCode: string, location: string): Promise<boolean> => {
