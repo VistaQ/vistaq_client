@@ -76,8 +76,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
     // ── Derived data ─────────────────────────────────────────────────────────
     const availableGroups = React.useMemo(() => {
         if (!currentUser) return [];
-        if (isAdmin || isMasterTrainer) return groups;
-        if (isTrainer) return groups.filter(g => currentUser.managedGroupIds?.includes(g.id));
+        if (isAdmin || isMasterTrainer || isTrainer) return groups;
         if (isGroupLeader) return groups.filter(g => g.id === currentUser.group_id);
         return [];
     }, [currentUser, groups, isAdmin, isMasterTrainer, isTrainer, isGroupLeader]);
@@ -85,8 +84,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
     const availableAgents = React.useMemo(() => {
         if (!currentUser) return [];
         const isParticipantRole = (u: User) => u.role === UserRole.AGENT || u.role === UserRole.GROUP_LEADER;
-        if (isAdmin || isMasterTrainer) return users.filter(isParticipantRole);
-        if (isTrainer) return users.filter(u => isParticipantRole(u) && currentUser.managedGroupIds?.includes(u.group_id || ''));
+        if (isAdmin || isMasterTrainer || isTrainer) return users.filter(isParticipantRole);
         if (isGroupLeader) return users.filter(u => isParticipantRole(u) && u.group_id === currentUser.group_id);
         return [];
     }, [currentUser, users, isAdmin, isMasterTrainer, isTrainer, isGroupLeader]);
