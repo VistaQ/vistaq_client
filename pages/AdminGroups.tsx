@@ -43,7 +43,8 @@ const AdminGroups: React.FC = () => {
       apiCall('/users').catch(() => ({ data: [] })),
     ]);
     setGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
-    setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+    const rawUsers = Array.isArray(usersRes.data) ? usersRes.data : [];
+    setUsers(rawUsers.map((u: any) => ({ ...u, managedGroupIds: u.managed_group_ids ?? [] })));
   };
 
   useEffect(() => { fetchData(); }, []);
