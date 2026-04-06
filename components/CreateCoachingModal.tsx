@@ -492,16 +492,18 @@ const GroupChecklist: React.FC<{ groups: any[]; selected: string[]; onToggle: (i
 
 const AgentChecklist: React.FC<{ agents: any[]; selected: string[]; onToggle: (id: string) => void }> = ({ agents, selected, onToggle }) => {
     const [searchTerm, setSearchTerm] = useState('');
+    const term = searchTerm.toLowerCase();
     const filteredAgents = agents.filter(a =>
-        a.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.id?.toLowerCase().includes(searchTerm.toLowerCase())
+        a.name?.toLowerCase().includes(term) ||
+        a.agent_code?.toLowerCase().includes(term) ||
+        a.id?.toLowerCase().includes(term)
     );
 
     return (
         <div className="space-y-2">
             <input
                 type="text"
-                placeholder="Search by agent name or ID..."
+                placeholder="Search by name or agent code..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors bg-white"
@@ -514,7 +516,7 @@ const AgentChecklist: React.FC<{ agents: any[]; selected: string[]; onToggle: (i
                             checked={selected.includes(a.id)} onChange={() => onToggle(a.id)} />
                         <div className="flex flex-col min-w-0">
                             <span className="text-sm text-gray-900 font-medium truncate">{a.name}</span>
-                            <span className="text-[10px] text-gray-400 uppercase">{a.role} • ID: {a.id}</span>
+                            <span className="text-[10px] text-gray-400">{a.agent_code || a.role}</span>
                         </div>
                     </label>
                 ))}
