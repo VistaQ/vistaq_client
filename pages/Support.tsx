@@ -268,11 +268,17 @@ const Support: React.FC = () => {
                 problem_type: problemType,
                 message,
             };
+
+            // Admin notification — must succeed for enquiry to be counted
             await emailjs.send(serviceId, adminTemplateId, templateParams, { publicKey });
-            await emailjs.send(serviceId, replyTemplateId, templateParams, { publicKey });
+
+            // User confirmation reply — best-effort; don't fail the whole form if this errors
+            emailjs.send(serviceId, replyTemplateId, templateParams, { publicKey })
+                .catch(e => console.error('[Support] reply email failed:', e));
+
             setSubmitted(true);
         } catch (e) {
-            console.error('[Support] emailjs.send failed:', e);
+            console.error('[Support] admin notification failed:', e);
             setError('Failed to send your enquiry. Please try again or contact us directly.');
         } finally {
             setLoading(false);
