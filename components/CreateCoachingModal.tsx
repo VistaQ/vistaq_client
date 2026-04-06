@@ -72,6 +72,25 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const [linkError, setLinkError] = useState('');
+
+    const isValidUrl = (value: string): boolean => {
+        if (!value) return true; // empty is allowed — link is optional
+        try {
+            const url = new URL(value);
+            return url.protocol === 'http:' || url.protocol === 'https:';
+        } catch {
+            return false;
+        }
+    };
+
+    const validateLink = (value: string) => {
+        if (value && !isValidUrl(value)) {
+            setLinkError('Please enter a valid URL starting with https:// or http://');
+        } else {
+            setLinkError('');
+        }
+    };
 
     // ── Derived data ─────────────────────────────────────────────────────────
     const availableGroups = React.useMemo(() => {
@@ -130,6 +149,13 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
         try {
             setError('');
             setIsSubmitting(true);
+
+            // Validate URL before anything else
+            if (link && !isValidUrl(link)) {
+                setLinkError('Please enter a valid URL starting with https:// or http://');
+                setIsSubmitting(false);
+                return;
+            }
 
             // Pass title as excludeLabel when editing
             const { hasConflict, conflictWith } = checkConflict(occupiedSlots, date, startTime, endTime, editSession ? title : undefined);
@@ -316,12 +342,12 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Training Mode <span className="text-red-500">*</span></label>
                             <div className="flex gap-3">
                                 <button type="button"
-                                    onClick={() => setTrainingMode('online')}
+                                    onClick={() => { setTrainingMode('online'); setLink(''); setLinkError(''); }}
                                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${trainingMode === 'online' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
                                     <LinkIcon className="w-4 h-4" /> {TRAINING_MODE_LABELS.online}
                                 </button>
                                 <button type="button"
-                                    onClick={() => setTrainingMode('face_to_face')}
+                                    onClick={() => { setTrainingMode('face_to_face'); setLink(''); setLinkError(''); }}
                                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${trainingMode === 'face_to_face' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
                                     <MapPin className="w-4 h-4" /> {TRAINING_MODE_LABELS.face_to_face}
                                 </button>
@@ -332,11 +358,17 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Meeting URL</label>
                                 <div className="relative">
-                                    <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                    <input type="url" value={link} onChange={e => setLink(e.target.value)}
-                                        className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 pl-9 p-2.5 text-sm"
-                                        placeholder="https://zoom.us/j/... or https://meet.google.com/..." />
+                                    <LinkIcon className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${linkError ? 'text-red-400' : 'text-gray-400'}`} />
+                                    <input
+                                        type="url"
+                                        value={link}
+                                        onChange={e => { setLink(e.target.value); setLinkError(''); }}
+                                        onBlur={e => validateLink(e.target.value)}
+                                        className={`block w-full bg-gray-50 border text-gray-900 rounded-lg shadow-sm focus-visible:ring-2 pl-9 p-2.5 text-sm ${linkError ? 'border-red-400 focus-visible:border-red-500 focus-visible:ring-red-200' : 'border-gray-300 focus-visible:border-blue-500 focus-visible:ring-blue-200'}`}
+                                        placeholder="https://zoom.us/j/... or https://meet.google.com/..."
+                                    />
                                 </div>
+                                {linkError && <p className="text-xs text-red-500 mt-1">{linkError}</p>}
                             </div>
                         )}
 
@@ -344,11 +376,17 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Google Maps or Waze Link</label>
                                 <div className="relative">
-                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                    <input type="url" value={link} onChange={e => setLink(e.target.value)}
-                                        className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 pl-9 p-2.5 text-sm"
-                                        placeholder="https://maps.google.com/... or https://waze.com/..." />
+                                    <MapPin className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${linkError ? 'text-red-400' : 'text-gray-400'}`} />
+                                    <input
+                                        type="url"
+                                        value={link}
+                                        onChange={e => { setLink(e.target.value); setLinkError(''); }}
+                                        onBlur={e => validateLink(e.target.value)}
+                                        className={`block w-full bg-gray-50 border text-gray-900 rounded-lg shadow-sm focus-visible:ring-2 pl-9 p-2.5 text-sm ${linkError ? 'border-red-400 focus-visible:border-red-500 focus-visible:ring-red-200' : 'border-gray-300 focus-visible:border-blue-500 focus-visible:ring-blue-200'}`}
+                                        placeholder="https://maps.google.com/... or https://waze.com/..."
+                                    />
                                 </div>
+                                {linkError && <p className="text-xs text-red-500 mt-1">{linkError}</p>}
                             </div>
                         )}
                     </div>
@@ -443,7 +481,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                     <button
                         onClick={handleSubmit}
                         disabled={
-                            isSubmitting || !title || !date || !startTime || !endTime ||
+                            isSubmitting || !title || !date || !startTime || !endTime || !!linkError ||
                             (isSeminar && selectedGroupIds.length === 0 && selectedAgentIds.length === 0) ||
                             (coachingType === 'individual_coaching' && selectedAgentIds.length === 0)
                         }
