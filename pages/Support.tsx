@@ -266,6 +266,7 @@ const Support: React.FC = () => {
                 name,
                 from_email: email,
                 email,
+                reply_to: email,
                 phone,
                 problem_type: problemType,
                 message,
