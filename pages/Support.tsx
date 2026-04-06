@@ -263,7 +263,9 @@ const Support: React.FC = () => {
         try {
             const templateParams = {
                 from_name: name,
+                name,
                 from_email: email,
+                email,
                 phone,
                 problem_type: problemType,
                 message,
