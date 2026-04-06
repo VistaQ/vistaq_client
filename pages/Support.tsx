@@ -268,8 +268,8 @@ const Support: React.FC = () => {
                 problem_type: problemType,
                 message,
             };
-            await emailjs.send(serviceId, adminTemplateId, templateParams, publicKey);
-            await emailjs.send(serviceId, replyTemplateId, templateParams, publicKey);
+            await emailjs.send(serviceId, adminTemplateId, templateParams, { publicKey });
+            await emailjs.send(serviceId, replyTemplateId, templateParams, { publicKey });
             setSubmitted(true);
         } catch (e) {
             console.error('[Support] emailjs.send failed:', e);
