@@ -71,7 +71,7 @@ const Login: React.FC = () => {
             <img src="/vistaq-logo.png" alt="VistaQ" className="h-16 w-auto" />
           </div>
           <p className="text-blue-100 text-sm tracking-wide">Sales Performance & Coaching</p>
-          <p className="text-blue-200/50 text-xs mt-1">Version 2.0</p>
+          <p className="text-blue-200/70 text-sm mt-1">Version 2.0</p>
         </div>
 
         <div className="p-8">
