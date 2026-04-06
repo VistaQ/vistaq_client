@@ -1,7 +1,7 @@
 
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import Layout from './components/Layout';
 import GlobalNotification from './components/GlobalNotification';
@@ -40,6 +40,15 @@ const PageSpinner: React.FC = () => (
   </div>
 );
 
+// Renders Support inside the Layout sidebar when authenticated, standalone when not
+const SupportRoute: React.FC = () => {
+  const { isAuthenticated } = useAuth();
+  if (isAuthenticated) {
+    return <Layout><React.Suspense fallback={<PageSpinner />}><Support /></React.Suspense></Layout>;
+  }
+  return <React.Suspense fallback={<PageSpinner />}><Support /></React.Suspense>;
+};
+
 const App: React.FC = () => {
   return (
     <AuthProvider>
@@ -52,7 +61,7 @@ const App: React.FC = () => {
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/support" element={<Support />} />
+            <Route path="/support" element={<SupportRoute />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
             {/* Protected app routes — nested inside Layout */}

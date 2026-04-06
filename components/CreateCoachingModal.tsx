@@ -335,19 +335,19 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                                     <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                                     <input type="url" value={link} onChange={e => setLink(e.target.value)}
                                         className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 pl-9 p-2.5 text-sm"
-                                        placeholder="https://zoom.us/j/..." />
+                                        placeholder="https://zoom.us/j/... or https://meet.google.com/..." />
                                 </div>
                             </div>
                         )}
 
                         {trainingMode === 'face_to_face' && (
                             <div>
-                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Venue / Google Maps or Waze Direction</label>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Google Maps or Waze Link</label>
                                 <div className="relative">
                                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                    <input type="text" value={link} onChange={e => setLink(e.target.value)}
+                                    <input type="url" value={link} onChange={e => setLink(e.target.value)}
                                         className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 pl-9 p-2.5 text-sm"
-                                        placeholder="e.g. Level 12, Menara XYZ or paste Google Maps / Waze link" />
+                                        placeholder="https://maps.google.com/... or https://waze.com/..." />
                                 </div>
                             </div>
                         )}

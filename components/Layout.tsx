@@ -96,6 +96,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex items-center">
             <img src="/vistaq-logo.png" alt="VistaQ" className="h-12 w-auto" />
           </div>
+          <p className="text-[10px] text-gray-500/50 mt-1 tracking-wide">Version 2.0</p>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-6 space-y-1">

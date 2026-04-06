@@ -59,11 +59,17 @@ const Coaching: React.FC = () => {
 
     const [groups, setGroups] = useState<Group[]>([]);
     const [users, setUsers] = useState<User[]>([]);
+    const [groupsLoadError, setGroupsLoadError] = useState(false);
+    const [usersLoadError, setUsersLoadError] = useState(false);
 
     useEffect(() => {
         refetchCoachingSessions();
-        apiCall('/groups').then(res => setGroups(Array.isArray(res.data) ? res.data : [])).catch(() => {});
-        apiCall('/users').then(res => setUsers(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+        apiCall('/groups')
+            .then(res => setGroups(Array.isArray(res.data) ? res.data : []))
+            .catch(() => setGroupsLoadError(true));
+        apiCall('/users')
+            .then(res => setUsers(Array.isArray(res.data) ? res.data : []))
+            .catch(() => setUsersLoadError(true));
     }, []);
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -91,7 +97,11 @@ const Coaching: React.FC = () => {
 
     // Handler for agents/group leaders to self-register attendance
     const handleJoinSession = async (sessionId: string) => {
+        const session = sessions.find(s => s.id === sessionId);
         await joinCoachingSession(sessionId);
+        if (session?.link) {
+            window.open(session.link, '_blank', 'noopener,noreferrer');
+        }
     };
 
     // Handler to cancel a session (management only)
@@ -151,6 +161,12 @@ const Coaching: React.FC = () => {
                 <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
                     <AlertCircle className="w-5 h-5 flex-shrink-0" />
                     <span>Failed to load coaching sessions. Check your connection and refresh the page.</span>
+                </div>
+            )}
+            {(groupsLoadError || usersLoadError) && isManagement && (
+                <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-4 py-3 text-sm">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                    <span>Could not load {groupsLoadError && usersLoadError ? 'groups and users' : groupsLoadError ? 'groups' : 'users'} for session creation. Refresh to try again.</span>
                 </div>
             )}
 
@@ -261,7 +277,7 @@ const Coaching: React.FC = () => {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <MapPin className="w-4 h-4 text-gray-400" />
-                                            <span>{TRAINING_MODE_LABELS[session.training_mode]}{session.link ? ` - ${session.link}` : ''}</span>
+                                            <span>{TRAINING_MODE_LABELS[session.training_mode]}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Users className="w-4 h-4 text-gray-400" />

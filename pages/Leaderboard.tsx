@@ -202,6 +202,22 @@ const Leaderboard: React.FC = () => {
                   const rank = top3.length === 3 ? podiumRanks[podiumIdx] : podiumIdx + 1;
                   const isFirst = rank === 1;
 
+                  const avatarGradient = rank === 1
+                    ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 ring-4 ring-yellow-300'
+                    : rank === 2
+                    ? 'bg-gradient-to-br from-gray-300 to-gray-500 ring-4 ring-gray-200'
+                    : 'bg-gradient-to-br from-amber-600 to-amber-800 ring-4 ring-amber-500';
+                  const podiumGradient = rank === 1
+                    ? 'bg-gradient-to-t from-yellow-600 to-yellow-400'
+                    : rank === 2
+                    ? 'bg-gradient-to-t from-gray-500 to-gray-400'
+                    : 'bg-gradient-to-t from-amber-800 to-amber-600';
+                  const scoreColor = rank === 1
+                    ? 'text-yellow-400 text-lg'
+                    : rank === 2
+                    ? 'text-gray-300 text-base'
+                    : 'text-amber-500 text-base';
+
                   if (tab === 'individual') {
                     const e = item as typeof individualRanked[0];
                     const isMe = e.entry.user_id === currentUser.id;
@@ -209,21 +225,21 @@ const Leaderboard: React.FC = () => {
                       <div key={e.entry.user_id} className="flex flex-col items-center">
                         <div className={`flex flex-col items-center mb-3 ${isFirst ? 'scale-110' : ''}`}>
                           {top3.length === 3 && podiumIcons[podiumIdx]}
-                          <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg mt-1 ${isFirst ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 ring-4 ring-yellow-300' : 'bg-gradient-to-br from-slate-500 to-slate-700'}`}>
+                          <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg mt-1 ${avatarGradient}`}>
                             {e.entry.name.charAt(0)}
                           </div>
                           <p className="text-white font-bold text-sm mt-2 max-w-[100px] text-center truncate">
                             {e.entry.name} {isMe && <span className="opacity-60 text-xs">(you)</span>}
                           </p>
                           <p className="text-slate-400 text-xs truncate max-w-[100px] text-center">{e.entry.group_name || '—'}</p>
-                          <p className={`font-extrabold mt-1 ${isFirst ? 'text-yellow-400 text-lg' : 'text-blue-300 text-base'}`}>
+                          <p className={`font-extrabold mt-1 ${scoreColor}`}>
                             {metric === 'points' ? `${e.score.toLocaleString()} pts` : `${e.score} prospects`}
                           </p>
                           <span className={`text-xs px-2 py-0.5 rounded-full mt-1 font-semibold ${e.badge.bg} ${e.badge.color}`}>
                             {e.badge.name}
                           </span>
                         </div>
-                        <div className={`${top3.length === 3 ? podiumHeights[podiumIdx] : 'h-20'} w-24 md:w-32 rounded-t-xl flex items-center justify-center ${isFirst ? 'bg-gradient-to-t from-yellow-600 to-yellow-400' : 'bg-slate-600'}`}>
+                        <div className={`${top3.length === 3 ? podiumHeights[podiumIdx] : 'h-20'} w-24 md:w-32 rounded-t-xl flex items-center justify-center ${podiumGradient}`}>
                           <span className="text-white font-black text-3xl opacity-30">#{rank}</span>
                         </div>
                       </div>
@@ -234,16 +250,16 @@ const Leaderboard: React.FC = () => {
                       <div key={g.group.group_id} className="flex flex-col items-center">
                         <div className={`flex flex-col items-center mb-3 ${isFirst ? 'scale-110' : ''}`}>
                           {top3.length === 3 && podiumIcons[podiumIdx]}
-                          <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg mt-1 ${isFirst ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 ring-4 ring-yellow-300' : 'bg-gradient-to-br from-slate-500 to-slate-700'}`}>
+                          <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg mt-1 ${avatarGradient}`}>
                             <Users className="w-6 h-6" />
                           </div>
                           <p className="text-white font-bold text-sm mt-2 max-w-[100px] text-center truncate">{g.group.group_name}</p>
                           <p className="text-slate-400 text-xs truncate max-w-[100px] text-center">{g.group.member_count} members</p>
-                          <p className={`font-extrabold mt-1 ${isFirst ? 'text-yellow-400 text-lg' : 'text-blue-300 text-base'}`}>
+                          <p className={`font-extrabold mt-1 ${scoreColor}`}>
                             {metric === 'points' ? `${g.totalScore.toLocaleString()} pts` : `${g.totalScore} prospects`}
                           </p>
                         </div>
-                        <div className={`${top3.length === 3 ? podiumHeights[podiumIdx] : 'h-20'} w-24 md:w-32 rounded-t-xl flex items-center justify-center ${isFirst ? 'bg-gradient-to-t from-yellow-600 to-yellow-400' : 'bg-slate-600'}`}>
+                        <div className={`${top3.length === 3 ? podiumHeights[podiumIdx] : 'h-20'} w-24 md:w-32 rounded-t-xl flex items-center justify-center ${podiumGradient}`}>
                           <span className="text-white font-black text-3xl opacity-30">#{rank}</span>
                         </div>
                       </div>
