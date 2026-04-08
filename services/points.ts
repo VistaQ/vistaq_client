@@ -11,16 +11,14 @@ export const DEFAULT_POINT_CONFIG: PointConfig = {
   coachingIndividual: 10,
   coachingGroup: 10,
   coachingPeerCircles: 10,
-  coachingFullDays: 40,
-  coachingOnlineSeminar: 10,
+  coachingSeminar: 10,
 };
 
 const COACHING_TYPE_TO_CONFIG_KEY: Record<CoachingType, keyof PointConfig> = {
   individual_coaching: 'coachingIndividual',
   group_coaching: 'coachingGroup',
   peer_circles: 'coachingPeerCircles',
-  '2_full_days_seminar': 'coachingFullDays',
-  '2_hours_online_seminar': 'coachingOnlineSeminar',
+  seminar: 'coachingSeminar',
 };
 
 export function computeUserPoints(

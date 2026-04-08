@@ -4491,7 +4491,7 @@ export interface components {
          * @example group_coaching
          * @enum {string}
          */
-        CoachingTypeEnum: "individual_coaching" | "group_coaching" | "peer_circles" | "2_full_days_seminar" | "2_hours_online_seminar";
+        CoachingTypeEnum: "individual_coaching" | "group_coaching" | "peer_circles" | "seminar";
         /**
          * @example online
          * @enum {string}

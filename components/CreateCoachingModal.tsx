@@ -19,11 +19,10 @@ type FrontendType = 'individual_coaching' | 'group_coaching' | 'seminar';
 const FRONTEND_TO_BACKEND: Record<FrontendType, CoachingType> = {
     individual_coaching: 'individual_coaching',
     group_coaching: 'group_coaching',
-    seminar: '2_full_days_seminar',
+    seminar: 'seminar',
 };
 
 const backendToFrontend = (type: CoachingType): FrontendType => {
-    if (type === '2_full_days_seminar' || type === '2_hours_online_seminar') return 'seminar';
     if (type === 'peer_circles') return 'individual_coaching';
     return type as FrontendType;
 };
@@ -59,8 +58,6 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
     const [sessionType, setSessionType] = useState<FrontendType>(
         editSession ? backendToFrontend(editSession.coaching_type) : 'individual_coaching'
     );
-    const isSeminar = sessionType === 'seminar';
-
     // ── Basic fields ──────────────────────────────────────────────────────────
     const [title, setTitle] = useState(editSession?.title || '');
     const [description, setDescription] = useState(editSession?.description || '');

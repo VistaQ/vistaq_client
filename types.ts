@@ -88,8 +88,7 @@ export interface PointConfig {
   coachingIndividual: number;     // default 10
   coachingGroup: number;          // default 10
   coachingPeerCircles: number;    // default 10
-  coachingFullDays: number;       // default 40
-  coachingOnlineSeminar: number;  // default 10
+  coachingSeminar: number;        // default 10
 }
 
 export interface PointEntry {
@@ -129,8 +128,7 @@ export const COACHING_TYPE_LABELS: Record<CoachingType, string> = {
   individual_coaching: 'Individual Coaching',
   group_coaching: 'Group Coaching',
   peer_circles: 'Peer Circle Meeting',
-  '2_full_days_seminar': 'Seminar',
-  '2_hours_online_seminar': 'Seminar',
+  seminar: 'Seminar',
 };
 
 export const TRAINING_MODE_LABELS: Record<TrainingMode, string> = {
