@@ -72,13 +72,6 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
     const [startDate, setStartDate] = useState(editSession?.start_date ? toLocalDate(editSession.start_date) : '');
     const [startTime, setStartTime] = useState(editSession?.start_date ? toHHMM(editSession.start_date) : '09:00');
     const [endTime, setEndTime] = useState(editSession?.end_date ? toHHMM(editSession.end_date) : '10:00');
-    // Seminar end-day fields
-    const [seminarEndDate, setSeminarEndDate] = useState(
-        editSession?.end_date ? toLocalDate(editSession.end_date) : ''
-    );
-    const [seminarEndTime, setSeminarEndTime] = useState(
-        editSession?.end_date ? toHHMM(editSession.end_date) : '17:00'
-    );
 
     // ── Participants ──────────────────────────────────────────────────────────
     const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(editSession?.targetGroupIds || []);
@@ -170,26 +163,17 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
             return;
         }
 
-        // Seminar end date required
-        if (isSeminar && !seminarEndDate) {
-            setError('Please enter an end date for the seminar.');
-            return;
-        }
-
         try {
             setError('');
             setIsSubmitting(true);
 
             // Build start/end ISO timestamps
             const startISO = toLocalISO(startDate, startTime);
-            const endISO = isSeminar
-                ? toLocalISO(seminarEndDate, seminarEndTime)
-                : toLocalISO(startDate, endTime);
+            const endISO = toLocalISO(startDate, endTime);
 
             // Conflict check
             const { hasConflict, conflictWith } = checkConflict(
-                occupiedSlots, startDate, startTime,
-                isSeminar ? '23:59' : endTime,
+                occupiedSlots, startDate, startTime, endTime,
                 editSession ? title : undefined
             );
             if (hasConflict) {
@@ -261,8 +245,7 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
         : (selectedGroupIds.length > 0 || selectedAgentIds.length > 0); // seminar
 
     const isDisabled = isSubmitting || !title || !startDate || !startTime || !endTime
-        || !!linkError || !participantsValid
-        || (isSeminar && !seminarEndDate);
+        || !!linkError || !participantsValid;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label={editSession ? 'Edit Session' : 'Create Session'}>
@@ -379,16 +362,16 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                             </div>
                         </div>
 
-                        {/* Start Date / Time row */}
+                        {/* Date / Time row — same for all session types */}
                         <div>
                             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
-                                {isSeminar ? 'Start Date & Time' : 'Date & Time'} <span className="text-red-500">*</span>
+                                Date & Time <span className="text-red-500">*</span>
                             </label>
                             <div className="grid grid-cols-3 gap-3">
                                 <div>
                                     <input type="date" required value={startDate} onChange={e => setStartDate(e.target.value)}
                                         className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 p-2.5 text-sm" />
-                                    <p className="text-[10px] text-gray-400 mt-1 text-center">Start Date</p>
+                                    <p className="text-[10px] text-gray-400 mt-1 text-center">Date</p>
                                 </div>
                                 <div>
                                     <input type="time" required value={startTime} onChange={handleStartTimeChange}
@@ -398,35 +381,10 @@ const CreateCoachingModal: React.FC<CreateCoachingModalProps> = ({ onClose, edit
                                 <div>
                                     <input type="time" required value={endTime} onChange={e => setEndTime(e.target.value)}
                                         className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 p-2.5 text-sm" />
-                                    <p className="text-[10px] text-gray-400 mt-1 text-center">{isSeminar ? 'End Time (Day 1)' : 'End Time'}</p>
+                                    <p className="text-[10px] text-gray-400 mt-1 text-center">End Time</p>
                                 </div>
                             </div>
                         </div>
-
-                        {/* Seminar End Date / Time row */}
-                        {isSeminar && (
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
-                                    End Date & Time <span className="text-red-500">*</span>
-                                </label>
-                                <div className="grid grid-cols-3 gap-3">
-                                    <div>
-                                        <input type="date" required={isSeminar} value={seminarEndDate}
-                                            min={startDate}
-                                            onChange={e => setSeminarEndDate(e.target.value)}
-                                            className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 p-2.5 text-sm" />
-                                        <p className="text-[10px] text-gray-400 mt-1 text-center">End Date</p>
-                                    </div>
-                                    <div className="col-span-2 flex items-start gap-3">
-                                        <div className="flex-1">
-                                            <input type="time" value={seminarEndTime} onChange={e => setSeminarEndTime(e.target.value)}
-                                                className="block w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500 p-2.5 text-sm" />
-                                            <p className="text-[10px] text-gray-400 mt-1 text-center">End Time (Last Day)</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
 
                         {/* URL input */}
                         <div>
