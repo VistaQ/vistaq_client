@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, UserRole, Notification } from '../types';
 import { apiCall, getTenantSlug } from '../services/apiClient';
 
@@ -32,6 +33,7 @@ const normalizeUser = (raw: any): User => ({
 });
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<Notification | null>(null);
@@ -122,6 +124,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('authToken');
     localStorage.removeItem('authUser');
     setCurrentUser(null);
+    navigate('/login', { replace: true });
   };
 
   const resetPassword = async (email: string): Promise<boolean> => {
