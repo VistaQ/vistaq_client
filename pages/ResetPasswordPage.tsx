@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
+import { Lock, AlertCircle, Loader2, CheckCircle, Check, X } from 'lucide-react';
 import { resetPassword } from '../services/auth.service';
+
+const PASSWORD_RULES = [
+  { label: 'At least 6 characters', test: (p: string) => p.length >= 6 },
+  { label: 'One uppercase letter (A–Z)', test: (p: string) => /[A-Z]/.test(p) },
+  { label: 'One number (0–9)', test: (p: string) => /[0-9]/.test(p) },
+  { label: 'One special character (!@#$...)', test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+];
 
 function validatePassword(password: string): string {
   if (password.length < 6) return 'Password must be at least 6 characters.';
@@ -10,6 +17,22 @@ function validatePassword(password: string): string {
   if (!/[^A-Za-z0-9]/.test(password)) return 'Password must contain at least one special character.';
   return '';
 }
+
+const PasswordCriteria: React.FC<{ password: string }> = ({ password }) => (
+  <ul className="mt-2 space-y-1">
+    {PASSWORD_RULES.map(rule => {
+      const met = rule.test(password);
+      return (
+        <li key={rule.label} className={`flex items-center gap-1.5 text-xs ${met ? 'text-green-600' : 'text-gray-400'}`}>
+          {met
+            ? <Check className="w-3.5 h-3.5 flex-shrink-0" />
+            : <X className="w-3.5 h-3.5 flex-shrink-0" />}
+          {rule.label}
+        </li>
+      );
+    })}
+  </ul>
+);
 
 const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
@@ -126,7 +149,9 @@ const ResetPasswordPage: React.FC = () => {
                     placeholder="••••••••"
                   />
                 </div>
-                {newPasswordError && <p className="text-xs text-red-500 mt-1">{newPasswordError}</p>}
+                {newPasswordError
+                  ? <p className="text-xs text-red-500 mt-1">{newPasswordError}</p>
+                  : newPassword && <PasswordCriteria password={newPassword} />}
               </div>
 
               <div>

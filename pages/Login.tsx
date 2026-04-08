@@ -37,6 +37,15 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
 
+  // Supabase password recovery links land on / and redirect to /login.
+  // Detect the recovery hash and forward to the reset-password page.
+  React.useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes('type=recovery') && hash.includes('access_token=')) {
+      navigate('/reset-password' + hash, { replace: true });
+    }
+  }, [navigate]);
+
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
