@@ -128,9 +128,9 @@ export type CoachingSessionUpdateBody = paths['/coaching-sessions/{sessionId}'][
 export const COACHING_TYPE_LABELS: Record<CoachingType, string> = {
   individual_coaching: 'Individual Coaching',
   group_coaching: 'Group Coaching',
-  peer_circles: 'Peer Circles',
-  '2_full_days_seminar': '2 Full Days Seminar',
-  '2_hours_online_seminar': '2 Hours Online Seminar',
+  peer_circles: 'Peer Circle Meeting',
+  '2_full_days_seminar': 'Seminar',
+  '2_hours_online_seminar': 'Seminar',
 };
 
 export const TRAINING_MODE_LABELS: Record<TrainingMode, string> = {
