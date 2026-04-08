@@ -177,7 +177,10 @@ const AdminRewards: React.FC = () => {
       alert('Each badge tier must have a unique points threshold. Please fix duplicate values before saving.');
       return;
     }
-    const sorted = [...tiers].sort((a, b) => a.threshold - b.threshold);
+    // Level is derived from sort order — not user-editable
+    const sorted = [...tiers]
+      .sort((a, b) => a.threshold - b.threshold)
+      .map((t, i) => ({ ...t, level: i + 1 }));
     updateBadgeTiers(sorted);
     setTiers(sorted);
     setHasTierChanges(false);
@@ -372,23 +375,13 @@ const AdminRewards: React.FC = () => {
                 {index + 1}
               </div>
 
-              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Badge Name</label>
                   <input
                     type="text"
                     value={tier.name}
                     onChange={e => handleUpdateTier(tier.id, 'name', e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded p-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Level</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={tier.level ?? index + 1}
-                    onChange={e => handleUpdateTier(tier.id, 'level', Number(e.target.value))}
                     className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded p-2 text-sm"
                   />
                 </div>
