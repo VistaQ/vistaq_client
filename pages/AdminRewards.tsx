@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useData } from '../context/DataContext';
-import { BadgeTier, PointConfig, UserRole } from '../types';
+import { PointConfig, UserRole } from '../types';
 import type { components } from '../types.generated';
 
 type PointConfigObject = components['schemas']['PointConfigObject'];
-import { Gift, Plus, Trash2, Save, Award, Target, Users, DollarSign, Loader2, AlertCircle } from 'lucide-react';
+import { Gift, Save, Target, Users, DollarSign, Loader2, AlertCircle } from 'lucide-react';
 import { DEFAULT_POINT_CONFIG } from '../services/points';
 import { apiCall } from '../services/apiClient';
 
@@ -38,10 +37,6 @@ const FIELD_TO_ACTIVITY: Partial<Record<keyof PointConfig, ActivityKey>> = {
 const AdminRewards: React.FC = () => {
   const { currentUser } = useAuth();
   if (!currentUser || currentUser.role !== UserRole.ADMIN) return null;
-
-  const { badgeTiers, updateBadgeTiers } = useData();
-  const [tiers, setTiers] = useState<BadgeTier[]>(badgeTiers);
-  const [hasTierChanges, setHasTierChanges] = useState(false);
 
   // Prospect Management — from API
   const [prospectPoints, setProspectPoints] = useState<Pick<PointConfig, 'prospectBasicInfo' | 'appointmentCompleted' | 'salesMeetingCompleted' | 'salesSuccessful'>>({
@@ -143,47 +138,6 @@ const AdminRewards: React.FC = () => {
     } finally {
       setIsSavingPoints(false);
     }
-  };
-
-  const handleUpdateTier = (id: string, field: keyof BadgeTier, value: string | number) => {
-    setTiers(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
-    setHasTierChanges(true);
-  };
-
-  const handleAddTier = () => {
-    const newTier: BadgeTier = {
-      id: `b_${Date.now()}`,
-      name: 'New Tier',
-      level: tiers.length + 1,
-      threshold: 0,
-      color: 'text-gray-600',
-      bg: 'bg-gray-100'
-    };
-    setTiers([...tiers, newTier]);
-    setHasTierChanges(true);
-  };
-
-  const handleDeleteTier = (id: string) => {
-    if (window.confirm('Delete this tier?')) {
-      setTiers(prev => prev.filter(t => t.id !== id));
-      setHasTierChanges(true);
-    }
-  };
-
-  const handleSaveTiers = () => {
-    const thresholds = tiers.map(t => t.threshold);
-    const hasDuplicates = thresholds.length !== new Set(thresholds).size;
-    if (hasDuplicates) {
-      alert('Each badge tier must have a unique points threshold. Please fix duplicate values before saving.');
-      return;
-    }
-    // Level is derived from sort order — not user-editable
-    const sorted = [...tiers]
-      .sort((a, b) => a.threshold - b.threshold)
-      .map((t, i) => ({ ...t, level: i + 1 }));
-    updateBadgeTiers(sorted);
-    setTiers(sorted);
-    setHasTierChanges(false);
   };
 
   const PROSPECT_FIELDS: { key: keyof typeof prospectPoints; label: string }[] = [
@@ -346,108 +300,6 @@ const AdminRewards: React.FC = () => {
         </div>
       </div>
 
-      {/* Badge Tiers Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 bg-gray-50 border-b flex justify-between items-center">
-          <h3 className="font-bold text-gray-800 flex items-center">
-            <Award className="w-5 h-5 mr-2 text-purple-600" />
-            Badge Tiers (Milestones)
-          </h3>
-          <div className="flex items-center space-x-3">
-            <button onClick={handleAddTier} className="text-blue-600 hover:text-blue-800 text-sm font-bold flex items-center">
-              <Plus className="w-4 h-4 mr-1" /> Add Tier
-            </button>
-            <button
-              onClick={handleSaveTiers}
-              disabled={!hasTierChanges}
-              className="bg-green-600 text-white px-4 py-1.5 rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center text-sm shadow-sm"
-            >
-              <Save className="w-4 h-4 mr-1.5" />
-              Save Tiers
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-4">
-          {tiers.sort((a, b) => a.threshold - b.threshold).map((tier, index) => (
-            <div key={tier.id} className="flex items-start space-x-4 p-4 border rounded-lg bg-gray-50/50 hover:bg-white hover:shadow-sm transition-all">
-              <div className="flex-none w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-500 mt-1">
-                {index + 1}
-              </div>
-
-              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Badge Name</label>
-                  <input
-                    type="text"
-                    value={tier.name}
-                    onChange={e => handleUpdateTier(tier.id, 'name', e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded p-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Points Threshold</label>
-                  <input
-                    type="number"
-                    value={tier.threshold}
-                    onChange={e => handleUpdateTier(tier.id, 'threshold', Number(e.target.value))}
-                    className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded p-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Color Theme</label>
-                  <select
-                    value={tier.color}
-                    onChange={e => {
-                      const color = e.target.value;
-                      let bg = 'bg-gray-100';
-                      if (color.includes('blue')) bg = 'bg-blue-100';
-                      if (color.includes('amber')) bg = 'bg-amber-100';
-                      if (color.includes('yellow') && color !== 'text-yellow-600') bg = 'bg-yellow-100';
-                      if (color.includes('indigo')) bg = 'bg-indigo-100';
-                      if (color.includes('slate')) bg = 'bg-slate-100';
-                      if (color.includes('purple')) bg = 'bg-purple-100';
-                      if (color === 'text-yellow-600') bg = 'bg-gray-900';
-                      handleUpdateTier(tier.id, 'color', color);
-                      handleUpdateTier(tier.id, 'bg', bg);
-                    }}
-                    className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded p-2 text-sm"
-                  >
-                    <option value="text-gray-500">Gray (Foundation)</option>
-                    <option value="text-blue-500">Blue (Momentum)</option>
-                    <option value="text-amber-700">Bronze</option>
-                    <option value="text-slate-400">Silver</option>
-                    <option value="text-yellow-500">Gold</option>
-                    <option value="text-indigo-400">Platinum</option>
-                    <option value="text-purple-600">Purple (Pinnacle)</option>
-                    <option value="text-yellow-600">Black & Gold (Achiever)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Lottie Animation URL</label>
-                  <input
-                    type="url"
-                    placeholder="https://assets.lottiefiles.com/..."
-                    value={tier.lottieUrl || ''}
-                    onChange={e => handleUpdateTier(tier.id, 'lottieUrl', e.target.value || undefined)}
-                    className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded p-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              <button
-                onClick={() => handleDeleteTier(tier.id)}
-                className="text-gray-400 hover:text-red-600 p-2 mt-1"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="px-6 py-4 bg-gray-50 border-t text-sm text-gray-500">
-          Lottie URLs: paste a JSON animation URL from <span className="font-medium text-blue-600">lottiefiles.com</span>. Leave blank to use the default icon. Thresholds must be in ascending order.
-        </div>
-      </div>
     </div>
   );
 };
