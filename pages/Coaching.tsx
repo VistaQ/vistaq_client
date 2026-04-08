@@ -248,8 +248,7 @@ const Coaching: React.FC = () => {
                                 individual_coaching: 'bg-blue-100 text-blue-700',
                                 group_coaching: 'bg-green-100 text-green-700',
                                 peer_circles: 'bg-purple-100 text-purple-700',
-                                '2_full_days_seminar': 'bg-orange-100 text-orange-700',
-                                '2_hours_online_seminar': 'bg-teal-100 text-teal-700',
+                                seminar: 'bg-orange-100 text-orange-700',
                             }[session.coaching_type] || 'bg-gray-100 text-gray-600';
 
                             return (

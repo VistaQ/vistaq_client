@@ -10,7 +10,7 @@ import { DEFAULT_POINT_CONFIG } from '../services/points';
 import { apiCall } from '../services/apiClient';
 
 type ProspectActivityKey = 'prospect_created' | 'appointment_set' | 'sales_meeting' | 'sale_closed';
-type CoachingActivityKey = 'coaching_individual_attended' | 'coaching_group_attended' | 'coaching_peer_circles_attended' | 'coaching_2_full_days_attended' | 'coaching_2_hours_online_attended';
+type CoachingActivityKey = 'coaching_individual_attended' | 'coaching_group_attended' | 'coaching_peer_circles_attended' | 'coaching_seminar_attended';
 type ActivityKey = ProspectActivityKey | CoachingActivityKey;
 
 const ACTIVITY_TO_FIELD: Record<ActivityKey, keyof PointConfig> = {
@@ -21,8 +21,7 @@ const ACTIVITY_TO_FIELD: Record<ActivityKey, keyof PointConfig> = {
   coaching_individual_attended: 'coachingIndividual',
   coaching_group_attended: 'coachingGroup',
   coaching_peer_circles_attended: 'coachingPeerCircles',
-  coaching_2_full_days_attended: 'coachingFullDays',
-  coaching_2_hours_online_attended: 'coachingOnlineSeminar',
+  coaching_seminar_attended: 'coachingSeminar',
 };
 
 const FIELD_TO_ACTIVITY: Partial<Record<keyof PointConfig, ActivityKey>> = {
@@ -33,8 +32,7 @@ const FIELD_TO_ACTIVITY: Partial<Record<keyof PointConfig, ActivityKey>> = {
   coachingIndividual: 'coaching_individual_attended',
   coachingGroup: 'coaching_group_attended',
   coachingPeerCircles: 'coaching_peer_circles_attended',
-  coachingFullDays: 'coaching_2_full_days_attended',
-  coachingOnlineSeminar: 'coaching_2_hours_online_attended',
+  coachingSeminar: 'coaching_seminar_attended',
 };
 
 const AdminRewards: React.FC = () => {
@@ -55,12 +53,11 @@ const AdminRewards: React.FC = () => {
   const [savedProspectPoints, setSavedProspectPoints] = useState({ ...prospectPoints });
 
   // Personal Development (Coaching) — from API
-  const [coachingPoints, setCoachingPoints] = useState<Pick<PointConfig, 'coachingIndividual' | 'coachingGroup' | 'coachingPeerCircles' | 'coachingFullDays' | 'coachingOnlineSeminar'>>({
+  const [coachingPoints, setCoachingPoints] = useState<Pick<PointConfig, 'coachingIndividual' | 'coachingGroup' | 'coachingPeerCircles' | 'coachingSeminar'>>({
     coachingIndividual: DEFAULT_POINT_CONFIG.coachingIndividual,
     coachingGroup: DEFAULT_POINT_CONFIG.coachingGroup,
     coachingPeerCircles: DEFAULT_POINT_CONFIG.coachingPeerCircles,
-    coachingFullDays: DEFAULT_POINT_CONFIG.coachingFullDays,
-    coachingOnlineSeminar: DEFAULT_POINT_CONFIG.coachingOnlineSeminar,
+    coachingSeminar: DEFAULT_POINT_CONFIG.coachingSeminar,
   });
   const [savedCoachingPoints, setSavedCoachingPoints] = useState({ ...coachingPoints });
 
@@ -110,8 +107,7 @@ const AdminRewards: React.FC = () => {
     coachingPoints.coachingIndividual !== savedCoachingPoints.coachingIndividual ||
     coachingPoints.coachingGroup !== savedCoachingPoints.coachingGroup ||
     coachingPoints.coachingPeerCircles !== savedCoachingPoints.coachingPeerCircles ||
-    coachingPoints.coachingFullDays !== savedCoachingPoints.coachingFullDays ||
-    coachingPoints.coachingOnlineSeminar !== savedCoachingPoints.coachingOnlineSeminar;
+    coachingPoints.coachingSeminar !== savedCoachingPoints.coachingSeminar;
 
   const handleUpdateProspectPoint = (key: keyof typeof prospectPoints, value: number) => {
     setProspectPoints(prev => ({ ...prev, [key]: value }));
@@ -204,8 +200,7 @@ const AdminRewards: React.FC = () => {
     { key: 'coachingIndividual', label: 'Individual Coaching' },
     { key: 'coachingGroup', label: 'Group Coaching' },
     { key: 'coachingPeerCircles', label: 'Peer Circles' },
-    { key: 'coachingFullDays', label: '2 Full Days Seminar' },
-    { key: 'coachingOnlineSeminar', label: '2 Hours Online Seminar' },
+    { key: 'coachingSeminar', label: 'Seminar' },
   ];
 
   return (
@@ -344,7 +339,7 @@ const AdminRewards: React.FC = () => {
         </div>
 
         <div className="px-6 py-3 bg-gray-50 border-t text-xs text-gray-500">
-          Defaults — Prospect: info +{DEFAULT_POINT_CONFIG.prospectBasicInfo} · appt +{DEFAULT_POINT_CONFIG.appointmentCompleted} · meeting +{DEFAULT_POINT_CONFIG.salesMeetingCompleted} · sale +{DEFAULT_POINT_CONFIG.salesSuccessful} · Sales: cert +{DEFAULT_POINT_CONFIG.salesIssuanceCertificate} · FYCt +{DEFAULT_POINT_CONFIG.salesFYCt} · ACE +{DEFAULT_POINT_CONFIG.salesACE} · Coaching: +{DEFAULT_POINT_CONFIG.coachingIndividual}/{DEFAULT_POINT_CONFIG.coachingFullDays} pts
+          Defaults — Prospect: info +{DEFAULT_POINT_CONFIG.prospectBasicInfo} · appt +{DEFAULT_POINT_CONFIG.appointmentCompleted} · meeting +{DEFAULT_POINT_CONFIG.salesMeetingCompleted} · sale +{DEFAULT_POINT_CONFIG.salesSuccessful} · Sales: cert +{DEFAULT_POINT_CONFIG.salesIssuanceCertificate} · FYCt +{DEFAULT_POINT_CONFIG.salesFYCt} · ACE +{DEFAULT_POINT_CONFIG.salesACE} · Coaching: +{DEFAULT_POINT_CONFIG.coachingIndividual}/{DEFAULT_POINT_CONFIG.coachingSeminar} pts
         </div>
       </div>
 
