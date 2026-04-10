@@ -45,7 +45,8 @@ const generateTempPassword = (): string => {
 };
 
 const AdminUsers: React.FC = () => {
-  const { addUser, updateUser, deleteUser } = useAuth();
+  const { currentUser, addUser, updateUser, deleteUser } = useAuth();
+  if (!currentUser || currentUser.role !== UserRole.ADMIN) return null;
 
   const [users, setUsers] = useState<User[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -221,6 +222,21 @@ const AdminUsers: React.FC = () => {
                     </td>
                  </tr>
               ))}
+              {filteredUsers.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                    <p className="font-medium">No users match your search.</p>
+                    {(searchTerm || filterRole !== 'all') && (
+                      <button
+                        onClick={() => { setSearchTerm(''); setFilterRole('all'); }}
+                        className="mt-2 text-sm text-blue-600 hover:underline"
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )}
            </tbody>
         </table>
       </div>
@@ -301,6 +317,7 @@ const AdminUsers: React.FC = () => {
                         onChange={e => setEditingUser({...editingUser, role: e.target.value as UserRole})}
                      >
                         <option value={UserRole.AGENT}>{getRoleLabel(UserRole.AGENT)}</option>
+                        <option value={UserRole.GROUP_LEADER}>{getRoleLabel(UserRole.GROUP_LEADER)}</option>
                         <option value={UserRole.TRAINER}>{getRoleLabel(UserRole.TRAINER)}</option>
                         <option value={UserRole.MASTER_TRAINER}>{getRoleLabel(UserRole.MASTER_TRAINER)}</option>
                         <option value={UserRole.ADMIN}>{getRoleLabel(UserRole.ADMIN)}</option>

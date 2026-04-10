@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
 import { UserRole, GroupDetailStats } from "../types";
@@ -40,12 +41,10 @@ const COLORS = CHART_COLORS;
 const Group: React.FC = () => {
   const { currentUser } = useAuth();
   const { groupStats, refetchGroupStats, isLoadingProspects, prospects } = useData();
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "sales">("overview");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedAgentId = searchParams.get('agent');
+  const trainerSelectedGroupId = searchParams.get('g');
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Trainer/Admin Logic: Allow selecting a group
-  const [trainerSelectedGroupId, setTrainerSelectedGroupId] = useState<string | null>(null);
 
   // Group detail stats fetched from API
   const [groupDetailStats, setGroupDetailStats] = useState<GroupDetailStats | null>(null);
@@ -122,7 +121,7 @@ const Group: React.FC = () => {
               return (
                 <button
                   key={g.group_id}
-                  onClick={() => setTrainerSelectedGroupId(g.group_id)}
+                  onClick={() => setSearchParams({ g: g.group_id })}
                   className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-300 transition-all text-left group flex flex-col h-full"
                 >
                   <div className="flex items-center justify-between mb-4">
@@ -265,7 +264,7 @@ const Group: React.FC = () => {
       <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
         <div className="flex items-center space-x-4">
           <button
-            onClick={() => setSelectedAgentId(null)}
+            onClick={() => setSearchParams(trainerSelectedGroupId ? { g: trainerSelectedGroupId } : {})}
             className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -355,7 +354,7 @@ const Group: React.FC = () => {
         <div>
           {isMultiGroupUser && (
             <button
-              onClick={() => setTrainerSelectedGroupId(null)}
+              onClick={() => setSearchParams({})}
               className="flex items-center text-sm text-gray-500 hover:text-blue-600 mb-2 transition-colors"
             >
               <ArrowLeft className="w-4 h-4 mr-1" /> Back to Group List
@@ -520,7 +519,7 @@ const Group: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 text-right">
                   <button
-                    onClick={() => setSelectedAgentId(agent.id)}
+                    onClick={() => setSearchParams(trainerSelectedGroupId ? { g: trainerSelectedGroupId, agent: agent.id } : { agent: agent.id })}
                     className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center justify-end w-full"
                   >
                     View <ChevronRight className="w-4 h-4 ml-1" />

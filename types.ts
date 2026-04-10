@@ -67,6 +67,7 @@ export interface Notification {
 export interface BadgeTier {
   id: string;
   name: string;
+  level: number;        // Numeric level (1 = Foundation, 8 = Achiever)
   threshold: number;
   color: string;
   bg: string;
@@ -74,21 +75,26 @@ export interface BadgeTier {
 }
 
 export interface PointConfig {
+  // Category 1: Prospect Management
   prospectBasicInfo: number;      // default 2
   appointmentCompleted: number;   // default 3
   salesMeetingCompleted: number;  // default 6
   salesSuccessful: number;        // default 15
+  // Category 2: Sales Completion (frontend-ready; backend TBD)
+  salesIssuanceCertificate: number; // default 30 per certificate
+  salesFYCt: number;                // default 30 per RM1,000
+  salesACE: number;                 // default 30 per RM1,000
+  // Category 3: Personal Development
   coachingIndividual: number;     // default 10
   coachingGroup: number;          // default 10
   coachingPeerCircles: number;    // default 10
-  coachingFullDays: number;       // default 40
-  coachingOnlineSeminar: number;  // default 10
+  coachingSeminar: number;        // default 10
 }
 
 export interface PointEntry {
   id: string;
   date: string;
-  category: 'prospect' | 'coaching';
+  category: 'prospect' | 'sales' | 'coaching';
   action: string;
   subject: string;
   points: number;
@@ -107,48 +113,25 @@ export type ProspectProduct = {
   amount: number;
 };
 
-// Coaching & Attendance Types
-export interface CoachingAttendance {
-  agentId: string;
-  agentName: string;
-  agentEmail?: string;
-  groupId?: string; // Group the agent belongs to
-  groupName?: string;
-  status: 'pending' | 'joined';
-  joinedAt?: string; // ISO String when agent clicks "Join" — this is the attendance log timestamp
-}
+// Coaching & Attendance Types (source of truth: openapi.yaml → types.generated.ts)
+export type CoachingSession = components['schemas']['CoachingSessionObject'];
+export type CoachingAttendance = components['schemas']['AttendanceRecordObject'];
+export type CoachingType = components['schemas']['CoachingTypeEnum'];
+export type TrainingMode = components['schemas']['TrainingModeEnum'];
+export type SessionStatus = components['schemas']['SessionStatusEnum'];
+export type AttendanceStatus = components['schemas']['AttendanceStatusEnum'];
 
-export type CoachingType =
-  | 'Individual Coaching'
-  | 'Group Coaching'
-  | 'Peer Circles'
-  | '2 Full Days Seminar'
-  | '2 Hours Online Seminar';
+export type CoachingSessionCreateBody = paths['/coaching-sessions']['post']['requestBody']['content']['application/json'];
+export type CoachingSessionUpdateBody = paths['/coaching-sessions/{sessionId}']['put']['requestBody']['content']['application/json'];
 
-export interface CoachingSession {
-  id: string;
-  coachingType: CoachingType;
-  title: string;
-  description?: string;
-  date: string; // ISO String for the selected date
-  durationStart: string; // e.g., "14:00"
-  durationEnd: string; // e.g., "15:00"
-  venue: 'Online' | 'Face to Face';
-  link?: string; // e.g. Zoom link or venue location
+export const COACHING_TYPE_LABELS: Record<CoachingType, string> = {
+  individual_coaching: 'Individual Coaching',
+  group_coaching: 'Group Coaching',
+  peer_circles: 'Peer Circle Meeting',
+  seminar: 'Seminar',
+};
 
-  // Creator Info
-  createdBy: string;
-  createdByName: string;
-  createdByRole: string; // e.g. 'master_trainer', 'trainer', 'group_leader'
-
-  // Target Audience (Assigned Groups/Agents)
-  targetGroupIds?: string[]; // Empty means all groups (for master trainer) or specific groups
-  targetAgentIds?: string[]; // Specific agents selected
-
-  // Attendance tracking
-  attendance: CoachingAttendance[];
-
-  status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
-  createdAt?: string;
-  updatedAt?: string;
-}
+export const TRAINING_MODE_LABELS: Record<TrainingMode, string> = {
+  online: 'Online',
+  face_to_face: 'Face to Face',
+};

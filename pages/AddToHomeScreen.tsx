@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Smartphone,
@@ -6,10 +7,6 @@ import {
   CheckCircle,
   ExternalLink,
 } from "lucide-react";
-
-interface Props {
-  onBack: () => void;
-}
 
 const InfoBox: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="flex gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-800 leading-relaxed">
@@ -41,13 +38,21 @@ const Step: React.FC<{
   </div>
 );
 
-const AddToHomeScreen: React.FC<Props> = ({ onBack }) => {
+const AddToHomeScreen: React.FC = () => {
+  const navigate = useNavigate();
+  const handleBack = () => {
+    if (window.history.state?.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate('/tutorials', { replace: true });
+    }
+  };
   return (
     <div className="max-w-2xl mx-auto space-y-8 pb-8">
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={onBack}
+          onClick={handleBack}
           className="flex items-center justify-center w-9 h-9 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition-colors shadow-sm"
         >
           <ArrowLeft className="w-4 h-4 text-gray-600" />

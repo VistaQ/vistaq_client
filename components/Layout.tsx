@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
 import {
@@ -29,12 +30,12 @@ import {
 
 interface LayoutProps {
   children: React.ReactNode;
-  activePage: string;
-  onNavigate: (page: string) => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => {
+const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { currentUser, logout } = useAuth();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const getRoleIcon = (role: UserRole) => {
@@ -47,28 +48,31 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
     }
   };
 
-  const NavItem = ({ id, label, icon: Icon, badge }: { id: string; label: string; icon: any; badge?: number }) => (
-    <button
-      onClick={() => { onNavigate(id); setIsMobileMenuOpen(false); }}
-      aria-current={activePage === id ? 'page' : undefined}
-      className={`relative flex items-center w-full px-6 py-3.5 text-sm font-medium transition-all duration-200 group ${activePage === id
-        ? 'text-white bg-white/10'
-        : 'text-gray-400 hover:text-white hover:bg-white/5'
-        }`}
-    >
-      {activePage === id && (
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
-      )}
-      <Icon className={`w-5 h-5 mr-3 transition-colors ${activePage === id ? 'text-blue-400' : 'text-slate-500 group-hover:text-blue-400'
-        }`} />
-      {label}
-      {badge !== undefined && badge > 0 && (
-        <span className="ml-auto flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold rounded-full bg-blue-500 text-white">
-          {badge > 99 ? '99+' : badge}
-        </span>
-      )}
-    </button>
-  );
+  const NavItem = ({ id, label, icon: Icon, badge }: { id: string; label: string; icon: React.ElementType; badge?: number }) => {
+    const isActive = pathname === `/${id}`;
+    return (
+      <Link
+        to={`/${id}`}
+        onClick={() => setIsMobileMenuOpen(false)}
+        aria-current={isActive ? 'page' : undefined}
+        className={`relative flex items-center w-full px-6 py-3.5 text-sm font-medium transition-all duration-200 group ${isActive
+          ? 'text-white bg-white/10'
+          : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+      >
+        {isActive && (
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+        )}
+        <Icon className={`w-5 h-5 mr-3 transition-colors ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-blue-400'}`} />
+        {label}
+        {badge !== undefined && badge > 0 && (
+          <span className="ml-auto flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold rounded-full bg-blue-500 text-white">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
+      </Link>
+    );
+  };
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
   // Management includes Master Trainer, Trainer, Admin, Group Leader
@@ -92,6 +96,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
           <div className="flex items-center">
             <img src="/vistaq-logo.png" alt="VistaQ" className="h-12 w-auto" />
           </div>
+          <p className="text-xs text-gray-400 mt-1 tracking-wide">Version 2.0</p>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-6 space-y-1">
@@ -121,7 +126,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
           {/* Management Views for Admin, Master Trainer, Trainer & Leaders */}
           {isManagement && (
             <>
-              <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Performance</div>
+              <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Group</div>
               <NavItem id="group" label="Group Progress" icon={TrendingUp} />
             </>
           )}
@@ -144,7 +149,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
 
         <div className="p-4 border-t border-gray-800/50 bg-sidebar-secondary">
           {/* User Profile Card */}
-          <div className="flex items-center gap-3 p-3 mb-3 rounded-lg bg-slate-800/50 border border-slate-700/50 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => onNavigate('profile')}>
+          <div className="flex items-center gap-3 p-3 mb-3 rounded-lg bg-slate-800/50 border border-slate-700/50 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => navigate('/profile')}>
             <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-600 text-white font-bold shadow-inner flex-shrink-0">
               {currentUser?.name?.charAt(0) || 'U'}
             </div>
@@ -160,7 +165,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
           {/* Footer Buttons (Stacked) */}
           <div className="flex flex-col gap-2">
             <button
-              onClick={() => onNavigate('profile')}
+              onClick={() => navigate('/profile')}
               className="w-full flex items-center justify-center px-3 py-2.5 text-xs font-bold text-slate-300 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
             >
               <UserCircle className="w-4 h-4 mr-2" /> Profile Settings
@@ -172,7 +177,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
               <LogOut className="w-4 h-4 mr-2" /> Sign Out
             </button>
             <button
-              onClick={() => onNavigate('privacy-policy')}
+              onClick={() => navigate('/privacy-policy')}
               className="w-full flex items-center justify-center px-3 py-2 text-xs text-slate-500 hover:text-slate-300 transition-colors gap-1.5"
             >
               <FileText className="w-3 h-3" /> Privacy Policy
@@ -211,7 +216,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                   <NavItem id="prospects" label="Prospects" icon={Users} />
                 )}
 
-                <NavItem id="events" label="My Calendar" icon={CalendarDays} />
+                <NavItem id="events" label="Calendar" icon={CalendarDays} />
                 <NavItem id="coaching" label="Coaching" icon={GraduationCap} />
                 <NavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
 
@@ -226,7 +231,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                 {/* Management */}
                 {isManagement && (
                   <>
-                    <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Performance</div>
+                    <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Group</div>
                     <NavItem id="group" label="Group Progress" icon={TrendingUp} />
                   </>
                 )}
@@ -250,7 +255,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
               {/* Mobile Footer */}
               <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800 bg-sidebar-secondary space-y-2">
                 <button
-                  onClick={() => { onNavigate('profile'); setIsMobileMenuOpen(false); }}
+                  onClick={() => { navigate('/profile'); setIsMobileMenuOpen(false); }}
                   className="flex items-center text-sm text-slate-300 font-medium w-full p-2 hover:bg-slate-800 rounded transition-colors"
                 >
                   <UserCircle className="w-4 h-4 mr-2" /> My Profile
@@ -262,7 +267,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activePage, onNavigate }) => 
                   <LogOut className="w-4 h-4 mr-2" /> Sign Out
                 </button>
                 <button
-                  onClick={() => { onNavigate('privacy-policy'); setIsMobileMenuOpen(false); }}
+                  onClick={() => { navigate('/privacy-policy'); setIsMobileMenuOpen(false); }}
                   className="flex items-center text-xs text-slate-500 hover:text-slate-300 w-full p-2 transition-colors gap-1.5"
                 >
                   <FileText className="w-3 h-3" /> Privacy Policy

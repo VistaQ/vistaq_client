@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, UserRole, Notification } from '../types';
 import { apiCall, getTenantSlug } from '../services/apiClient';
 
@@ -32,6 +33,7 @@ const normalizeUser = (raw: any): User => ({
 });
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<Notification | null>(null);
@@ -77,22 +79,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (identifier: string, password?: string): Promise<boolean> => {
     if (!password) return false;
 
-    try {
-      const response = await apiCall('/auth/login', {
-        method: 'POST',
-        data: { email: identifier, password },
-        headers: { 'X-Tenant-Slug': getTenantSlug() }
-      });
-      const { user: rawUser, token } = response.data;
-      localStorage.setItem('authToken', token);
-      const user = normalizeUser(rawUser);
-      localStorage.setItem('authUser', JSON.stringify(user));
-      setCurrentUser(user);
-      return true;
-    } catch (e) {
-      console.error('[AuthContext] login failed:', e);
-      return false;
-    }
+    const response = await apiCall('/auth/login', {
+      method: 'POST',
+      data: { email: identifier, password },
+      headers: { 'X-Tenant-Slug': getTenantSlug() }
+    });
+    const { user: rawUser, token } = response.data;
+    localStorage.setItem('authToken', token);
+    const user = normalizeUser(rawUser);
+    localStorage.setItem('authUser', JSON.stringify(user));
+    setCurrentUser(user);
+    return true;
   };
 
   const register = async (name: string, email: string, password: string, groupId: string, agentCode: string, location: string): Promise<boolean> => {
@@ -127,6 +124,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('authToken');
     localStorage.removeItem('authUser');
     setCurrentUser(null);
+    navigate('/login', { replace: true });
   };
 
   const resetPassword = async (email: string): Promise<boolean> => {

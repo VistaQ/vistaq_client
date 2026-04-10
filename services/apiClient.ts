@@ -55,9 +55,13 @@ export const apiCall = async <T = any>(endpoint: string, options: ApiCallOptions
   }
 
   if (response.status === 401) {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('authUser');
-    window.location.href = '/login';
+    // Only hard-redirect when a token existed (session expired).
+    // Unauthenticated calls (no token) should just throw so the caller handles it.
+    if (localStorage.getItem('authToken')) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('authUser');
+      window.location.href = '/login';
+    }
     throw { status: 401, message: 'Session expired. Please log in again.' } as ApiError;
   }
 

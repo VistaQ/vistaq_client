@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole, Prospect, ProspectStage, CoachingSession, User } from '../types';
+import { UserRole, Prospect, ProspectStage, CoachingSession, User, TRAINING_MODE_LABELS } from '../types';
 import { apiCall } from '../services/apiClient';
 import {
    Calendar,
@@ -32,13 +33,10 @@ const COLORS = CHART_COLORS;
 
 // ---------------------------------------------------------------------------
 
-interface DashboardProps {
-   onNavigate?: (page: string) => void;
-}
-
-const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+const Dashboard: React.FC = () => {
+   const navigate = useNavigate();
    const { currentUser } = useAuth();
-   const { prospects, getEventsForUser, getCoachingSessionsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats, isLoadingProspects } = useData();
+   const { prospects, coachingSessions, getEventsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats, isLoadingProspects } = useData();
 
    const [users, setUsers] = useState<User[]>([]);
 
@@ -115,35 +113,34 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       const mgmtNow = new Date();
       const sevenDaysFromNow = new Date(mgmtNow.getTime() + 7 * 24 * 60 * 60 * 1000);
       const mgmtEvents = currentUser ? getEventsForUser(currentUser) : [];
-      const mgmtSessions = currentUser ? getCoachingSessionsForUser(currentUser) : [];
+      const mgmtSessions = coachingSessions;
 
-      type ScheduleItem = { id: string; title: string; date: string; type: 'event' | 'coaching'; meta?: string; link?: string; isOwned: boolean; };
+      type ScheduleItem = { id: string; title: string; date: string; endDate?: string; type: 'event' | 'coaching'; meta?: string; link?: string; isOwned: boolean; };
 
       const mgmtScheduleItems: ScheduleItem[] = [
          ...mgmtEvents
             .filter(e => e.status !== 'cancelled')
             .map(e => ({
-               id: `evt_${e.id}`, title: e.event_title, date: e.start_date,
+               id: `evt_${e.id}`, title: e.event_title, date: e.start_date, endDate: e.end_date || undefined,
                type: 'event' as const, meta: e.venue, link: e.meeting_link || undefined,
                isOwned: e.created_by === currentUser?.id
             })),
          ...mgmtSessions
             .filter(s => s.status !== 'cancelled')
             .map(s => {
-               let sessionDate = s.date;
-               try {
-                  const b = new Date(s.date);
-                  if (s.durationStart) { const [h, m] = s.durationStart.split(':').map(Number); b.setHours(h, m, 0, 0); sessionDate = b.toISOString(); }
-               } catch { }
+               const startD = new Date(s.start_date);
+               const meta = `${startD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}${s.end_date ? ` – ${new Date(s.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}` : ''} · ${TRAINING_MODE_LABELS[s.training_mode]}`;
                return {
-                  id: `cs_${s.id}`, title: s.title, date: sessionDate, type: 'coaching' as const,
-                  meta: `${s.durationStart || ''} – ${s.durationEnd || ''} · ${s.venue}`,
-                  link: s.link || undefined,
-                  isOwned: s.createdBy === currentUser?.id
+                  id: `cs_${s.id}`, title: s.title, date: s.start_date, endDate: s.end_date || undefined, type: 'coaching' as const,
+                  meta, link: s.link || undefined, isOwned: s.created_by === currentUser?.id
                };
             })
       ]
-         .filter(i => { const d = new Date(i.date); return !isNaN(d.getTime()) && d >= mgmtNow && d <= sevenDaysFromNow; })
+         .filter(i => {
+            const start = new Date(i.date);
+            const end = i.endDate ? new Date(i.endDate) : start;
+            return !isNaN(start.getTime()) && end >= mgmtNow && start <= sevenDaysFromNow;
+         })
          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
          .slice(0, 5);
 
@@ -199,7 +196,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                            <div className="mt-1 flex justify-between items-end w-full">
                               <div>
                                  <h3 className="text-xl font-bold text-gray-900 truncate">{groupRankings[0]?.name || 'N/A'}</h3>
-                                 <p className="text-sm font-mono text-green-600 font-bold">RM {groupRankings[0]?.fyc.toLocaleString() || '0'}</p>
+                                 <p className="text-sm font-mono text-green-600 font-bold">RM {groupRankings[0]?.fyc.toLocaleString() || '0'} <span className="text-xs font-sans font-semibold text-gray-400">ACE</span></p>
                               </div>
                               <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg"><Crown className="w-5 h-5" /></div>
                            </div>
@@ -222,7 +219,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                <BarChart2 className="w-5 h-5 mr-2 text-gray-500" />
                Performance Metrics (YTD)
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects</p>
+                  <h3 className="text-3xl font-bold text-gray-900">{ytd?.prospects ?? 0}</h3>
+                  <p className="text-xs text-gray-400 mt-1">Year to Date</p>
+               </div>
+
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Calendar className="w-5 h-5" /></div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Total Appointments</p>
@@ -335,11 +339,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   </h3>
                   <div className="flex items-center gap-2">
 
-                     {onNavigate && (
-                        <button onClick={() => onNavigate('events')} className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
-                           View Calendar <ExternalLink className="w-3 h-3" />
-                        </button>
-                     )}
+                     <button onClick={() => navigate('/events')} className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
+                        View Calendar <ExternalLink className="w-3 h-3" />
+                     </button>
                   </div>
                </div>
                <div className="flex-1 space-y-3 overflow-y-auto pr-1">
@@ -347,8 +349,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                      <div
                         key={item.id}
                         className={`flex flex-col p-3 rounded-lg border transition-colors ${item.type === 'event' ? 'bg-indigo-50/50 border-indigo-100' : 'bg-green-50/50 border-green-100'
-                           } ${item.isOwned && onNavigate ? 'cursor-pointer hover:brightness-95' : ''}`}
-                        onClick={item.isOwned && onNavigate ? () => onNavigate(item.type === 'coaching' ? 'coaching' : 'events') : undefined}
+                           } ${item.isOwned ? 'cursor-pointer hover:brightness-95' : ''}`}
+                        onClick={item.isOwned ? () => navigate(item.type === 'coaching' ? '/coaching' : '/events') : undefined}
                      >
                         <div className="flex items-start">
                            <div className="mt-1 mr-3">
@@ -455,23 +457,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
          meta: e.venue, link: e.meeting_link || undefined, isOwned: e.created_by === currentUser?.id
       }));
 
-   const myCoachingSessions = currentUser ? getCoachingSessionsForUser(currentUser) : [];
-   const upcomingCoachingSessions: ScheduleItem[] = myCoachingSessions
+   const upcomingCoachingSessions: ScheduleItem[] = coachingSessions
       .filter(s => s.status !== 'cancelled')
       .map(s => {
-         let sessionDate = s.date;
-         try {
-            const base = new Date(s.date);
-            if (s.durationStart) { const [h, m] = s.durationStart.split(':').map(Number); base.setHours(h, m, 0, 0); sessionDate = base.toISOString(); }
-         } catch { }
+         const startD = new Date(s.start_date);
+         const meta = `${startD.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}${s.end_date ? ` – ${new Date(s.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}` : ''} · ${TRAINING_MODE_LABELS[s.training_mode]}`;
          return {
-            id: s.id, title: s.title, date: sessionDate, type: 'coaching' as const,
-            meta: `${s.durationStart || ''} – ${s.durationEnd || ''} · ${s.venue}`,
-            link: s.link || undefined,
-            isOwned: s.createdBy === currentUser?.id
+            id: s.id, title: s.title, date: s.start_date, type: 'coaching' as const,
+            meta, link: s.link || undefined, isOwned: s.created_by === currentUser?.id
          };
       })
-      .filter(i => { const d = new Date(i.date); return d >= now && d <= sevenDaysFromNow; });
+      .filter(i => { const end = new Date(i.date); return end >= now && end <= sevenDaysFromNow; });
 
    // Take the 5 soonest upcoming items across all 3 types
    const combinedSchedule = useMemo(
@@ -601,11 +597,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                      Upcoming Schedule
                   </h3>
                   <div className="flex items-center gap-2">
-                     {onNavigate && (
-                        <button onClick={() => onNavigate('events')} className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
-                           View Calendar <ExternalLink className="w-3 h-3" />
-                        </button>
-                     )}
+                     <button onClick={() => navigate('/events')} className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1">
+                        View Calendar <ExternalLink className="w-3 h-3" />
+                     </button>
                   </div>
                </div>
 
@@ -617,9 +611,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                            className={`flex flex-col p-3 rounded-lg border transition-colors ${item.type === 'event' ? 'bg-indigo-50/50 border-indigo-100'
                               : item.type === 'coaching' ? 'bg-green-50/50 border-green-100'
                                  : 'bg-gray-50 border-gray-100'
-                              } ${item.isOwned && onNavigate ? 'cursor-pointer hover:brightness-95' : ''}`}
-                           onClick={item.isOwned && onNavigate
-                              ? () => onNavigate(item.type === 'coaching' ? 'coaching' : item.type === 'meeting' ? 'prospects' : 'events')
+                              } ${item.isOwned ? 'cursor-pointer hover:brightness-95' : ''}`}
+                           onClick={item.isOwned
+                              ? () => navigate(item.type === 'coaching' ? '/coaching' : item.type === 'meeting' ? '/prospects' : '/events')
                               : undefined}
                         >
                            <div className="flex items-start">
