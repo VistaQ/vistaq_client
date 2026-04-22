@@ -321,10 +321,16 @@ const PointsHistory: React.FC = () => {
                       <tr key={entry.id} className="hover:bg-blue-50 transition-colors">
                         <td className="px-6 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(entry.date)}</td>
                         <td className="px-6 py-3 text-sm text-gray-700 font-medium">{entry.action}</td>
-                        <td className="px-6 py-3 text-sm text-gray-600 truncate max-w-[160px]">{entry.subject}</td>
+                        <td className="px-6 py-3 text-sm text-gray-600 truncate max-w-[160px]">
+                          {entry.subject ?? <span className="italic text-gray-400">(deleted prospect)</span>}
+                        </td>
                         <td className="px-6 py-3 text-right">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">
-                            +{entry.points} pts
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                              entry.points < 0 ? 'bg-rose-100 text-rose-700' : 'bg-green-100 text-green-700'
+                            }`}
+                          >
+                            {entry.points >= 0 ? `+${entry.points}` : entry.points} pts
                           </span>
                         </td>
                       </tr>
