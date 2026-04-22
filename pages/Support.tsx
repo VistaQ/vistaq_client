@@ -240,6 +240,13 @@ const Support: React.FC = () => {
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState('');
 
+    // Sync form pre-fills when currentUser loads asynchronously (e.g. from localStorage restore)
+    React.useEffect(() => {
+        if (currentUser?.name && !name) setName(currentUser.name);
+        if (currentUser?.email && !email) setEmail(currentUser.email);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentUser]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');

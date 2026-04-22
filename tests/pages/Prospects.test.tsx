@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../mocks/server';
@@ -11,9 +12,11 @@ import td from '../fixtures/testData.json';
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(
-    <AuthProvider>
-      <DataProvider>{ui}</DataProvider>
-    </AuthProvider>
+    <MemoryRouter>
+      <AuthProvider>
+        <DataProvider>{ui}</DataProvider>
+      </AuthProvider>
+    </MemoryRouter>
   );
 }
 
@@ -165,6 +168,147 @@ describe('Prospects — search filter', () => {
     await waitFor(() => {
       expect(screen.queryByText('Alice Tan')).toBeNull();
       expect(screen.getByText('Bob Lim')).toBeInTheDocument();
+    });
+  });
+
+  it('filters by phone number in real time', async () => {
+    loginAs('admin');
+    renderWithProviders(<Prospects />);
+    await waitFor(() => {
+      expect(screen.getByText('Alice Tan')).toBeInTheDocument();
+    });
+    // Bob Lim's phone is +60222222222; Alice Tan's is +60111111111
+    await userEvent.type(screen.getByPlaceholderText(/search/i), '+60222');
+    await waitFor(() => {
+      expect(screen.queryByText('Alice Tan')).toBeNull();
+      expect(screen.getByText('Bob Lim')).toBeInTheDocument();
+    });
+  });
+
+  it('shows "No prospects found." when search has no matches', async () => {
+    loginAs('admin');
+    renderWithProviders(<Prospects />);
+    await waitFor(() => {
+      expect(screen.getByText('Alice Tan')).toBeInTheDocument();
+    });
+    await userEvent.type(screen.getByPlaceholderText(/search/i), 'zzz');
+    await waitFor(() => {
+      expect(screen.getByText(/no prospects found/i)).toBeInTheDocument();
+    });
+  });
+});
+
+describe('Prospects — role permissions (extended)', () => {
+  it('Group Leader sees the Add Prospect button', async () => {
+    loginAs('mdrt_stars_leader');
+    renderWithProviders(<Prospects />);
+    await waitFor(() => {
+      expect(screen.getByText('Add Prospect')).toBeInTheDocument();
+    });
+  });
+
+  it('Master Trainer is view-only — sees View buttons, no Edit', async () => {
+    server.use(
+      http.get('/api/prospects', () =>
+        HttpResponse.json({
+          data: [
+            makeProspect({ prospect_name: 'Alice Tan', prospect_phone: '+60111111111' }),
+          ],
+        })
+      )
+    );
+    loginAs('masterTrainer1');
+    renderWithProviders(<Prospects />);
+    await waitFor(() => {
+      expect(screen.getByText('Alice Tan')).toBeInTheDocument();
+    });
+    const viewButtons = screen.getAllByRole('button', { name: /view/i });
+    expect(viewButtons.length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /^edit$/i })).toBeNull();
+  });
+
+  it('Trainer sees prospects list but no Add Prospect and no Export Excel', async () => {
+    // Export Excel is guarded by (isAdmin || canAddProspect); trainer is neither.
+    loginAs('mdrt_stars_trainer');
+    renderWithProviders(<Prospects />);
+    await waitFor(() => {
+      expect(screen.getByText('Prospect Management')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Add Prospect')).toBeNull();
+    expect(screen.queryByRole('button', { name: /export excel/i })).toBeNull();
+  });
+
+  it('Agent sees only their own prospects — not those of another agent', async () => {
+    // mdrt_stars_agent owns p001 (Alice Tan) and p002 (Bob Lim)
+    // power_rangers_agent owns p003 (Charlie Wong)
+    // MSW scopedProspects filters by agent_id for the 'agent' role
+    loginAs('mdrt_stars_agent');
+    renderWithProviders(<Prospects />);
+    await waitFor(() => {
+      expect(screen.getByText('Alice Tan')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Charlie Wong')).toBeNull();
+  });
+});
+
+describe('Prospects — stage badges (remaining)', () => {
+  it('sales_outcome=kiv → KIV badge', async () => {
+    server.use(
+      http.get('/api/prospects', () =>
+        HttpResponse.json({
+          data: [makeProspect({ current_stage: 'sales', sales_outcome: 'kiv', appointment_status: null })],
+        })
+      )
+    );
+    loginAs('mdrt_stars_agent');
+    renderWithProviders(<Prospects />);
+    await waitFor(() => {
+      expect(screen.getByText('KIV')).toBeInTheDocument();
+    });
+  });
+
+  it('appointment_status=rescheduled → Rescheduled badge', async () => {
+    server.use(
+      http.get('/api/prospects', () =>
+        HttpResponse.json({
+          data: [makeProspect({ current_stage: 'appointment', appointment_status: 'rescheduled', sales_outcome: null })],
+        })
+      )
+    );
+    loginAs('mdrt_stars_agent');
+    renderWithProviders(<Prospects />);
+    await waitFor(() => {
+      expect(screen.getByText('Rescheduled')).toBeInTheDocument();
+    });
+  });
+
+  it('appointment_status=kiv → KIV badge', async () => {
+    server.use(
+      http.get('/api/prospects', () =>
+        HttpResponse.json({
+          data: [makeProspect({ current_stage: 'appointment', appointment_status: 'kiv', sales_outcome: null })],
+        })
+      )
+    );
+    loginAs('mdrt_stars_agent');
+    renderWithProviders(<Prospects />);
+    await waitFor(() => {
+      expect(screen.getByText('KIV')).toBeInTheDocument();
+    });
+  });
+
+  it('appointment_status=not_done → Not Scheduled badge', async () => {
+    server.use(
+      http.get('/api/prospects', () =>
+        HttpResponse.json({
+          data: [makeProspect({ current_stage: 'appointment', appointment_status: 'not_done', sales_outcome: null })],
+        })
+      )
+    );
+    loginAs('mdrt_stars_agent');
+    renderWithProviders(<Prospects />);
+    await waitFor(() => {
+      expect(screen.getByText('Not Scheduled')).toBeInTheDocument();
     });
   });
 });

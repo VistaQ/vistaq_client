@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { loginAs } from '../mocks/auth';
 import Dashboard from '../../pages/Dashboard';
 import { AuthProvider } from '../../context/AuthContext';
@@ -7,11 +8,13 @@ import { DataProvider } from '../../context/DataContext';
 
 function renderDashboard() {
   return render(
-    <AuthProvider>
-      <DataProvider>
-        <Dashboard />
-      </DataProvider>
-    </AuthProvider>
+    <MemoryRouter>
+      <AuthProvider>
+        <DataProvider>
+          <Dashboard />
+        </DataProvider>
+      </AuthProvider>
+    </MemoryRouter>
   );
 }
 

@@ -25,5 +25,4 @@ dist-ssr
 .env
 .vercel
 
-# Test fixtures (contain credentials/IDs)
-tests/fixtures/testData.json
+# (testData.json intentionally committed — contains only fake test IDs, no real credentials)

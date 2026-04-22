@@ -34,10 +34,9 @@ const FIELD_TO_ACTIVITY: Partial<Record<keyof PointConfig, ActivityKey>> = {
   coachingSeminar: 'coaching_seminar_attended',
 };
 
-const AdminRewards: React.FC = () => {
-  const { currentUser } = useAuth();
-  if (!currentUser || currentUser.role !== UserRole.ADMIN) return null;
-
+// Inner component — all hooks live here so the Rules of Hooks are never violated
+// by the outer role-guard returning null before hooks are called.
+const AdminRewardsContent: React.FC = () => {
   // Prospect Management — from API
   const [prospectPoints, setProspectPoints] = useState<Pick<PointConfig, 'prospectBasicInfo' | 'appointmentCompleted' | 'salesMeetingCompleted' | 'salesSuccessful'>>({
     prospectBasicInfo: DEFAULT_POINT_CONFIG.prospectBasicInfo,
@@ -302,6 +301,14 @@ const AdminRewards: React.FC = () => {
 
     </div>
   );
+};
+
+// Thin role-guard wrapper. Returning null here (before any hooks) is safe because
+// AdminRewardsContent owns all of its own hooks unconditionally.
+const AdminRewards: React.FC = () => {
+  const { currentUser } = useAuth();
+  if (!currentUser || currentUser.role !== UserRole.ADMIN) return null;
+  return <AdminRewardsContent />;
 };
 
 export default AdminRewards;

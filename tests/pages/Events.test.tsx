@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { server } from '../mocks/server';
 import { loginAs } from '../mocks/auth';
@@ -9,9 +10,11 @@ import { DataProvider } from '../../context/DataContext';
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(
-    <AuthProvider>
-      <DataProvider>{ui}</DataProvider>
-    </AuthProvider>
+    <MemoryRouter>
+      <AuthProvider>
+        <DataProvider>{ui}</DataProvider>
+      </AuthProvider>
+    </MemoryRouter>
   );
 }
 

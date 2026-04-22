@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { loginAs } from '../mocks/auth';
 import Leaderboard from '../../pages/Leaderboard';
 import { AuthProvider } from '../../context/AuthContext';
@@ -8,11 +9,13 @@ import td from '../fixtures/testData.json';
 
 function renderLeaderboard() {
   return render(
-    <AuthProvider>
-      <DataProvider>
-        <Leaderboard />
-      </DataProvider>
-    </AuthProvider>
+    <MemoryRouter>
+      <AuthProvider>
+        <DataProvider>
+          <Leaderboard />
+        </DataProvider>
+      </AuthProvider>
+    </MemoryRouter>
   );
 }
 
@@ -49,9 +52,14 @@ describe('Leaderboard', () => {
     });
   });
 
-  it('populates the group filter dropdown with group names', async () => {
+  it('populates the group tab with all group names', async () => {
     loginAs('admin');
     renderLeaderboard();
+
+    // Wait for data to load then switch to Group tab where all groups are always listed
+    await waitFor(() => expect(screen.getByRole('button', { name: /group/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /group/i }));
+
     await waitFor(() => {
       expect(screen.getAllByText(td.groups.mdrt_stars.name).length).toBeGreaterThan(0);
       expect(screen.getAllByText(td.groups.kpi_busters.name).length).toBeGreaterThan(0);

@@ -1,0 +1,117 @@
+{
+  "users": {
+    "admin": {
+      "id": "user-admin-001",
+      "email": "admin@demo-agency.com",
+      "name": "Admin User",
+      "role": "admin"
+    },
+    "masterTrainer1": {
+      "id": "user-mt-001",
+      "email": "mastertrainer@demo-agency.com",
+      "name": "Master Trainer",
+      "role": "master_trainer"
+    },
+    "mdrt_stars_trainer": {
+      "id": "user-trainer-001",
+      "email": "trainer.mdrt@demo-agency.com",
+      "name": "Marty Schultz",
+      "role": "trainer"
+    },
+    "kpi_busters_trainer": {
+      "id": "user-trainer-002",
+      "email": "trainer.kpi@demo-agency.com",
+      "name": "Byron Douglas",
+      "role": "trainer"
+    },
+    "power_rangers_trainer": {
+      "id": "user-trainer-003",
+      "email": "trainer.power@demo-agency.com",
+      "name": "Mylene Predovic",
+      "role": "trainer"
+    },
+    "mdrt_stars_leader": {
+      "id": "user-leader-001",
+      "email": "leader.mdrt@demo-agency.com",
+      "name": "MDRT Leader",
+      "role": "group_leader",
+      "groupId": "group-mdrt-001"
+    },
+    "mdrt_stars_agent": {
+      "id": "user-agent-001",
+      "email": "agent.mdrt@demo-agency.com",
+      "name": "Alex Agent",
+      "role": "agent",
+      "groupId": "group-mdrt-001",
+      "agentCode": "AGT-12345"
+    },
+    "power_rangers_agent": {
+      "id": "user-agent-002",
+      "email": "agent.power@demo-agency.com",
+      "name": "Power Ranger Agent",
+      "role": "agent",
+      "groupId": "group-power-001"
+    }
+  },
+  "groups": {
+    "mdrt_stars": {
+      "id": "group-mdrt-001",
+      "name": "MDRT Stars"
+    },
+    "kpi_busters": {
+      "id": "group-kpi-001",
+      "name": "KPI Busters"
+    },
+    "power_rangers": {
+      "id": "group-power-001",
+      "name": "Power Rangers"
+    }
+  },
+  "prospects": [
+    {
+      "id": "p001",
+      "agent_id": "user-agent-001",
+      "group_id": "group-mdrt-001",
+      "prospect_name": "Alice Tan",
+      "prospect_phone": "+60111111111",
+      "current_stage": "appointment",
+      "appointment_status": "scheduled",
+      "sales_outcome": null,
+      "updated_at": "2026-03-01T00:00:00Z"
+    },
+    {
+      "id": "p002",
+      "agent_id": "user-agent-001",
+      "group_id": "group-mdrt-001",
+      "prospect_name": "Bob Lim",
+      "prospect_phone": "+60222222222",
+      "current_stage": "prospect",
+      "appointment_status": null,
+      "sales_outcome": null,
+      "updated_at": "2026-03-01T00:00:00Z"
+    },
+    {
+      "id": "p003",
+      "agent_id": "user-agent-002",
+      "group_id": "group-power-001",
+      "prospect_name": "Charlie Wong",
+      "prospect_phone": "+60333333333",
+      "current_stage": "prospect",
+      "appointment_status": null,
+      "sales_outcome": null,
+      "updated_at": "2026-03-01T00:00:00Z"
+    },
+    {
+      "id": "p004",
+      "agent_id": "user-agent-001",
+      "group_id": "group-mdrt-001",
+      "prospect_name": "Diana Chen",
+      "prospect_phone": "+60444444444",
+      "current_stage": "sales",
+      "appointment_status": null,
+      "sales_outcome": "successful",
+      "products_sold": [{ "productName": "Life Policy A", "amount": 25000 }],
+      "updated_at": "2026-03-15T00:00:00Z"
+    }
+  ]
+}

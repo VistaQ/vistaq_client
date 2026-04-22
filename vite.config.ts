@@ -19,6 +19,12 @@ export default defineConfig(({ mode }) => {
       environment: "jsdom",
       globals: true,
       setupFiles: ["./tests/setup.ts"],
+      // Override VITE_API_URL so apiClient uses relative '/api' paths that MSW can intercept.
+      // Without this, the staging URL from .env is used and MSW misses all requests.
+      env: {
+        VITE_API_URL: "",
+        VITE_TENANT_SLUG: "test-tenant",
+      },
     },
   };
 });
