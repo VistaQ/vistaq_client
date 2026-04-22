@@ -577,6 +577,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change the authenticated user's password
+         * @description Updates the password for the currently authenticated user. The caller must supply a valid Bearer token. The new password must be at least 6 characters and contain at least one uppercase letter, one digit, and one special character.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    /**
+                     * @example {
+                     *       "newPassword": "$Test1"
+                     *     }
+                     */
+                    "application/json": {
+                        /**
+                         * @description The replacement password. Must be at least 6 characters and contain at least one uppercase letter, one digit, and one special (non-alphanumeric) character.
+                         * @example $Test1
+                         */
+                        newPassword: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Password changed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true,
+                         *       "message": "Password changed successfully"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            /** @example Password changed successfully */
+                            message: string;
+                        };
+                    };
+                };
+                /** @description Bad request. Returned when the request body fails validation — for example when `newPassword` is absent, too short, or does not meet the complexity requirements. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Validation failed",
+                         *       "errors": [
+                         *         {
+                         *           "code": "too_small",
+                         *           "minimum": 6,
+                         *           "type": "string",
+                         *           "inclusive": true,
+                         *           "exact": false,
+                         *           "message": "Password must be at least 6 characters",
+                         *           "path": [
+                         *             "newPassword"
+                         *           ]
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
     "/users": {
         parameters: {
             query?: never;
@@ -1952,7 +2067,87 @@ export interface paths {
             };
         };
         post?: never;
-        delete?: never;
+        /**
+         * Delete a prospect
+         * @description Deletes the prospect identified by prospectId. Requires a valid Bearer token. RLS enforces tenant and agent scoping — if the prospect is not visible to the caller, a 404 is returned (existence is not leaked via 403). Only agents (own prospects) and admins may delete prospects.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description The UUID of the prospect to delete. */
+                    prospectId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Prospect deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                        };
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. Returned when the authenticated user does not have the `agent` or `admin` role. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Not found. Returned when no prospect exists for the given `prospectId`, or the prospect is not visible to the caller due to RLS. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Prospect not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -4451,10 +4646,10 @@ export interface components {
              */
             action: string;
             /**
-             * @description Name of the subject (e.g. prospect) associated with the action.
+             * @description Name of the subject (e.g. prospect) associated with the action. Null when the underlying subject has been deleted — e.g. a `prospect_deleted` compensation row references a prospect that no longer exists. Frontends should fall back to the action label.
              * @example John Tan
              */
-            subject: string;
+            subject?: string | null;
             /**
              * @description Number of points awarded for this transaction.
              * @example 3
