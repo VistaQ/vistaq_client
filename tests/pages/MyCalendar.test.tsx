@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { loginAs } from '../mocks/auth';
 import MyCalendar from '../../pages/MyCalendar';
@@ -9,11 +10,13 @@ import td from '../fixtures/testData.json';
 
 function renderCalendar() {
   return render(
-    <AuthProvider>
-      <DataProvider>
-        <MyCalendar />
-      </DataProvider>
-    </AuthProvider>
+    <MemoryRouter>
+      <AuthProvider>
+        <DataProvider>
+          <MyCalendar />
+        </DataProvider>
+      </AuthProvider>
+    </MemoryRouter>
   );
 }
 

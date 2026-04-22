@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { loginAs } from '../mocks/auth';
 import Group from '../../pages/Group';
 import { AuthProvider } from '../../context/AuthContext';
@@ -8,11 +9,13 @@ import td from '../fixtures/testData.json';
 
 function renderGroup() {
   return render(
-    <AuthProvider>
-      <DataProvider>
-        <Group />
-      </DataProvider>
-    </AuthProvider>
+    <MemoryRouter>
+      <AuthProvider>
+        <DataProvider>
+          <Group />
+        </DataProvider>
+      </AuthProvider>
+    </MemoryRouter>
   );
 }
 

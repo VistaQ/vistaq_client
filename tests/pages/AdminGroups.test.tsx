@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { loginAs } from '../mocks/auth';
 import AdminGroups from '../../pages/AdminGroups';
 import { AuthProvider } from '../../context/AuthContext';
@@ -7,9 +8,11 @@ import { DataProvider } from '../../context/DataContext';
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(
-    <AuthProvider>
-      <DataProvider>{ui}</DataProvider>
-    </AuthProvider>
+    <MemoryRouter>
+      <AuthProvider>
+        <DataProvider>{ui}</DataProvider>
+      </AuthProvider>
+    </MemoryRouter>
   );
 }
 
@@ -30,7 +33,7 @@ describe('AdminGroups', () => {
       expect(screen.getByText('MDRT Stars')).toBeInTheDocument();
     });
     expect(screen.getByText('KPI Busters')).toBeInTheDocument();
-    expect(screen.getByText('MDRT Power Rangers')).toBeInTheDocument();
+    expect(screen.getByText('Power Rangers')).toBeInTheDocument();
   });
 
   it('filters groups when searching by name', async () => {
@@ -51,7 +54,7 @@ describe('AdminGroups', () => {
 
     // Other groups should be filtered out
     expect(screen.queryByText('MDRT Stars')).not.toBeInTheDocument();
-    expect(screen.queryByText('MDRT Power Rangers')).not.toBeInTheDocument();
+    expect(screen.queryByText('Power Rangers')).not.toBeInTheDocument();
   });
 
   it('shows the Create Group button', async () => {

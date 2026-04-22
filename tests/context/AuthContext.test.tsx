@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { loginAs } from '../mocks/auth';
 import { AuthProvider, useAuth } from '../../context/AuthContext';
 import { server } from '../mocks/server';
@@ -17,9 +18,11 @@ function AuthConsumer({ onAuth }: { onAuth: (auth: ReturnType<typeof useAuth>) =
 function renderAuth() {
   let captured: ReturnType<typeof useAuth>;
   const utils = render(
-    <AuthProvider>
-      <AuthConsumer onAuth={(a) => { captured = a; }} />
-    </AuthProvider>
+    <MemoryRouter>
+      <AuthProvider>
+        <AuthConsumer onAuth={(a) => { captured = a; }} />
+      </AuthProvider>
+    </MemoryRouter>
   );
   return { ...utils, getAuth: () => captured! };
 }
@@ -84,8 +87,9 @@ describe('AuthContext', () => {
     expect(localStorage.getItem('authToken')).not.toBeNull();
   });
 
-  it('login() returns false for unknown email', async () => {
-    // Override login handler to return 400 (not 401) to avoid apiClient redirect
+  it('login() throws for invalid credentials (does not swallow errors)', async () => {
+    // login() propagates API errors so the Login page can display specific messages.
+    // Override login handler to return 400 (not 401 — avoids the apiClient redirect).
     server.use(
       http.post('/api/auth/login', async ({ request }) => {
         const body = await request.json() as any;
@@ -100,12 +104,16 @@ describe('AuthContext', () => {
 
     const { getAuth } = renderAuth();
 
-    let result: boolean | undefined;
+    let threw = false;
     await act(async () => {
-      result = await getAuth().login('nonexistent@example.com', 'password');
+      try {
+        await getAuth().login('nonexistent@example.com', 'password');
+      } catch {
+        threw = true;
+      }
     });
 
-    expect(result).toBe(false);
+    expect(threw).toBe(true);
     expect(getAuth().currentUser).toBeNull();
     expect(getAuth().isAuthenticated).toBe(false);
   });

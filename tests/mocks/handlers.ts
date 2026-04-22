@@ -228,8 +228,65 @@ export const handlers = [
 
   http.delete(`${BASE}/prospects/:id`, () => new HttpResponse(null, { status: 204 })),
 
-  // ─── Config ───
+  // ─── Config (legacy) ───
   http.get(`${BASE}/config/points`, () => HttpResponse.json({ data: {} })),
   http.get(`${BASE}/config/badges`, () => HttpResponse.json({ data: [] })),
   http.put(`${BASE}/config/points`, () => HttpResponse.json({ data: {} })),
+
+  // ─── Point Configs (AdminRewards) ───
+  http.get(`${BASE}/point-configs`, () =>
+    HttpResponse.json({
+      success: true,
+      data: [
+        { activity: 'prospect_created',              points: 10 },
+        { activity: 'appointment_set',               points: 20 },
+        { activity: 'sales_meeting',                 points: 30 },
+        { activity: 'sale_closed',                   points: 50 },
+        { activity: 'coaching_individual_attended',  points: 15 },
+        { activity: 'coaching_group_attended',       points: 10 },
+        { activity: 'coaching_peer_circles_attended',points: 10 },
+        { activity: 'coaching_seminar_attended',     points: 25 },
+      ],
+    })
+  ),
+  http.put(`${BASE}/point-configs/:activity`, () =>
+    HttpResponse.json({ success: true })
+  ),
+
+  // ─── Auth — reset password ───
+  http.post(`${BASE}/auth/reset-password`, () =>
+    HttpResponse.json({ success: true })
+  ),
+
+  // ─── Leaderboard ───
+  http.get(`${BASE}/leaderboard/stats`, ({ request }) => {
+    const user = getCurrentUser(request);
+    const url = new URL(request.url);
+    const period = (url.searchParams.get('period') || 'mtd') as 'mtd' | 'ytd';
+    // Return one entry per agent user so group names, agent names, and "(you)" markers work in tests
+    const agentUsers = allUsers.filter(u => u.role === 'agent');
+    const individual = agentUsers.map(u => ({
+      user_id: u.id,
+      name: u.name,
+      agent_code: u.agent_code ?? '',
+      group_id: u.group_id ?? null,
+      group_name: allGroups.find(g => g.id === u.group_id)?.name ?? null,
+      prospects_added: 0,
+      appointments_completed: 0,
+      total_points: 0,
+    }));
+    const groups = allGroups.map(g => ({
+      group_id: g.id,
+      group_name: g.name,
+      leader_name: null,
+      member_count: allUsers.filter(u => u.group_id === g.id).length,
+      prospects_added: 0,
+      appointments_completed: 0,
+      total_points: 0,
+    }));
+    return HttpResponse.json({
+      success: true,
+      data: { period, generated_at: new Date().toISOString(), individual, groups },
+    });
+  }),
 ];

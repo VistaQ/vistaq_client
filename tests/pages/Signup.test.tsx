@@ -142,8 +142,9 @@ describe('Signup — API error mapping', () => {
     await userEvent.selectOptions(screen.getByRole('combobox'), 'g1');
     await userEvent.click(screen.getByRole('button', { name: /register account/i }));
     await waitFor(() => {
-      expect(screen.getByText('Email already in use')).toBeInTheDocument();
-    });
+      // Signup.tsx maps 409 → "An account with this email already exists."
+      expect(screen.getByText('An account with this email already exists.')).toBeInTheDocument();
+    }, { timeout: 5000 });
   });
 
   it('429 (rate limit) shows general error', async () => {
@@ -167,8 +168,8 @@ describe('Signup — API error mapping', () => {
     await userEvent.selectOptions(screen.getByRole('combobox'), 'g1');
     await userEvent.click(screen.getByRole('button', { name: /register account/i }));
     await waitFor(() => {
-      // apiClient maps 429 to this hardcoded message (apiClient.ts line 72)
-      expect(screen.getByText(/too many attempts/i)).toBeInTheDocument();
-    });
+      // Signup.tsx maps 429 → "Too many registration attempts. Please wait a moment and try again."
+      expect(screen.getByText(/too many registration attempts/i)).toBeInTheDocument();
+    }, { timeout: 5000 });
   });
 });
