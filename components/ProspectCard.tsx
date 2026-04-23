@@ -126,9 +126,11 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
 
   // Permission logic
   const isNew = !formData.id;
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
   const isOwner = isNew || formData.agent_id === currentUser?.id;
-  const isViewOnly = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.MASTER_TRAINER;
-  const canEdit = !isViewOnly && isOwner;
+  const isViewOnly = currentUser?.role === UserRole.MASTER_TRAINER; // Master Trainer is read-only; Admin can now edit/delete
+  const canEdit = isAdmin || (!isViewOnly && isOwner);
+  const canDelete = !isNew && (isAdmin || (!isViewOnly && isOwner));
   const isReadOnly = !canEdit;
 
   // Time helpers
@@ -164,8 +166,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
   };
 
   const handleDelete = async () => {
-    if (isReadOnly) return;
-    if (isNew || !formData.id) return;
+    if (!canDelete || !formData.id) return;
     try {
       await deleteProspect(formData.id);
       setShowDeleteConfirm(false);
@@ -358,7 +359,15 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold text-gray-800">{isNew ? 'New Prospect' : `Client Status : ${formData.prospect_name}`}</h2>
               {isReadOnly && <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs font-bold border border-gray-200 flex items-center"><Eye className="w-3 h-3 mr-1" /> View Only</span>}
+              {isAdmin && !isNew && !isOwner && (
+                <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200 flex items-center gap-1">
+                  🛡️ Admin Edit
+                </span>
+              )}
             </div>
+            {isAdmin && !isNew && !isOwner && formData.agent_id && (
+              <p className="text-xs text-amber-600 mt-0.5">Editing on behalf of agent · ID: {formData.agent_id}</p>
+            )}
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-colors">
             <XCircle className="w-6 h-6" />
@@ -792,7 +801,7 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
         </div>
 
         <div className="p-4 border-t bg-white flex justify-between items-center rounded-b-xl z-10">
-          {!isNew && !isReadOnly ? (
+          {canDelete ? (
             <button onClick={() => setShowDeleteConfirm(true)} className="text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg flex items-center font-medium transition-colors">
               <Trash2 className="w-4 h-4 mr-2" /> Delete Prospect
             </button>
