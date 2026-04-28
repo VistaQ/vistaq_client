@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import Layout from './components/Layout';
 import GlobalNotification from './components/GlobalNotification';
+import SessionTimeoutModal from './components/SessionTimeoutModal';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import Spinner from './components/ui/Spinner';
@@ -54,6 +55,7 @@ const App: React.FC = () => {
     <AuthProvider>
       <DataProvider>
         <GlobalNotification />
+        <SessionTimeoutModal />
         <Suspense fallback={<PageSpinner />}>
           <Routes>
             {/* Public routes */}
