@@ -1,8 +1,12 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, UserRole, Notification } from '../types';
 import { apiCall, getTenantSlug } from '../services/apiClient';
+
+// Session idle thresholds
+const IDLE_WARN_MS   = 25 * 60 * 1000; // 25 min of inactivity → show warning
+const IDLE_EXPIRE_MS = 30 * 60 * 1000; // 30 min of inactivity → force expire
 
 interface AuthContextType {
   currentUser: User | null;
@@ -23,6 +27,10 @@ interface AuthContextType {
   notification: Notification | null;
   showNotification: (title: string, message: string, type?: 'success' | 'error' | 'info') => void;
   closeNotification: () => void;
+  // Session timeout
+  sessionModalState: null | 'warning' | 'expired';
+  extendSession: () => void;
+  sessionExpiredRedirect: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,6 +45,110 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<Notification | null>(null);
+  const [sessionModalState, setSessionModalState] = useState<null | 'warning' | 'expired'>(null);
+
+  // Refs for idle timers and current modal state (avoids stale closures in event handlers)
+  const idleWarnTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleExpireTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionModalRef    = useRef<null | 'warning' | 'expired'>(null);
+
+  const setSessionModal = (s: null | 'warning' | 'expired') => {
+    sessionModalRef.current = s;
+    setSessionModalState(s);
+  };
+
+  const clearIdleTimers = () => {
+    if (idleWarnTimerRef.current)   clearTimeout(idleWarnTimerRef.current);
+    if (idleExpireTimerRef.current) clearTimeout(idleExpireTimerRef.current);
+  };
+
+  const scheduleIdleTimers = () => {
+    clearIdleTimers();
+    idleWarnTimerRef.current = setTimeout(() => {
+      setSessionModal('warning');
+    }, IDLE_WARN_MS);
+    idleExpireTimerRef.current = setTimeout(() => {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('authUser');
+      setCurrentUser(null);
+      setSessionModal('expired');
+    }, IDLE_EXPIRE_MS);
+  };
+
+  const extendSession = () => {
+    setSessionModal(null);
+    scheduleIdleTimers();
+  };
+
+  const sessionExpiredRedirect = async () => {
+    clearIdleTimers();
+    try { await apiCall('/auth/logout', { method: 'POST' }); } catch { /* ignore */ }
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('authUser');
+    setCurrentUser(null);
+    setSessionModal(null);
+    navigate('/login', { replace: true });
+  };
+
+  // Start/stop idle timers whenever auth state changes
+  useEffect(() => {
+    if (!currentUser) {
+      clearIdleTimers();
+      return;
+    }
+
+    scheduleIdleTimers();
+
+    // Activity events reset the idle countdown (only when no modal is showing)
+    const onActivity = () => {
+      if (sessionModalRef.current !== null) return;
+      scheduleIdleTimers();
+    };
+
+    const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+    ACTIVITY_EVENTS.forEach(ev => window.addEventListener(ev, onActivity, { passive: true }));
+
+    return () => {
+      ACTIVITY_EVENTS.forEach(ev => window.removeEventListener(ev, onActivity));
+      clearIdleTimers();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser]);
+
+  // Listen for 401 events dispatched by apiClient
+  useEffect(() => {
+    const onSessionExpired = () => {
+      clearIdleTimers();
+      setCurrentUser(null);
+      setSessionModal('expired');
+    };
+    window.addEventListener('vistaq:session-expired', onSessionExpired);
+    return () => window.removeEventListener('vistaq:session-expired', onSessionExpired);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-validate token when the device wakes or the tab regains focus
+  useEffect(() => {
+    const onVisibilityChange = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!localStorage.getItem('authToken')) return;
+      try {
+        const res = await apiCall('/auth/me');
+        const fresh = normalizeUser(res.data);
+        setCurrentUser(fresh);
+        localStorage.setItem('authUser', JSON.stringify(fresh));
+      } catch {
+        clearIdleTimers();
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('authUser');
+        setCurrentUser(null);
+        setSessionModal('expired');
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const showNotification = (title: string, message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setNotification({ title, message, type });
@@ -233,7 +345,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       addUser, updateUser, deleteUser,
       addGroup, updateGroup, deleteGroup,
       resetPassword,
-      notification, showNotification, closeNotification
+      notification, showNotification, closeNotification,
+      sessionModalState, extendSession, sessionExpiredRedirect,
     }}>
       {!loading && children}
     </AuthContext.Provider>
