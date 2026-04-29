@@ -58,6 +58,48 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
     const session = item.type === 'coaching' ? (item.raw as CoachingSession) : null;
     const prospect = item.type === 'appointment' ? (item.raw as Prospect) : null;
 
+    // ── Add to Calendar helpers (events only) ────────────────
+    const [copied, setCopied] = React.useState(false);
+    const formatICSDate = (iso: string) => iso.replace(/[-:.]/g, '').slice(0, 15) + 'Z';
+    const startISO = evt?.start_date || item.date;
+    const endISO   = evt?.end_date || startISO;
+    const googleUrl = evt ? ('https://calendar.google.com/calendar/render?action=TEMPLATE'
+        + `&text=${encodeURIComponent(evt.event_title)}`
+        + `&dates=${formatICSDate(startISO)}/${formatICSDate(endISO)}`
+        + `&details=${encodeURIComponent(evt.description || '')}`
+        + `&location=${encodeURIComponent(evt.venue || evt.meeting_link || '')}`) : '';
+    const outlookUrl = evt ? ('https://outlook.live.com/calendar/0/deeplink/compose'
+        + `?subject=${encodeURIComponent(evt.event_title)}`
+        + `&startdt=${startISO}&enddt=${endISO}`
+        + `&body=${encodeURIComponent(evt.description || '')}`
+        + `&location=${encodeURIComponent(evt.venue || '')}`) : '';
+    const downloadICS = () => {
+        if (!evt) return;
+        const ics = [
+            'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//VistaQ//EN',
+            'BEGIN:VEVENT',
+            `SUMMARY:${evt.event_title}`,
+            `DTSTART:${formatICSDate(startISO)}`,
+            `DTEND:${formatICSDate(endISO)}`,
+            `DESCRIPTION:${(evt.description || '').replace(/\n/g, '\\n')}`,
+            `LOCATION:${evt.venue || evt.meeting_link || ''}`,
+            'END:VEVENT', 'END:VCALENDAR',
+        ].join('\r\n');
+        const blob = new Blob([ics], { type: 'text/calendar' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${evt.event_title.replace(/\s+/g, '_')}.ics`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    };
+    const publicUrl = `${window.location.origin}/event/${item.id}`;
+    const copyLink = () => {
+        navigator.clipboard.writeText(publicUrl).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
     // Standardised time & venue extraction per type
     const timeDisplay = (() => {
         if (item.type === 'coaching' && session) {
@@ -202,6 +244,47 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
                                     <X className="w-3.5 h-3.5" /> Delete
                                 </button>
                             )}
+                        </div>
+                    )}
+
+                    {/* ── Add to Calendar (events only) ─────────── */}
+                    {item.type === 'event' && (
+                        <div className="pt-4 border-t">
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Add to Calendar</p>
+                            <div className="flex flex-wrap gap-2">
+                                <a
+                                    href={googleUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
+                                >
+                                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="18" height="17" rx="2" stroke="#4285F4" strokeWidth="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="#4285F4" strokeWidth="2" strokeLinecap="round"/></svg>
+                                    Google Calendar
+                                </a>
+                                <button
+                                    onClick={downloadICS}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
+                                >
+                                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="18" height="17" rx="2" stroke="#6B7280" strokeWidth="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="#6B7280" strokeWidth="2" strokeLinecap="round"/></svg>
+                                    Apple / Outlook (.ics)
+                                </button>
+                                <a
+                                    href={outlookUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
+                                >
+                                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="18" height="17" rx="2" stroke="#0072C6" strokeWidth="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="#0072C6" strokeWidth="2" strokeLinecap="round"/></svg>
+                                    Outlook Web
+                                </a>
+                                <button
+                                    onClick={copyLink}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
+                                >
+                                    <LinkIcon className="w-3.5 h-3.5" />
+                                    {copied ? 'Copied!' : 'Copy Link'}
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -557,7 +640,10 @@ const MyCalendar: React.FC = () => {
         currentUser.role === UserRole.MASTER_TRAINER ||
         currentUser.role === UserRole.TRAINER;
 
-    const canManageEvents = isManagementOnly || currentUser.role === UserRole.GROUP_LEADER;
+    const isAgent = currentUser.role === UserRole.AGENT;
+    const canManageEvents = isManagementOnly ||
+        currentUser.role === UserRole.GROUP_LEADER ||
+        currentUser.role === UserRole.AGENT;
 
     // --- Build unified CalItem list ---
     const calItems = useMemo((): CalItem[] => {
@@ -697,9 +783,10 @@ const MyCalendar: React.FC = () => {
             alert('Please enter a Meeting URL for an Online event.');
             return;
         }
+        const isAgentPersonal = currentUser.role === UserRole.AGENT;
         const hasGroupTarget = formData.groupIds.length > 0;
         const hasAgentTarget = formData.targetAgentIds.length > 0;
-        if (!hasGroupTarget && !hasAgentTarget && currentUser.role !== UserRole.GROUP_LEADER) {
+        if (!isAgentPersonal && !hasGroupTarget && !hasAgentTarget && currentUser.role !== UserRole.GROUP_LEADER) {
             alert('Please select at least one group or agent to share this event with.');
             return;
         }
@@ -728,7 +815,9 @@ const MyCalendar: React.FC = () => {
             venue: formData.eventType === 'face-to-face' ? formData.venue : undefined,
             meeting_link: formData.eventType === 'online' ? formData.meetingLink : undefined,
             groupIds: formData.groupIds,
-            agentIds: formData.targetAgentIds.length > 0 ? formData.targetAgentIds : undefined,
+            agentIds: isAgentPersonal
+                ? [currentUser.id]
+                : formData.targetAgentIds.length > 0 ? formData.targetAgentIds : undefined,
         };
         if (editingEventId) {
             await updateEvent(editingEventId, eventData);
@@ -972,7 +1061,13 @@ const MyCalendar: React.FC = () => {
                                     Audience
                                 </h3>
 
-                                {currentUser.role === UserRole.GROUP_LEADER ? (
+                                {isAgent ? (
+                                    /* Agent: personal event — no targeting needed */
+                                    <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700 flex items-center gap-2">
+                                        <UserIcon className="w-4 h-4 flex-shrink-0" />
+                                        This event will be added to your personal calendar only.
+                                    </div>
+                                ) : currentUser.role === UserRole.GROUP_LEADER ? (
                                     <div className="space-y-3">
                                         <label className="flex items-center gap-2 cursor-pointer">
                                             <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus-visible:ring-blue-500"
