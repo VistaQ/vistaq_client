@@ -58,41 +58,68 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
     const session = item.type === 'coaching' ? (item.raw as CoachingSession) : null;
     const prospect = item.type === 'appointment' ? (item.raw as Prospect) : null;
 
-    // ── Add to Calendar helpers (events only) ────────────────
+    // ── Add to Calendar helpers (all item types) ────────────
     const [copied, setCopied] = React.useState(false);
     const formatICSDate = (iso: string) => iso.replace(/[-:.]/g, '').slice(0, 15) + 'Z';
-    const startISO = evt?.start_date || item.date;
-    const endISO   = evt?.end_date || startISO;
-    const googleUrl = evt ? ('https://calendar.google.com/calendar/render?action=TEMPLATE'
-        + `&text=${encodeURIComponent(evt.event_title)}`
-        + `&dates=${formatICSDate(startISO)}/${formatICSDate(endISO)}`
-        + `&details=${encodeURIComponent(evt.description || '')}`
-        + `&location=${encodeURIComponent(evt.venue || evt.meeting_link || '')}`) : '';
-    const outlookUrl = evt ? ('https://outlook.live.com/calendar/0/deeplink/compose'
-        + `?subject=${encodeURIComponent(evt.event_title)}`
-        + `&startdt=${startISO}&enddt=${endISO}`
-        + `&body=${encodeURIComponent(evt.description || '')}`
-        + `&location=${encodeURIComponent(evt.venue || '')}`) : '';
+
+    // Resolve title / start / end / location for any item type
+    const calTitle = item.type === 'event'
+        ? (evt?.event_title || item.title)
+        : item.title;
+    const calStartISO = item.type === 'event'
+        ? (evt?.start_date || item.date)
+        : (session?.start_date || item.date);
+    const calEndISO = item.type === 'event'
+        ? (evt?.end_date || calStartISO)
+        : item.type === 'coaching'
+            ? (session?.end_date || calStartISO)
+            : calStartISO;
+    const calDescription = item.type === 'event'
+        ? (evt?.description || '')
+        : item.type === 'coaching'
+            ? (session?.description || '')
+            : (prospect ? `Appointment with ${prospect.prospect_name}` : '');
+    const calLocation = item.type === 'event'
+        ? (evt?.venue || evt?.meeting_link || '')
+        : item.type === 'coaching'
+            ? (session?.link || '')
+            : (prospect?.appointment_location || '');
+
+    const googleUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+        + `&text=${encodeURIComponent(calTitle)}`
+        + `&dates=${formatICSDate(calStartISO)}/${formatICSDate(calEndISO)}`
+        + `&details=${encodeURIComponent(calDescription)}`
+        + `&location=${encodeURIComponent(calLocation)}`;
+
+    const outlookUrl = 'https://outlook.live.com/calendar/0/deeplink/compose'
+        + `?subject=${encodeURIComponent(calTitle)}`
+        + `&startdt=${calStartISO}&enddt=${calEndISO}`
+        + `&body=${encodeURIComponent(calDescription)}`
+        + `&location=${encodeURIComponent(calLocation)}`;
+
     const downloadICS = () => {
-        if (!evt) return;
         const ics = [
             'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//VistaQ//EN',
             'BEGIN:VEVENT',
-            `SUMMARY:${evt.event_title}`,
-            `DTSTART:${formatICSDate(startISO)}`,
-            `DTEND:${formatICSDate(endISO)}`,
-            `DESCRIPTION:${(evt.description || '').replace(/\n/g, '\\n')}`,
-            `LOCATION:${evt.venue || evt.meeting_link || ''}`,
+            `SUMMARY:${calTitle}`,
+            `DTSTART:${formatICSDate(calStartISO)}`,
+            `DTEND:${formatICSDate(calEndISO)}`,
+            `DESCRIPTION:${calDescription.replace(/\n/g, '\\n')}`,
+            `LOCATION:${calLocation}`,
             'END:VEVENT', 'END:VCALENDAR',
         ].join('\r\n');
         const blob = new Blob([ics], { type: 'text/calendar' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `${evt.event_title.replace(/\s+/g, '_')}.ics`;
+        a.download = `${calTitle.replace(/\s+/g, '_')}.ics`;
         a.click();
         URL.revokeObjectURL(a.href);
     };
-    const publicUrl = `${window.location.origin}/event/${item.id}`;
+
+    // Public link only makes sense for events; for others just copy the app URL
+    const publicUrl = item.type === 'event'
+        ? `${window.location.origin}/event/${evt?.id || item.id.replace('evt_', '')}`
+        : window.location.href;
     const copyLink = () => {
         navigator.clipboard.writeText(publicUrl).then(() => {
             setCopied(true);
@@ -247,9 +274,8 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
                         </div>
                     )}
 
-                    {/* ── Add to Calendar (events only) ─────────── */}
-                    {item.type === 'event' && (
-                        <div className="pt-4 border-t">
+                    {/* ── Add to Calendar (all item types) ─────── */}
+                    <div className="pt-4 border-t">
                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Add to Calendar</p>
                             <div className="flex flex-wrap gap-2">
                                 <a
@@ -286,7 +312,6 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({ item, onClose, onEdit
                                 </button>
                             </div>
                         </div>
-                    )}
                 </div>
             </div>
         </div>
