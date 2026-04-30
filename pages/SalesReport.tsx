@@ -187,6 +187,7 @@ const SalesReportPage: React.FC = () => {
 
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [kpiTab, setKpiTab] = useState<'fyct' | 'fyc' | 'ace' | 'noc'>('fyct');
+  const [periodTab, setPeriodTab] = useState<'mtd' | 'ytd'>('ytd');
   // Default to demo — stays on until real ETL data is confirmed available
   const [demoMode, setDemoMode] = useState(true);
   const [trendLines, setTrendLines] = useState<Record<string, boolean>>({
@@ -328,38 +329,42 @@ const SalesReportPage: React.FC = () => {
     fyct: {
       label: 'FYCt',
       ytd: myReport?.fyct_ytd ?? 0,
-      target: MDRT_TARGET,
-      shortage: myReport?.mdrt_shortage_fyct ?? MDRT_TARGET,
-      pctField: myReport?.fyct_pct ?? 0,
+      ytdTarget: MDRT_TARGET,
       mtd: myReport?.month_fyct?.[n - 1] ?? 0,
+      mtdTarget: MDRT_TARGET / 12,
+      isMonetary: true,
     },
     fyc: {
       label: 'FYC',
       ytd: myReport?.fyc_ytd ?? 0,
-      target: MDRT_TARGET,
-      shortage: myReport?.mdrt_shortage_fyc ?? MDRT_TARGET,
-      pctField: myReport?.fyc_pct ?? 0,
+      ytdTarget: MDRT_TARGET,
       mtd: myReport?.month_fyc?.[n - 1] ?? 0,
+      mtdTarget: MDRT_TARGET / 12,
+      isMonetary: true,
     },
     ace: {
       label: 'ACE',
       ytd: myReport?.ace_ytd ?? 0,
-      target: MDRT_TARGET,
-      shortage: Math.max(MDRT_TARGET - (myReport?.ace_ytd ?? 0), 0),
-      pctField: myReport ? (myReport.ace_ytd / MDRT_TARGET) * 100 : 0,
+      ytdTarget: MDRT_TARGET,
       mtd: myReport?.month_ace?.[n - 1] ?? 0,
+      mtdTarget: MDRT_TARGET / 12,
+      isMonetary: true,
     },
     noc: {
       label: 'NOC',
       ytd: myReport?.noc_ytd ?? 0,
-      target: 0, // configurable — shown as N/A until set
-      shortage: 0,
-      pctField: 0,
+      ytdTarget: 0, // configurable — shown as N/A until set
       mtd: myReport?.month_noc?.[n - 1] ?? 0,
+      mtdTarget: 0,
+      isMonetary: false,
     },
   };
   const kpi = kpiConfig[kpiTab];
-  const mtdTarget = kpi.target > 0 ? kpi.target / 12 : 0;
+  const isMtd = periodTab === 'mtd';
+  const kpiValue  = isMtd ? kpi.mtd : kpi.ytd;
+  const kpiTarget = isMtd ? kpi.mtdTarget : kpi.ytdTarget;
+  const kpiDiff   = kpiValue - kpiTarget;
+  const kpiPct    = kpiTarget > 0 ? (kpiValue / kpiTarget) * 100 : 0;
   const monthsLeft = Math.max(12 - n, 0);
 
   // ─── Download ─────────────────────────────────────────────────────────────
@@ -533,50 +538,95 @@ const SalesReportPage: React.FC = () => {
             </div>
           ) : (
             <>
-              {/* YTD summary stat cards */}
+              {/* ── Period toggle (MTD / YTD) — drives entire widget ── */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+                  {(['mtd', 'ytd'] as const).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setPeriodTab(p)}
+                      className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${periodTab === p ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      {p === 'mtd' ? 'Month to Date' : 'Year to Date'}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-sm text-blue-600 font-medium">{monthsLeft} months remaining</span>
+              </div>
+
+              {/* ── Stat cards — values swap with period toggle ── */}
               {myReport && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  {[
-                    { label: 'FYCt YTD', value: rm(myReport.fyct_ytd), sub: `${myReport.fyct_pct.toFixed(1)}% of target`, color: 'text-blue-600', bg: 'bg-blue-50', icon: <TrendingUp className="w-5 h-5 text-blue-600" /> },
-                    { label: 'FYC YTD', value: rm(myReport.fyc_ytd), sub: `${myReport.fyc_pct.toFixed(1)}% of target`, color: 'text-indigo-600', bg: 'bg-indigo-50', icon: <Award className="w-5 h-5 text-indigo-600" /> },
-                    { label: 'ACE YTD', value: rm(myReport.ace_ytd), sub: 'Annualised contribution', color: 'text-emerald-600', bg: 'bg-emerald-50', icon: <Target className="w-5 h-5 text-emerald-600" /> },
-                    { label: 'NOC YTD', value: String(myReport.noc_ytd), sub: 'Number of cases', color: 'text-purple-600', bg: 'bg-purple-50', icon: <Users className="w-5 h-5 text-purple-600" /> },
-                  ].map(card => (
+                  {([
+                    {
+                      label: `FYCt ${periodTab.toUpperCase()}`,
+                      value: isMtd ? rm(myReport.month_fyct?.[n - 1] ?? 0) : rm(myReport.fyct_ytd),
+                      sub: isMtd
+                        ? `${((( myReport.month_fyct?.[n - 1] ?? 0) / (MDRT_TARGET / 12)) * 100).toFixed(1)}% of monthly target`
+                        : `${myReport.fyct_pct.toFixed(1)}% of annual target`,
+                      bg: 'bg-blue-50', icon: <TrendingUp className="w-5 h-5 text-blue-600" />,
+                    },
+                    {
+                      label: `FYC ${periodTab.toUpperCase()}`,
+                      value: isMtd ? rm(myReport.month_fyc?.[n - 1] ?? 0) : rm(myReport.fyc_ytd),
+                      sub: isMtd
+                        ? `${(((myReport.month_fyc?.[n - 1] ?? 0) / (MDRT_TARGET / 12)) * 100).toFixed(1)}% of monthly target`
+                        : `${myReport.fyc_pct.toFixed(1)}% of annual target`,
+                      bg: 'bg-indigo-50', icon: <Award className="w-5 h-5 text-indigo-600" />,
+                    },
+                    {
+                      label: `ACE ${periodTab.toUpperCase()}`,
+                      value: isMtd ? rm(myReport.month_ace?.[n - 1] ?? 0) : rm(myReport.ace_ytd),
+                      sub: 'Annualised contribution',
+                      bg: 'bg-emerald-50', icon: <Target className="w-5 h-5 text-emerald-600" />,
+                    },
+                    {
+                      label: `NOC ${periodTab.toUpperCase()}`,
+                      value: isMtd ? String(myReport.month_noc?.[n - 1] ?? 0) : String(myReport.noc_ytd),
+                      sub: 'Number of cases',
+                      bg: 'bg-purple-50', icon: <Users className="w-5 h-5 text-purple-600" />,
+                    },
+                  ] as { label: string; value: string; sub: string; bg: string; icon: React.ReactNode }[]).map(card => (
                     <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
                       <div className="flex items-center mb-3">
                         <div className={`p-2 ${card.bg} rounded-lg mr-3`}>{card.icon}</div>
                         <p className="text-xs font-semibold text-gray-500 uppercase">{card.label}</p>
                       </div>
-                      <p className={`text-2xl font-bold text-gray-900`}>{card.value}</p>
+                      <p className="text-2xl font-bold text-gray-900">{card.value}</p>
                       <p className="text-xs text-gray-400 mt-1">{card.sub}</p>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* MDRT progress bars */}
+              {/* ── MDRT progress bars — values swap with period toggle ── */}
               {myReport && (
                 <div className="mb-6 p-6 bg-gray-50 rounded-xl border border-gray-100">
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">MDRT Progress · RM 400,000 target</span>
-                    <span className="text-sm text-blue-600 font-medium">{monthsLeft} months remaining</span>
+                    <span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                      MDRT Progress · {isMtd ? `Monthly target ${rm(MDRT_TARGET / 12)}` : `Annual target ${rm(MDRT_TARGET)}`}
+                    </span>
                   </div>
                   <MdrtBar
                     label="FYC"
-                    value={myReport.fyc_ytd}
-                    target={MDRT_TARGET}
-                    shortage={myReport.mdrt_shortage_fyc}
+                    value={isMtd ? (myReport.month_fyc?.[n - 1] ?? 0) : myReport.fyc_ytd}
+                    target={isMtd ? MDRT_TARGET / 12 : MDRT_TARGET}
+                    shortage={isMtd
+                      ? Math.max(MDRT_TARGET / 12 - (myReport.month_fyc?.[n - 1] ?? 0), 0)
+                      : myReport.mdrt_shortage_fyc}
                   />
                   <MdrtBar
                     label="FYCt"
-                    value={myReport.fyct_ytd}
-                    target={MDRT_TARGET}
-                    shortage={myReport.mdrt_shortage_fyct}
+                    value={isMtd ? (myReport.month_fyct?.[n - 1] ?? 0) : myReport.fyct_ytd}
+                    target={isMtd ? MDRT_TARGET / 12 : MDRT_TARGET}
+                    shortage={isMtd
+                      ? Math.max(MDRT_TARGET / 12 - (myReport.month_fyct?.[n - 1] ?? 0), 0)
+                      : myReport.mdrt_shortage_fyct}
                   />
                 </div>
               )}
 
-              {/* KPI toggle */}
+              {/* ── KPI metric toggle ── */}
               <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1 w-fit">
                 {(['fyct', 'fyc', 'ace', 'noc'] as const).map(tab => (
                   <button
@@ -589,30 +639,38 @@ const SalesReportPage: React.FC = () => {
                 ))}
               </div>
 
-              {/* KPI table */}
+              {/* ── KPI table — columns reflect selected period ── */}
               <MiniTable
-                headers={['', 'MTD %', 'MTD', 'YTD %', 'YTD']}
+                headers={['', `${isMtd ? 'MTD' : 'YTD'} %`, isMtd ? 'MTD Value' : 'YTD Value', 'Target', 'Difference']}
                 rows={[
                   [
                     'Achieved',
-                    mtdTarget > 0 ? pct(kpi.mtd / mtdTarget) : '—',
-                    kpiTab === 'noc' ? kpi.mtd : rm(kpi.mtd),
-                    kpi.target > 0 ? pct(kpi.ytd / kpi.target) : '—',
-                    kpiTab === 'noc' ? kpi.ytd : rm(kpi.ytd),
+                    kpiTarget > 0 ? `${kpiPct.toFixed(1)}%` : '—',
+                    kpi.isMonetary ? rm(kpiValue) : String(kpiValue),
+                    kpi.isMonetary && kpiTarget > 0 ? rm(kpiTarget) : kpiTarget > 0 ? String(Math.round(kpiTarget)) : '—',
+                    kpiTarget > 0
+                      ? <span className={kpiDiff >= 0 ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'}>
+                          {kpiDiff >= 0 ? '+' : ''}{kpi.isMonetary ? rm(kpiDiff) : String(Math.round(kpiDiff))}
+                        </span>
+                      : '—',
                   ],
                   [
                     'Target',
-                    kpi.target > 0 ? '100%' : '—',
-                    kpiTab === 'noc' ? '—' : rm(mtdTarget),
-                    '100%',
-                    kpiTab === 'noc' ? '—' : rm(kpi.target),
+                    kpiTarget > 0 ? '100%' : '—',
+                    kpi.isMonetary && kpiTarget > 0 ? rm(kpiTarget) : kpiTarget > 0 ? String(Math.round(kpiTarget)) : '—',
+                    '—',
+                    '—',
                   ],
                   [
-                    'Var',
-                    mtdTarget > 0 ? pct((kpi.mtd - mtdTarget) / mtdTarget) : '—',
-                    kpiTab === 'noc' ? String(kpi.mtd) : rm(kpi.mtd - mtdTarget),
-                    kpi.target > 0 ? pct((kpi.ytd - kpi.target) / kpi.target) : '—',
-                    kpiTab === 'noc' ? String(kpi.ytd) : rm(kpi.ytd - kpi.target),
+                    'Difference',
+                    kpiTarget > 0 ? `${(kpiPct - 100).toFixed(1)}%` : '—',
+                    kpiTarget > 0
+                      ? <span className={kpiDiff >= 0 ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'}>
+                          {kpiDiff >= 0 ? '+' : ''}{kpi.isMonetary ? rm(kpiDiff) : String(Math.round(kpiDiff))}
+                        </span>
+                      : '—',
+                    '—',
+                    '—',
                   ],
                 ]}
               />
