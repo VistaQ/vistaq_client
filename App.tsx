@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import Layout from './components/Layout';
 import GlobalNotification from './components/GlobalNotification';
+import SessionTimeoutModal from './components/SessionTimeoutModal';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import Spinner from './components/ui/Spinner';
@@ -33,6 +34,7 @@ const Support = React.lazy(() => import('./pages/Support'));
 const Tutorials = React.lazy(() => import('./pages/Tutorials'));
 const Coaching = React.lazy(() => import('./pages/Coaching'));
 const AddToHomeScreen = React.lazy(() => import('./pages/AddToHomeScreen'));
+const EventPublicPage = React.lazy(() => import('./pages/EventPublicPage'));
 
 const PageSpinner: React.FC = () => (
   <div className="flex h-full min-h-[60vh] items-center justify-center">
@@ -54,6 +56,7 @@ const App: React.FC = () => {
     <AuthProvider>
       <DataProvider>
         <GlobalNotification />
+        <SessionTimeoutModal />
         <Suspense fallback={<PageSpinner />}>
           <Routes>
             {/* Public routes */}
@@ -63,6 +66,7 @@ const App: React.FC = () => {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/support" element={<SupportRoute />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/event/:eventId" element={<EventPublicPage />} />
 
             {/* Protected app routes — nested inside Layout */}
             <Route
