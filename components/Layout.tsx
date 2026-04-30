@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { UserRole } from '../types';
 import {
   LayoutDashboard,
@@ -26,8 +27,10 @@ import {
   FileText,
   BookOpen,
   Trophy,
-  BarChart2
+  BarChart2,
+  Bell,
 } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -38,6 +41,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { unreadCount } = useNotifications();
 
   const getRoleIcon = (role: UserRole) => {
     switch (role) {
@@ -148,6 +152,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {/* Support & Tutorials — always visible */}
           <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Help</div>
+          <NavItem id="notifications" label="Notifications" icon={Bell} badge={unreadCount} />
           <NavItem id="tutorials" label="Tutorials" icon={BookOpen} />
           <NavItem id="support" label="Support" icon={HelpCircle} />
         </nav>
@@ -197,9 +202,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex items-center">
             <img src="/vistaq-logo.png" alt="VistaQ" className="h-8 w-auto" />
           </div>
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'} className="p-2 text-gray-300 hover:text-white">
-            {isMobileMenuOpen ? <X /> : <Menu />}
-          </button>
+          <div className="flex items-center gap-1">
+            <div className="[&_button]:text-gray-300 [&_button:hover]:text-white [&_button:hover]:bg-white/10">
+              <NotificationBell />
+            </div>
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'} className="p-2 text-gray-300 hover:text-white">
+              {isMobileMenuOpen ? <X /> : <Menu />}
+            </button>
+          </div>
         </header>
 
         {/* Mobile Menu Overlay */}
@@ -254,6 +264,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
                 {/* Support & Tutorials */}
                 <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Help</div>
+                <NavItem id="notifications" label="Notifications" icon={Bell} badge={unreadCount} />
                 <NavItem id="tutorials" label="Tutorials" icon={BookOpen} />
                 <NavItem id="support" label="Support" icon={HelpCircle} />
               </nav>
@@ -282,6 +293,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           </div>
         )}
+
+        {/* Desktop top-bar — notification bell sits here */}
+        <div className="hidden md:flex items-center justify-end h-14 px-8 border-b border-gray-100 bg-white flex-shrink-0">
+          <NotificationBell />
+        </div>
 
         {/* Main Content */}
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 relative bg-gray-50">

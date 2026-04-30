@@ -3,6 +3,7 @@ import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
+import { NotificationProvider } from './context/NotificationContext';
 import Layout from './components/Layout';
 import GlobalNotification from './components/GlobalNotification';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
@@ -37,6 +38,7 @@ const AddToHomeScreen = React.lazy(() => import('./pages/AddToHomeScreen'));
 const EventPublicPage = React.lazy(() => import('./pages/EventPublicPage'));
 const SalesReport = React.lazy(() => import('./pages/SalesReport'));
 const GroupSalesReport = React.lazy(() => import('./pages/GroupSalesReport'));
+const Notifications = React.lazy(() => import('./pages/Notifications'));
 
 const PageSpinner: React.FC = () => (
   <div className="flex h-full min-h-[60vh] items-center justify-center">
@@ -57,6 +59,7 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <DataProvider>
+        <NotificationProvider>
         <GlobalNotification />
         <SessionTimeoutModal />
         <Suspense fallback={<PageSpinner />}>
@@ -92,6 +95,7 @@ const App: React.FC = () => {
                       <Route path="import" element={<Import />} />
                       <Route path="profile" element={<Profile />} />
                       <Route path="tutorials" element={<Tutorials />} />
+                      <Route path="notifications" element={<Notifications />} />
                       <Route path="add-to-home-screen" element={<AddToHomeScreen />} />
                       <Route path="users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
                       <Route path="admin-groups" element={<AdminRoute><AdminGroups /></AdminRoute>} />
@@ -108,6 +112,7 @@ const App: React.FC = () => {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Suspense>
+        </NotificationProvider>
       </DataProvider>
     </AuthProvider>
   );

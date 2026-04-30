@@ -196,3 +196,25 @@ export interface SalesImportRecord {
 
 export const MDRT_TARGET = 400_000; // RM — fixed for all agents
 export const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// ─── In-app Notifications ────────────────────────────────────────────────────
+
+export type NotificationType =
+  | 'achievement'   // badge unlocked, milestone reached
+  | 'event'         // calendar event reminder
+  | 'coaching'      // coaching session reminder
+  | 'milestone'     // MDRT / sales target update
+  | 'etl'           // ETL data uploaded (admin)
+  | 'announcement'  // general system announcement
+  | 'system';       // system / technical
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  created_at: string;        // ISO timestamp
+  read_at: string | null;    // null = unread
+  action_url?: string;       // if set, clicking navigates here
+  action_label?: string;     // label for the action button
+}
