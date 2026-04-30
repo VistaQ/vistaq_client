@@ -14,6 +14,55 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
+// ─── demo / mock data (used when no ETL upload exists yet) ──────────────────
+
+const MOCK_SALES_REPORT: SalesReportType = {
+  id: 'mock-001',
+  agent_id: 'mock-agent',
+  agent_code: 'T75040K',
+  agent_name: 'Sarah Tan Mei Ling',
+  year: new Date().getFullYear(),
+  imported_at: new Date().toISOString(),
+  // YTD (Jan–May, n=5)
+  ace_ytd:  312_500,
+  noc_ytd:  9,
+  fyct_ytd: 156_000,
+  fyct_pct: 39.0,
+  mdrt_shortage_fyct: 244_000,
+  fyc_ytd:  148_200,
+  fyc_pct:  37.05,
+  mdrt_shortage_fyc:  251_800,
+  // Monthly ACE  Jan     Feb     Mar     Apr     May    Jun–Dec
+  month_ace:  [48000, 55000, 70000, 82000, 57500,   0,0,0,0,0,0,0],
+  month_noc:  [    1,     2,     2,     3,     1,   0,0,0,0,0,0,0],
+  month_fyct: [28000, 31000, 38500, 40000, 18500,   0,0,0,0,0,0,0],
+  month_fyc:  [24000, 28500, 36000, 38200, 21500,   0,0,0,0,0,0,0],
+};
+
+// Mock prospects for widgets 3-5 when the API returns none
+const MOCK_PROSPECTS_DATA = [
+  // Successful sales with products
+  { stage: 'sales', outcome: 'successful', product: 'Medical Card', amount: 48000, enteredAt: '2026-01-05', apptDate: '2026-01-10', completedAt: '2026-01-18' },
+  { stage: 'sales', outcome: 'successful', product: 'Investment Link', amount: 55000, enteredAt: '2026-01-20', apptDate: '2026-01-28', completedAt: '2026-02-05' },
+  { stage: 'sales', outcome: 'successful', product: 'Medical Card', amount: 32000, enteredAt: '2026-02-03', apptDate: '2026-02-10', completedAt: '2026-02-20' },
+  { stage: 'sales', outcome: 'successful', product: 'Term Life', amount: 70000, enteredAt: '2026-03-01', apptDate: '2026-03-08', completedAt: '2026-03-22' },
+  { stage: 'sales', outcome: 'successful', product: 'Investment Link', amount: 82000, enteredAt: '2026-03-15', apptDate: '2026-03-22', completedAt: '2026-04-10' },
+  { stage: 'sales', outcome: 'successful', product: 'Medical Card', amount: 28000, enteredAt: '2026-04-02', apptDate: '2026-04-09', completedAt: '2026-04-18' },
+  { stage: 'sales', outcome: 'successful', product: 'Takaful Savings', amount: 42000, enteredAt: '2026-04-10', apptDate: '2026-04-17', completedAt: '2026-04-30' },
+  { stage: 'sales', outcome: 'successful', product: 'Term Life', amount: 35000, enteredAt: '2026-04-22', apptDate: '2026-04-29', completedAt: '2026-05-08' },
+  { stage: 'sales', outcome: 'successful', product: 'Investment Link', amount: 57500, enteredAt: '2026-05-01', apptDate: '2026-05-07', completedAt: '2026-05-15' },
+  // Unsuccessful / KIV
+  { stage: 'sales', outcome: 'unsuccessful', product: '', amount: 0, enteredAt: '2026-02-15', apptDate: '2026-02-22', completedAt: '2026-03-01' },
+  { stage: 'sales', outcome: 'unsuccessful', product: '', amount: 0, enteredAt: '2026-03-20', apptDate: '2026-03-28', completedAt: '2026-04-05' },
+  { stage: 'sales', outcome: 'kiv', product: '', amount: 0, enteredAt: '2026-05-05', apptDate: '2026-05-12', completedAt: '2026-05-20' },
+  // Still in appointment stage
+  { stage: 'appointment', outcome: null, product: '', amount: 0, enteredAt: '2026-04-25', apptDate: '2026-05-03', completedAt: null },
+  { stage: 'appointment', outcome: null, product: '', amount: 0, enteredAt: '2026-05-10', apptDate: '2026-05-17', completedAt: null },
+  // Still prospect
+  { stage: 'prospect', outcome: null, product: '', amount: 0, enteredAt: '2026-05-20', apptDate: null, completedAt: null },
+  { stage: 'prospect', outcome: null, product: '', amount: 0, enteredAt: '2026-05-22', apptDate: null, completedAt: null },
+];
+
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const rm = (v: number) =>
@@ -138,6 +187,7 @@ const SalesReportPage: React.FC = () => {
 
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [kpiTab, setKpiTab] = useState<'fyct' | 'fyc' | 'ace' | 'noc'>('fyct');
+  const [demoMode, setDemoMode] = useState(false);
   const [trendLines, setTrendLines] = useState<Record<string, boolean>>({
     Prospects: true, Appointments: false, 'Sales Meetings': false, Sales: true,
     FYCt: true, FYC: false, ACE: false, NOC: false,
@@ -154,15 +204,40 @@ const SalesReportPage: React.FC = () => {
     || currentUser.role === UserRole.MASTER_TRAINER
     || currentUser.role === UserRole.TRAINER;
 
-  // ─── ETL data (own record for agents, all for management) ─────────────────
+  // ─── ETL data — use mock when demo mode is on or no real data ────────────
+
+  const hasRealEtlData = salesReports.length > 0;
+  const effectiveSalesReports = demoMode || !hasRealEtlData
+    ? [{ ...MOCK_SALES_REPORT, agent_id: currentUser.id }]
+    : salesReports;
 
   const myReport: SalesReportType | undefined = isManagement
     ? undefined
-    : salesReports.find(r => r.agent_id === currentUser.id) ?? salesReports[0];
+    : effectiveSalesReports.find(r => r.agent_id === currentUser.id) ?? effectiveSalesReports[0];
 
-  // ─── Prospect data ────────────────────────────────────────────────────────
+  // ─── Prospect data — use mock when demo mode is on ────────────────────────
 
-  const allProspects = getProspectsByScope(currentUser);
+  const realProspects = getProspectsByScope(currentUser);
+  const mockProspects = MOCK_PROSPECTS_DATA.map((d, idx) => ({
+    id: `mock-p-${idx}`,
+    agent_id: currentUser.id,
+    tenant_id: '',
+    prospect_name: `Demo Client ${idx + 1}`,
+    prospect_email: null,
+    prospect_phone: null,
+    current_stage: d.stage as any,
+    prospect_entered_at: d.enteredAt,
+    appointment_date: d.apptDate ?? undefined,
+    appointment_completed_at: d.apptDate,
+    sales_parts_completed: d.stage === 'sales' ? ['social', 'factFind'] as any : [],
+    products_sold: d.product ? [{ productName: d.product, amount: d.amount }] : [],
+    sales_outcome: d.outcome as any,
+    sales_completed_at: d.completedAt,
+    created_at: d.enteredAt,
+    updated_at: d.completedAt ?? d.enteredAt,
+  }));
+
+  const allProspects = (demoMode || realProspects.length === 0) ? mockProspects as any[] : realProspects;
 
   // Effectiveness counts — using YTD (current year) and MTD filters
   const prospectsMTD = allProspects.filter(p => isThisMonth(p.prospect_entered_at));
@@ -282,7 +357,7 @@ const SalesReportPage: React.FC = () => {
   // ─── Download ─────────────────────────────────────────────────────────────
 
   const downloadExcel = () => {
-    const rows = salesReports.map(r => {
+    const rows = effectiveSalesReports.map(r => {
       const row: Record<string, unknown> = {
         'Agent Code': r.agent_code,
         'Agent Name': r.agent_name,
@@ -308,7 +383,7 @@ const SalesReportPage: React.FC = () => {
   };
 
   const downloadCSV = () => {
-    const rows = salesReports.map(r => ({
+    const rows = effectiveSalesReports.map(r => ({
       'Agent Code': r.agent_code,
       'Agent Name': r.agent_name,
       'ACE (YTD)': r.ace_ytd,
@@ -333,7 +408,7 @@ const SalesReportPage: React.FC = () => {
 
   // ─── empty ETL state ──────────────────────────────────────────────────────
 
-  const noEtlData = !isLoadingSalesReports && salesReports.length === 0;
+  const noEtlData = false; // always show data — real or mock
 
   // ─── render ───────────────────────────────────────────────────────────────
 
@@ -359,6 +434,18 @@ const SalesReportPage: React.FC = () => {
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
+
+          {/* Demo toggle (when real data exists) */}
+          {hasRealEtlData && (
+            <button
+              onClick={() => setDemoMode(v => !v)}
+              className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                demoMode ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+              }`}
+            >
+              {demoMode ? '⚠ Demo On' : 'Demo'}
+            </button>
+          )}
 
           {/* Download */}
           <div className="relative group">
@@ -391,6 +478,30 @@ const SalesReportPage: React.FC = () => {
           </button>
         ))}
       </div>
+
+      {/* ── Demo mode banner ── */}
+      {(!hasRealEtlData || demoMode) && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-500" />
+            <span>
+              {demoMode
+                ? 'Demo mode — showing sample data. Toggle off to see real data.'
+                : 'No ETL data uploaded yet — showing sample data so you can preview all widgets.'}
+            </span>
+          </div>
+          <button
+            onClick={() => setDemoMode(v => !v)}
+            className={`flex-shrink-0 px-3 py-1 rounded-lg text-xs font-bold border transition-colors ${
+              demoMode
+                ? 'bg-amber-200 text-amber-800 border-amber-300 hover:bg-amber-300'
+                : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-100'
+            }`}
+          >
+            {demoMode ? 'Exit Demo' : 'View Demo'}
+          </button>
+        </div>
+      )}
 
       {/* ── Loading ── */}
       {isLoadingSalesReports && (
