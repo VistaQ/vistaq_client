@@ -31,6 +31,7 @@ import {
   Bell,
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
+import WelcomeModal from './WelcomeModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -304,6 +305,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           {children}
         </main>
       </div>
+
+      {/* Welcome modal — shown once per day for Agent and Group Leader */}
+      <WelcomeModal />
     </div>
   );
 };
