@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole, Prospect, ProspectStage, CoachingSession, User, TRAINING_MODE_LABELS } from '../types';
+import { UserRole, Prospect, ProspectStage, CoachingSession, User, TRAINING_MODE_LABELS, MDRT_TARGET } from '../types';
 import { apiCall } from '../services/apiClient';
 import {
    Calendar,
@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, Label } from 'recharts';
 
-const MDRT_TARGET_FYC = 100000;
+const MDRT_TARGET_FYC = MDRT_TARGET; // RM 400,000 — sourced from types.ts
 const MDRT_TARGET_PROSPECTS = 100;
 
 import { CHART_COLORS, CHART_LABEL_FILL } from '../constants/tokens';
@@ -36,7 +36,7 @@ const COLORS = CHART_COLORS;
 const Dashboard: React.FC = () => {
    const navigate = useNavigate();
    const { currentUser } = useAuth();
-   const { prospects, coachingSessions, getEventsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats, isLoadingProspects } = useData();
+   const { prospects, coachingSessions, getEventsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats, isLoadingProspects, salesReports, isLoadingSalesReports, refetchSalesReports } = useData();
 
    const [users, setUsers] = useState<User[]>([]);
 
@@ -46,6 +46,7 @@ const Dashboard: React.FC = () => {
       refetchGroupStats();
       refetchEvents();
       refetchCoachingSessions();
+      refetchSalesReports();
       apiCall('/users').then(res => setUsers(Array.isArray(res.data) ? res.data : [])).catch(() => {});
    }, []);
 
@@ -562,6 +563,56 @@ const Dashboard: React.FC = () => {
                <h3 className="text-3xl font-bold text-yellow-600 mt-1">RM {acsYTD.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
             </div>
          </div>
+
+         {/* MDRT Progress Widget */}
+         {(() => {
+            const myReport = salesReports.find(r => r.agent_id === currentUser?.id) ?? salesReports[0];
+            const monthsLeft = Math.max(12 - (new Date().getMonth() + 1), 0);
+            const fycPct = myReport ? Math.min((myReport.fyc_ytd / MDRT_TARGET) * 100, 100) : 0;
+            const fyctPct = myReport ? Math.min((myReport.fyct_ytd / MDRT_TARGET) * 100, 100) : 0;
+            const barColor = (p: number) => p < 25 ? 'from-red-500 to-red-400' : p < 75 ? 'from-amber-500 to-amber-400' : 'from-green-500 to-green-400';
+
+            return (
+               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-4">
+                     <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">MDRT Progress</p>
+                        <p className="text-sm text-gray-500 mt-0.5">Target: RM {MDRT_TARGET.toLocaleString()} · {monthsLeft} months remaining</p>
+                     </div>
+                     <button
+                        onClick={() => navigate('/sales-report')}
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                     >
+                        Full Report →
+                     </button>
+                  </div>
+                  {isLoadingSalesReports ? (
+                     <p className="text-sm text-gray-400 animate-pulse">Loading sales data…</p>
+                  ) : !myReport ? (
+                     <p className="text-sm text-gray-400 italic">No ETL data for this year yet. Contact your admin.</p>
+                  ) : (
+                     <div className="space-y-3">
+                        {[{ label: 'FYC', ytd: myReport.fyc_ytd, shortage: myReport.mdrt_shortage_fyc, pct: fycPct },
+                          { label: 'FYCt', ytd: myReport.fyct_ytd, shortage: myReport.mdrt_shortage_fyct, pct: fyctPct }].map(item => (
+                           <div key={item.label}>
+                              <div className="flex justify-between text-sm mb-1">
+                                 <span className="font-semibold text-gray-700">{item.label}</span>
+                                 <span className="font-bold text-gray-900">{item.pct.toFixed(1)}%</span>
+                              </div>
+                              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                                 <div className={`h-full rounded-full bg-gradient-to-r ${barColor(item.pct)}`} style={{ width: `${item.pct}%` }} />
+                              </div>
+                              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                                 <span>RM {Math.round(item.ytd).toLocaleString()}</span>
+                                 <span>Shortage: RM {Math.round(Math.max(item.shortage, 0)).toLocaleString()}</span>
+                              </div>
+                           </div>
+                        ))}
+                     </div>
+                  )}
+               </div>
+            );
+         })()}
 
          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* MTD Bar Chart */}

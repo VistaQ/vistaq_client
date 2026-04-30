@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, CoachingSessionCreateBody, CoachingSessionUpdateBody, PointConfig, Group, DashboardStats, GroupStats } from '../types';
+import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, CoachingSessionCreateBody, CoachingSessionUpdateBody, PointConfig, Group, DashboardStats, GroupStats, SalesReport } from '../types';
 import { apiCall } from '../services/apiClient';
 import { toLocalISO } from '../utils/dateUtils';
 import { DEFAULT_POINT_CONFIG } from '../services/points';
@@ -50,6 +50,11 @@ interface DataContextType {
   joinCoachingSession: (sessionId: string) => Promise<void>;
   markNonAttendees: (sessionId: string) => Promise<void>;
   refetchCoachingSessions: () => Promise<void>;
+
+  // Sales Reports (ETL)
+  salesReports: SalesReport[];
+  isLoadingSalesReports: boolean;
+  refetchSalesReports: (year?: number) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -72,6 +77,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [groupStats, setGroupStats] = useState<GroupStats[]>([]);
   const [isLoadingDashboardStats, setIsLoadingDashboardStats] = useState(false);
+  const [salesReports, setSalesReports] = useState<SalesReport[]>([]);
+  const [isLoadingSalesReports, setIsLoadingSalesReports] = useState(false);
 
   const getCurrentUserId = (): string | null => {
     try {
@@ -162,6 +169,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (e) { console.error('[DataContext] fetchGroupStats:', e); }
   };
 
+  const fetchSalesReports = async (year = new Date().getFullYear()) => {
+    if (!localStorage.getItem('authToken')) { setSalesReports([]); return; }
+    setIsLoadingSalesReports(true);
+    try {
+      const res = await apiCall(`/sales-reports?year=${year}`);
+      setSalesReports(Array.isArray(res.data) ? res.data as SalesReport[] : []);
+    } catch (e) {
+      console.error('[DataContext] fetchSalesReports:', e);
+      setSalesReports([]);
+    } finally {
+      setIsLoadingSalesReports(false);
+    }
+  };
+
   // Track authentication state to trigger refetch on login
   const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('authToken'));
   const [userRole, setUserRole] = useState<string | null>(() => {
@@ -230,6 +251,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setDashboardStats(null);
       setGroupStats([]);
     }
+  }, [authToken]);
+
+  // 5. Clear sales reports on logout (fetch is triggered by SalesReport page on mount)
+  useEffect(() => {
+    if (!authToken) setSalesReports([]);
   }, [authToken]);
 
   const addProspect = async (data: Partial<Prospect>) => {
@@ -425,7 +451,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       coachingSessions, addCoachingSession, updateCoachingSession, deleteCoachingSession,
       joinCoachingSession, markNonAttendees, refetchCoachingSessions: fetchCoachingSessions,
       dashboardStats, groupStats, isLoadingDashboardStats,
-      refetchDashboardStats: fetchDashboardStats, refetchGroupStats: fetchGroupStats
+      refetchDashboardStats: fetchDashboardStats, refetchGroupStats: fetchGroupStats,
+      salesReports, isLoadingSalesReports, refetchSalesReports: fetchSalesReports
     }}>
       {children}
     </DataContext.Provider>

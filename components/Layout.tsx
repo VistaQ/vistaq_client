@@ -25,7 +25,8 @@ import {
   HelpCircle,
   FileText,
   BookOpen,
-  Trophy
+  Trophy,
+  BarChart2
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -122,6 +123,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <NavItem id="points" label="My Points" icon={Star} />
             </>
           )}
+
+          {/* Sales Report — visible to all roles */}
+          <NavItem id="sales-report" label="Sales Report" icon={BarChart2} />
 
           {/* Management Views for Admin, Master Trainer, Trainer & Leaders */}
           {isManagement && (
