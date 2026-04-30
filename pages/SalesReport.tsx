@@ -187,7 +187,8 @@ const SalesReportPage: React.FC = () => {
 
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [kpiTab, setKpiTab] = useState<'fyct' | 'fyc' | 'ace' | 'noc'>('fyct');
-  const [demoMode, setDemoMode] = useState(false);
+  // Default to demo — stays on until real ETL data is confirmed available
+  const [demoMode, setDemoMode] = useState(true);
   const [trendLines, setTrendLines] = useState<Record<string, boolean>>({
     Prospects: true, Appointments: false, 'Sales Meetings': false, Sales: true,
     FYCt: true, FYC: false, ACE: false, NOC: false,
@@ -197,6 +198,13 @@ const SalesReportPage: React.FC = () => {
 
   // Fetch on mount / year change
   useEffect(() => { refetchSalesReports(selectedYear); }, [selectedYear]);
+
+  // Auto-exit demo mode once real ETL data has loaded
+  useEffect(() => {
+    if (salesReports.length > 0 && !isLoadingSalesReports) {
+      setDemoMode(false);
+    }
+  }, [salesReports, isLoadingSalesReports]);
 
   if (!currentUser) return null;
 
