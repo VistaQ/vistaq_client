@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Calendar, Briefcase, CheckCircle2, X,
@@ -8,15 +8,6 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { UserRole, ProspectStage } from '../types';
 
-// ─── Show once per calendar day per user ─────────────────────────────────────
-
-const shouldShow = (userId: string): boolean => {
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const key = `vistaq_welcome_${userId}_${today}`;
-  if (localStorage.getItem(key)) return false;
-  localStorage.setItem(key, '1');
-  return true;
-};
 
 // ─── Greeting based on time of day ───────────────────────────────────────────
 
@@ -47,17 +38,12 @@ const WelcomeModal: React.FC = () => {
   const { currentUser } = useAuth();
   const { prospects, getProspectsByScope, salesReports, dashboardStats } = useData();
 
-  const [visible, setVisible] = useState(false);
+  // Show on every login for Agent and Group Leader
+  const isTargetRole =
+    currentUser?.role === UserRole.AGENT ||
+    currentUser?.role === UserRole.GROUP_LEADER;
 
-  // Show once per day for Agent and Group Leader only
-  useEffect(() => {
-    if (!currentUser) return;
-    const isTargetRole =
-      currentUser.role === UserRole.AGENT ||
-      currentUser.role === UserRole.GROUP_LEADER;
-    if (!isTargetRole) return;
-    if (shouldShow(currentUser.id)) setVisible(true);
-  }, [currentUser?.id]);
+  const [visible, setVisible] = useState(isTargetRole);
 
   const myProspects = useMemo(() => {
     if (!currentUser) return [];
