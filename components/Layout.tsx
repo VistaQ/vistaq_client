@@ -132,6 +132,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <>
               <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Group</div>
               <NavItem id="group" label="Group Progress" icon={TrendingUp} />
+              <NavItem id="group-sales-report" label="Group Sales Report" icon={BarChart2} />
             </>
           )}
 
@@ -237,6 +238,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <>
                     <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Group</div>
                     <NavItem id="group" label="Group Progress" icon={TrendingUp} />
+                    <NavItem id="group-sales-report" label="Group Sales Report" icon={BarChart2} />
                   </>
                 )}
 

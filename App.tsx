@@ -36,6 +36,7 @@ const Coaching = React.lazy(() => import('./pages/Coaching'));
 const AddToHomeScreen = React.lazy(() => import('./pages/AddToHomeScreen'));
 const EventPublicPage = React.lazy(() => import('./pages/EventPublicPage'));
 const SalesReport = React.lazy(() => import('./pages/SalesReport'));
+const GroupSalesReport = React.lazy(() => import('./pages/GroupSalesReport'));
 
 const PageSpinner: React.FC = () => (
   <div className="flex h-full min-h-[60vh] items-center justify-center">
@@ -85,6 +86,7 @@ const App: React.FC = () => {
                       <Route path="sales" element={<Sales />} />
                       <Route path="points" element={<PointsHistory />} />
                       <Route path="group" element={<Group />} />
+                      <Route path="group-sales-report" element={<GroupSalesReport />} />
                       <Route path="sales-report" element={<SalesReport />} />
                       <Route path="reports" element={<Reports />} />
                       <Route path="import" element={<Import />} />
