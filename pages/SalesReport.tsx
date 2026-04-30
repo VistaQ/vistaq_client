@@ -116,24 +116,24 @@ const SECTIONS = [
 const SectionCard: React.FC<{ id: string; title: string; subtitle?: string; children: React.ReactNode }> = ({
   id, title, subtitle, children
 }) => (
-  <div id={id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-start justify-between">
+  <div id={id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="px-8 py-5 border-b border-gray-100 bg-gray-50/50 flex items-start justify-between">
       <div>
-        <h2 className="text-base font-bold text-gray-900">{title}</h2>
-        {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
+        <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+        {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
       </div>
     </div>
-    <div className="p-6">{children}</div>
+    <div className="p-8">{children}</div>
   </div>
 );
 
 const MiniTable: React.FC<{ headers: string[]; rows: (string | number | React.ReactNode)[][] }> = ({ headers, rows }) => (
   <div className="overflow-x-auto">
-    <table className="w-full text-sm">
+    <table className="w-full">
       <thead>
         <tr className="border-b border-gray-100">
           {headers.map((h, i) => (
-            <th key={i} className={`py-2 px-3 text-xs font-bold text-gray-400 uppercase tracking-wider ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
+            <th key={i} className={`px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
           ))}
         </tr>
       </thead>
@@ -141,7 +141,7 @@ const MiniTable: React.FC<{ headers: string[]; rows: (string | number | React.Re
         {rows.map((row, ri) => (
           <tr key={ri} className="hover:bg-gray-50/50">
             {row.map((cell, ci) => (
-              <td key={ci} className={`py-2.5 px-3 ${ci === 0 ? 'font-medium text-gray-800' : 'text-right text-gray-700 font-mono text-xs'}`}>
+              <td key={ci} className={`px-6 py-3 text-sm ${ci === 0 ? 'font-medium text-gray-800' : 'text-right text-gray-700'}`}>
                 {cell}
               </td>
             ))}
@@ -156,17 +156,17 @@ const MdrtBar: React.FC<{ label: string; value: number; target: number; shortage
   label, value, target, shortage
 }) => {
   const pctVal = Math.min((value / target) * 100, 100);
-  const color = pctVal < 25 ? 'from-red-500 to-red-400' : pctVal < 75 ? 'from-amber-500 to-amber-400' : 'from-green-500 to-green-400';
+  const color = pctVal < 25 ? 'bg-red-500' : pctVal < 75 ? 'bg-amber-500' : 'bg-green-500';
   return (
-    <div className="mb-4">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-sm font-semibold text-gray-700">{label}</span>
-        <span className="text-sm font-bold text-gray-900">{pctVal.toFixed(1)}%</span>
+    <div className="mb-5">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-base font-semibold text-gray-700">{label}</span>
+        <span className="text-base font-bold text-gray-900">{pctVal.toFixed(1)}%</span>
       </div>
-      <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full bg-gradient-to-r ${color} transition-all duration-700`} style={{ width: `${pctVal}%` }} />
+      <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
+        <div className={`h-4 rounded-full ${color} transition-all duration-700 shadow-sm`} style={{ width: `${pctVal}%` }} />
       </div>
-      <div className="flex justify-between mt-1 text-xs text-gray-500">
+      <div className="flex justify-between mt-1.5 text-sm text-gray-500">
         <span>{rm(value)} of {rm(target)}</span>
         <span>Shortage: {rm(Math.max(shortage, 0))}</span>
       </div>
@@ -421,7 +421,7 @@ const SalesReportPage: React.FC = () => {
   // ─── render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-8 pb-12">
 
       {/* ── Page header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -475,12 +475,12 @@ const SalesReportPage: React.FC = () => {
       </div>
 
       {/* ── Section nav ── */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border border-gray-100 rounded-2xl shadow-sm px-4 py-2.5 flex gap-1 overflow-x-auto">
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border border-gray-100 rounded-xl shadow-sm px-4 py-3 flex gap-1 overflow-x-auto">
         {SECTIONS.map(s => (
           <button
             key={s.id}
             onClick={() => scrollTo(s.id)}
-            className="flex-shrink-0 text-sm font-medium px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            className="flex-shrink-0 text-sm font-semibold px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
           >
             {s.label}
           </button>
@@ -533,12 +533,33 @@ const SalesReportPage: React.FC = () => {
             </div>
           ) : (
             <>
+              {/* YTD summary stat cards */}
+              {myReport && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  {[
+                    { label: 'FYCt YTD', value: rm(myReport.fyct_ytd), sub: `${myReport.fyct_pct.toFixed(1)}% of target`, color: 'text-blue-600', bg: 'bg-blue-50', icon: <TrendingUp className="w-5 h-5 text-blue-600" /> },
+                    { label: 'FYC YTD', value: rm(myReport.fyc_ytd), sub: `${myReport.fyc_pct.toFixed(1)}% of target`, color: 'text-indigo-600', bg: 'bg-indigo-50', icon: <Award className="w-5 h-5 text-indigo-600" /> },
+                    { label: 'ACE YTD', value: rm(myReport.ace_ytd), sub: 'Annualised contribution', color: 'text-emerald-600', bg: 'bg-emerald-50', icon: <Target className="w-5 h-5 text-emerald-600" /> },
+                    { label: 'NOC YTD', value: String(myReport.noc_ytd), sub: 'Number of cases', color: 'text-purple-600', bg: 'bg-purple-50', icon: <Users className="w-5 h-5 text-purple-600" /> },
+                  ].map(card => (
+                    <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
+                      <div className="flex items-center mb-3">
+                        <div className={`p-2 ${card.bg} rounded-lg mr-3`}>{card.icon}</div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase">{card.label}</p>
+                      </div>
+                      <p className={`text-2xl font-bold text-gray-900`}>{card.value}</p>
+                      <p className="text-xs text-gray-400 mt-1">{card.sub}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* MDRT progress bars */}
               {myReport && (
-                <div className="mb-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl">
+                <div className="mb-6 p-6 bg-gray-50 rounded-xl border border-gray-100">
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-bold text-blue-800 uppercase tracking-wide">MDRT Progress</span>
-                    <span className="text-xs text-blue-600 font-medium">{monthsLeft} months remaining</span>
+                    <span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">MDRT Progress · RM 400,000 target</span>
+                    <span className="text-sm text-blue-600 font-medium">{monthsLeft} months remaining</span>
                   </div>
                   <MdrtBar
                     label="FYC"
@@ -623,8 +644,8 @@ const SalesReportPage: React.FC = () => {
               />
 
               {/* Monthly trend chart */}
-              <div className="mt-6">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Monthly Trend</p>
+              <div className="mt-8">
+                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Monthly Trend</p>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={trendData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -669,7 +690,7 @@ const SalesReportPage: React.FC = () => {
           subtitle="Conversion rates and pipeline timing"
         >
           {/* Efficiency table */}
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Conversion Rates</p>
+          <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Conversion Rates</p>
           <MiniTable
             headers={['Metric', 'MTD', 'YTD', 'Per Month']}
             rows={[
@@ -680,10 +701,10 @@ const SalesReportPage: React.FC = () => {
           />
 
           {/* Prospect aging */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Prospect Aging</p>
-              <p className="text-xs text-gray-500 mb-3">Days from prospect creation → appointment date</p>
+              <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Prospect Aging</p>
+              <p className="text-sm text-gray-400 mb-4">Days from prospect creation → appointment date</p>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={AGING_BUCKETS.map(b => ({ name: b, count: prospectAgingCounts[b] }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -695,8 +716,8 @@ const SalesReportPage: React.FC = () => {
               </ResponsiveContainer>
             </div>
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Meeting Aging</p>
-              <p className="text-xs text-gray-500 mb-3">Days from appointment → sales completion</p>
+              <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Meeting Aging</p>
+              <p className="text-sm text-gray-400 mb-4">Days from appointment → sales completion</p>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={AGING_BUCKETS.map(b => ({ name: b, count: meetingAgingCounts[b] }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -724,32 +745,32 @@ const SalesReportPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               {/* Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-100">
-                      <th className="py-2 px-3 text-xs font-bold text-gray-400 uppercase text-left">Product</th>
-                      <th className="py-2 px-3 text-xs font-bold text-gray-400 uppercase text-right">Cases</th>
-                      <th className="py-2 px-3 text-xs font-bold text-gray-400 uppercase text-right">% (No.)</th>
-                      <th className="py-2 px-3 text-xs font-bold text-gray-400 uppercase text-right">Total ACE</th>
-                      <th className="py-2 px-3 text-xs font-bold text-gray-400 uppercase text-right">% (ACE)</th>
+                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Product</th>
+                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Cases</th>
+                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">% (No.)</th>
+                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Total ACE</th>
+                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">% (ACE)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {productRows.map((r, idx) => (
                       <tr key={idx} className="hover:bg-gray-50/50">
-                        <td className="py-2.5 px-3 font-medium text-gray-800">{r.name}</td>
-                        <td className="py-2.5 px-3 text-right font-mono text-xs text-gray-700">{r.count}</td>
-                        <td className="py-2.5 px-3 text-right font-mono text-xs text-gray-700">{totalProdCount > 0 ? pct(r.count / totalProdCount) : '—'}</td>
-                        <td className="py-2.5 px-3 text-right font-mono text-xs text-gray-700">{rm(r.ace)}</td>
-                        <td className="py-2.5 px-3 text-right font-mono text-xs text-gray-700">{totalProdACE > 0 ? pct(r.ace / totalProdACE) : '—'}</td>
+                        <td className="px-6 py-3 text-sm font-medium text-gray-800">{r.name}</td>
+                        <td className="px-6 py-3 text-sm text-right text-gray-700">{r.count}</td>
+                        <td className="px-6 py-3 text-sm text-right text-gray-700">{totalProdCount > 0 ? pct(r.count / totalProdCount) : '—'}</td>
+                        <td className="px-6 py-3 text-sm text-right text-gray-700">{rm(r.ace)}</td>
+                        <td className="px-6 py-3 text-sm text-right text-gray-700">{totalProdACE > 0 ? pct(r.ace / totalProdACE) : '—'}</td>
                       </tr>
                     ))}
                     <tr className="border-t-2 border-gray-200 font-bold bg-gray-50">
-                      <td className="py-2.5 px-3 text-gray-900 text-sm">Total</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-xs text-gray-900">{totalProdCount}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-xs text-gray-900">100%</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-xs text-gray-900">{rm(totalProdACE)}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-xs text-gray-900">100%</td>
+                      <td className="px-6 py-3 text-sm font-bold text-gray-900">Total</td>
+                      <td className="px-6 py-3 text-sm font-bold text-right text-gray-900">{totalProdCount}</td>
+                      <td className="px-6 py-3 text-sm font-bold text-right text-gray-900">100%</td>
+                      <td className="px-6 py-3 text-sm font-bold text-right text-gray-900">{rm(totalProdACE)}</td>
+                      <td className="px-6 py-3 text-sm font-bold text-right text-gray-900">100%</td>
                     </tr>
                   </tbody>
                 </table>
