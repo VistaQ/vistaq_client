@@ -1,14 +1,12 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, CoachingSessionCreateBody, CoachingSessionUpdateBody, PointConfig, Group, DashboardStats, GroupStats, SalesReport } from '../types';
+import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, CoachingSessionCreateBody, CoachingSessionUpdateBody, Group, DashboardStats, GroupStats, SalesReport } from '../types';
 import { apiCall } from '../services/apiClient';
 import { toLocalISO } from '../utils/dateUtils';
-import { DEFAULT_POINT_CONFIG } from '../services/points';
 
 interface DataContextType {
   prospects: Prospect[];
   badgeTiers: BadgeTier[];
-  pointConfig: PointConfig;
   events: Event[];
   addProspect: (p: Partial<Prospect>) => Promise<Prospect>;
   updateProspect: (id: string, updates: Partial<Prospect>) => Promise<void>;
@@ -17,7 +15,6 @@ interface DataContextType {
   getGroupProspects: (groupId: string) => Prospect[];
   deleteProspect: (id: string) => Promise<void>;
   updateBadgeTiers: (tiers: BadgeTier[]) => Promise<void>;
-  updatePointConfig: (cfg: PointConfig) => Promise<void>;
 
   // Event Methods
   addEvent: (evt: Partial<Event>) => Promise<void>;
@@ -69,7 +66,6 @@ const DEFAULT_MILESTONES: BadgeTier[] = DEFAULT_BADGE_TIERS;
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [badgeTiers, setBadgeTiers] = useState<BadgeTier[]>(DEFAULT_MILESTONES);
-  const [pointConfig, setPointConfig] = useState<PointConfig>(DEFAULT_POINT_CONFIG);
   const [events, setEvents] = useState<Event[]>([]);
   const [coachingSessions, setCoachingSessions] = useState<CoachingSession[]>([]);
   const [isLoadingProspects, setIsLoadingProspects] = useState(false);
@@ -246,15 +242,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [authToken, userRole]);
 
-  // 1. Sync Prospects + config when authenticated or user role changes, clear on logout
+  // 1. Sync Prospects when authenticated or user role changes, clear on logout
   useEffect(() => {
     if (authToken) {
       fetchProspects();
-      fetchPointConfig();
     } else {
-      // Clear data on logout
       setProspects([]);
-      setPointConfig(DEFAULT_POINT_CONFIG);
     }
   }, [authToken]);
 
@@ -351,22 +344,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const updateBadgeTiers = async (tiers: BadgeTier[]) => {
     await apiCall('/config/badges', { method: 'PUT', data: { tiers } });
     setBadgeTiers(tiers);
-  };
-
-  const fetchPointConfig = async () => {
-    try {
-      const data = await apiCall('/config/points');
-      if (data && typeof data === 'object') {
-        setPointConfig({ ...DEFAULT_POINT_CONFIG, ...data });
-      }
-    } catch (_e) {
-      // Use defaults if endpoint not available yet
-    }
-  };
-
-  const updatePointConfig = async (cfg: PointConfig) => {
-    await apiCall('/config/points', { method: 'PUT', data: cfg });
-    setPointConfig(cfg);
   };
 
   // --- SCOPING HELPER ---
@@ -468,11 +445,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <DataContext.Provider value={{
-      prospects, badgeTiers, pointConfig, events,
+      prospects, badgeTiers, events,
       isLoadingProspects, isLoadingEvents, isLoadingCoaching,
       eventsError, coachingError,
       addProspect, updateProspect, importProspects, deleteProspect,
-      getProspectsByScope, getGroupProspects, updateBadgeTiers, updatePointConfig,
+      getProspectsByScope, getGroupProspects, updateBadgeTiers,
       addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents,
       coachingSessions, addCoachingSession, updateCoachingSession, deleteCoachingSession,
       joinCoachingSession, markNonAttendees, refetchCoachingSessions: fetchCoachingSessions,
