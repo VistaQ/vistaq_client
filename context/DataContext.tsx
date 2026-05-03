@@ -55,6 +55,9 @@ interface DataContextType {
   salesReports: SalesReport[];
   isLoadingSalesReports: boolean;
   refetchSalesReports: (year?: number) => Promise<void>;
+  mySalesReport: SalesReport | null;
+  isLoadingMySalesReport: boolean;
+  refetchMySalesReport: (year?: number) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -79,6 +82,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoadingDashboardStats, setIsLoadingDashboardStats] = useState(false);
   const [salesReports, setSalesReports] = useState<SalesReport[]>([]);
   const [isLoadingSalesReports, setIsLoadingSalesReports] = useState(false);
+  const [mySalesReport, setMySalesReport] = useState<SalesReport | null>(null);
+  const [isLoadingMySalesReport, setIsLoadingMySalesReport] = useState(false);
 
   const getCurrentUserId = (): string | null => {
     try {
@@ -183,6 +188,24 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const fetchMySalesReport = async (year = new Date().getFullYear()) => {
+    if (!localStorage.getItem('authToken')) { setMySalesReport(null); return; }
+    setIsLoadingMySalesReport(true);
+    try {
+      const res = await apiCall(`/sales-reports/me?year=${year}`);
+      setMySalesReport((res.data as SalesReport) ?? null);
+    } catch (e: any) {
+      // 404 = "No sales report for this year" → render as empty, not an error
+      if (e?.status === 404) setMySalesReport(null);
+      else {
+        console.error('[DataContext] fetchMySalesReport:', e);
+        setMySalesReport(null);
+      }
+    } finally {
+      setIsLoadingMySalesReport(false);
+    }
+  };
+
   // Track authentication state to trigger refetch on login
   const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('authToken'));
   const [userRole, setUserRole] = useState<string | null>(() => {
@@ -255,7 +278,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // 5. Clear sales reports on logout (fetch is triggered by SalesReport page on mount)
   useEffect(() => {
-    if (!authToken) setSalesReports([]);
+    if (!authToken) {
+      setSalesReports([]);
+      setMySalesReport(null);
+    }
   }, [authToken]);
 
   const addProspect = async (data: Partial<Prospect>) => {
@@ -452,7 +478,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       joinCoachingSession, markNonAttendees, refetchCoachingSessions: fetchCoachingSessions,
       dashboardStats, groupStats, isLoadingDashboardStats,
       refetchDashboardStats: fetchDashboardStats, refetchGroupStats: fetchGroupStats,
-      salesReports, isLoadingSalesReports, refetchSalesReports: fetchSalesReports
+      salesReports, isLoadingSalesReports, refetchSalesReports: fetchSalesReports,
+      mySalesReport, isLoadingMySalesReport, refetchMySalesReport: fetchMySalesReport
     }}>
       {children}
     </DataContext.Provider>

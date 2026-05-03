@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { Prospect, ProspectStage, SalesImportRecord, UserRole } from '../types';
+import { Prospect, ProspectStage, UploadAuditEntry, UserRole } from '../types';
 import { Upload, FileText, CheckCircle, AlertCircle, FileSpreadsheet, Loader2, Clock, User, BarChart2, ChevronDown } from 'lucide-react';
 import { parseCSV } from '../utils/exportUtils';
 import { apiCall } from '../services/apiClient';
@@ -99,13 +99,13 @@ const Import: React.FC = () => {
   const [etlUploading, setEtlUploading] = useState(false);
   const [etlResult, setEtlResult] = useState<{ imported: number; skipped: number; errors: { source_row?: number; agent_code: string; issue: string; action?: string }[] } | null>(null);
   const [etlError, setEtlError] = useState<string | null>(null);
-  const [uploadHistory, setUploadHistory] = useState<SalesImportRecord[]>([]);
+  const [uploadHistory, setUploadHistory] = useState<UploadAuditEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const fetchHistory = async () => {
     setHistoryLoading(true);
     try {
-      const res = await apiCall('/etl/uploads');
+      const res = await apiCall(`/sales-reports/uploads?year=${etlYear}&page=1&pageSize=50`);
       setUploadHistory(Array.isArray(res.data) ? res.data : []);
     } catch (_) {
       setUploadHistory([]);
@@ -116,7 +116,7 @@ const Import: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'sales-report' && isAdmin) fetchHistory();
-  }, [activeTab]);
+  }, [activeTab, etlYear]);
 
   const handleEtlUpload = async () => {
     if (!etlFile) return;
@@ -387,10 +387,10 @@ const Import: React.FC = () => {
                       <tr key={record.id} className="hover:bg-gray-50/50">
                         <td className="py-3 px-4 text-gray-600">{new Date(record.imported_at).toLocaleDateString()}</td>
                         <td className="py-3 px-4 text-gray-700 font-medium">{MONTH_NAMES[record.month - 1]} {record.year}</td>
-                        <td className="py-3 px-4 text-right text-gray-700">{record.rows_imported}</td>
+                        <td className="py-3 px-4 text-right text-gray-700">{record.rows_loaded}</td>
                         <td className="py-3 px-4 text-right text-gray-500">{record.rows_skipped}</td>
                         <td className="py-3 px-4 text-gray-600 flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-gray-400" />{record.imported_by_name}
+                          <User className="w-3.5 h-3.5 text-gray-400" />{record.uploader_name ?? <span className="text-gray-400 italic">manual ingest</span>}
                         </td>
                         <td className="py-3 px-4 text-center">
                           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${

@@ -3980,6 +3980,774 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingest a sales report ETL result
+         * @description Persists a pre-shaped ETL result produced by the upstream ETL pipeline. Creates a row in `upload_batches` for audit, then bulk-upserts a YTD snapshot for the report month and MTD ACE/NOC rows for every month present in `rowData`. Re-uploading the same `(tenant_id, year, month)` is last-writer-wins on YTD/MTD; both batch rows are retained. Manager-only (`group_leader`, `master_trainer`, or `admin`). `tenant_id` and `uploaded_by` are derived from the JWT and are not accepted from the request body.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UploadReportRequest"];
+                };
+            };
+            responses: {
+                /** @description Upload completed. Partial success is allowed: rows that failed validation or whose `agentCode` did not resolve to a user are reported in the `errors` array, while the rest are persisted. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UploadReportResponse"];
+                    };
+                };
+                /** @description Validation failed (Zod schema mismatch or invalid ETL data). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Missing or invalid bearer token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Caller is not a manager. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Non-consecutive month upload (e.g. month 4 when latest is month 2). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Manual ETL ingest (interim — INTERNAL_API_KEY auth, NOT user JWT)
+         * @description Manual-mode endpoint used while the production HTTP-hosted ETL is being built. The ETL author runs the local Python pipeline on their laptop and POSTs the resulting `etl_result` here directly. Skips the `report_jobs` lifecycle and Storage round-trip entirely; just persists the same audit + YTD/MTD rows that `/reports/upload` does.
+         *     Authenticated with `Authorization: Bearer <INTERNAL_API_KEY>` (the same shared secret the ETL uses for `/reports/jobs/{reference}/complete`). Because there is no JWT, `tenant_id` is supplied in the request body and `uploaded_by` is intentionally recorded as NULL. The consecutive-month guard (409) is inherited from the shared service layer.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["IngestReportRequest"];
+                };
+            };
+            responses: {
+                /** @description Upload completed. Partial success is allowed: rows whose `agentCode` did not resolve to a user are reported in `errors`. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UploadReportResponse"];
+                    };
+                };
+                /** @description Validation failed (Zod schema mismatch or invalid ETL data). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Missing or wrong internal key. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Non-consecutive month upload (e.g. month 4 when latest is month 2). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Per-agent year rollup for the tenant (role-scoped)
+         * @description Returns one `SalesReport` per agent for the given year. Each entry combines the agent's latest YTD snapshot with monthly arrays for ACE/NOC (from `sales_report_mtd`) and FYC/FYCt (from the `sales_report_mtd_fyc` view, which derives MTD values from YTD via `LAG()`). Tenant-scoped from the JWT.
+         *     The response is additionally filtered to the caller's permitted scope:
+         *     * `admin`, `master_trainer` — see all agents in the tenant. * `trainer` — see only agents whose `users.group_id` is in the set of
+         *       groups the trainer manages via `group_trainers`. A trainer with
+         *       zero managed groups receives an empty array (200, not 403).
+         *     * `group_leader` — see only agents whose `users.group_id` matches the
+         *       caller's own `users.group_id`. A group_leader with no `group_id`
+         *       receives an empty array.
+         *     * `agent` — receives 403.
+         */
+        get: {
+            parameters: {
+                query: {
+                    year: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Array of per-agent year rollups for the tenant. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SalesReportListResponse"];
+                    };
+                };
+                /** @description Invalid query parameter. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Missing or invalid bearer token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Caller's role is not entitled to this endpoint (e.g. agent). */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-reports/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Caller's own year rollup
+         * @description Returns the calling user's `SalesReport` for the given year. Available to any authenticated user — no role gate. Returns 404 when the user has no YTD row for that year (e.g. they were not part of any upload yet).
+         */
+        get: {
+            parameters: {
+                query: {
+                    year: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The caller's per-agent year rollup. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SalesReportSingleResponse"];
+                    };
+                };
+                /** @description Invalid query parameter. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Missing or invalid bearer token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No sales report exists for the calling user in that year. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "No sales report for this year"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales-reports/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Paginated audit list of past uploads
+         * @description Returns past `upload_batches` rows for the tenant, sorted most-recent first. Each row reports its `rows_loaded`, `rows_skipped`, derived `status` (`success` | `partial` | `failed`), and the uploader's display name. `uploader_name` is `null` for manual-mode uploads (POST `/api/reports/ingest`) where there is no JWT to attribute.
+         *     Available to any of the four manager-tier roles (`admin`, `master_trainer`, `trainer`, `group_leader`) — the audit list is tenant-wide because uploads are not group-bound (every xlsx covers the whole tenant). `agent` receives 403.
+         *     NOTE: Failed uploads that never created an `upload_batches` row (e.g. validation rejected the payload before persistence) do not appear in this list. They are visible only in error logs and `report_jobs` (async path only).
+         */
+        get: {
+            parameters: {
+                query: {
+                    year: number;
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Paginated audit entries with `meta` for pagination state. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["UploadAuditListResponse"];
+                    };
+                };
+                /** @description Invalid query parameter. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Missing or invalid bearer token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Caller is not a manager. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an async report-upload job
+         * @description Accepts a raw xlsx file, stores it in Supabase Storage, creates a `report_jobs` row, and kicks off the external ETL service. Returns immediately with a human-readable `reference` identifier (`SALES-REPORT-YYYYMMDDHHMMSSsss`). Manager-only.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /**
+                         * Format: binary
+                         * @description The raw .xlsx file
+                         */
+                        file: string;
+                        reportYear: number;
+                        reportMonth: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Job accepted; processing asynchronously */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            data?: {
+                                /** @example SALES-REPORT-20260502143022873 */
+                                reference?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Missing file */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or invalid bearer token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not a manager */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Non-consecutive month upload (e.g. month 4 when latest is month 2). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/jobs/{reference}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Poll the status of a report-upload job */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @example SALES-REPORT-20260502143022873 */
+                    reference: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Job state */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReportJobResponse"];
+                    };
+                };
+                /** @description Missing or invalid bearer token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Job belongs to another tenant or caller is not a manager */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Job not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/jobs/{reference}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * ETL callback (internal-key auth, NOT user JWT)
+         * @description Called by the Python ETL service when processing finishes. Authenticated with `Authorization: Bearer <INTERNAL_API_KEY>`. Triggers persistence on success or marks the job failed on error.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @example SALES-REPORT-20260502143022873 */
+                    reference: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["EtlCallbackBody"];
+                };
+            };
+            responses: {
+                /** @description Callback accepted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Missing or wrong internal key */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Job not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/jobs/{reference}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry a failed report job
+         * @description Re-kicks the ETL using the file already in Storage. Only allowed when the job is in `failed` status. Manager-only, tenant-scoped.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @example SALES-REPORT-20260502143022873 */
+                    reference: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Retry kicked off */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            data?: {
+                                reference?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Missing or invalid bearer token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not a manager or job belongs to another tenant */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Job not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Job is not in failed status */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/cleanup-old-report-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retention cleanup for raw report files (INTERNAL_API_KEY auth)
+         * @description Deletes raw xlsx files in the `reports-raw` Storage bucket attached to completed `report_jobs` whose `created_at` is older than 30 days, then clears the `report_jobs.storage_path` for those rows so the same files are not re-queued on subsequent runs. The audit row itself is retained.
+         *     Authenticated with `Authorization: Bearer <INTERNAL_API_KEY>`. Designed to be invoked by an external scheduler (Vercel Cron, GitHub Actions, etc.) once per day. Replaces an earlier pg_cron-based approach which deleted only `storage.objects` metadata rows and orphaned the file bytes — this endpoint goes through the Storage HTTP admin API which actually removes the backing bytes.
+         *     The endpoint never throws on per-chunk failures. `failedCount > 0` indicates a partial failure and the next run will retry the affected files (they retain their `storage_path`).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cleanup completed (possibly with per-chunk failures, see response). */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            data?: {
+                                /** @description Number of report-job files successfully removed from Storage. */
+                                deletedCount?: number;
+                                /** @description Number of report-job files that failed to remove and remain queued for the next run. */
+                                failedCount?: number;
+                            };
+                        };
+                    };
+                };
+                /** @description Missing or wrong internal key */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Internal server error (unexpected — per-chunk failures are reported in the 200 body, not surfaced as 500). */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4835,6 +5603,289 @@ export interface components {
             message: string;
             /** @example [] */
             errors: Record<string, never>[];
+        };
+        /** @description ETL pipeline output as produced by the upstream `dynamic_excel_etl` template — the raw artifact, untouched by the caller. The intent metadata `report_year` / `report_month` lives one level up on the request body, not inside this object. Extra top-level fields (`success`, `etl_version`, `template_name`, `upload_id`, `output_excel`, `json_output`, `log_file`, `errors_found`, `columns_detected`, `layout_detected`, `errors`) are accepted and ignored. */
+        EtlResultObject: {
+            /**
+             * @description Filename or identifier of the original report.
+             * @example tests/samples/Book2_ytd_and_months_uploaded.xlsx
+             */
+            source: string;
+            /**
+             * Format: date-time
+             * @description Timestamp the ETL pipeline produced this result. Informational only — not used to derive year/month.
+             * @example 2026-04-29T16:01:33.114596+00:00
+             */
+            created_at: string;
+            /**
+             * @description Number of rows the ETL pipeline read from the source.
+             * @example 67
+             */
+            rows_loaded: number;
+            /** @description Uppercase English month names whose ACE/NOC columns are present in the source. Informational only — used by the FE for column-coverage display, not by the backend to derive the report month. */
+            months_detected: ("JANUARY" | "FEBRUARY" | "MARCH" | "APRIL" | "MAY" | "JUNE" | "JULY" | "AUGUST" | "SEPTEMBER" | "OCTOBER" | "NOVEMBER" | "DECEMBER")[];
+            records: {
+                /**
+                 * @description The agent code from the source row; resolved server-side to a `users.id`.
+                 * @example T66701C
+                 */
+                agentCode: string;
+                /** @description Open-ended bag of column-name → value pairs. Recognised numeric keys include the YTD totals (`'ACE (YTD)'`, `'NOC (YTD)'`, `'FYCT (YTD)'`, `'% FYCT (YTD)'`, `'MDRT SHORTAGE FYCT'`, `'FYC (YTD)'`, `'% FYC (YTD)'`, `'MDRT SHORTAGE FYC'`) and per-month MTD pairs (`'JANUARY ACE'`, `'JANUARY NOC'`, etc.). String keys like `'AGENT CODE'` and `'AGENT NAME'` (which the ETL may include as duplicates of the outer fields) are accepted and ignored. Missing or non-numeric values default to 0. */
+                rowData: {
+                    [key: string]: unknown;
+                };
+            }[];
+        };
+        /** @description Sync upload body. `report_year` / `report_month` are caller-supplied intent metadata that sit alongside the raw ETL artifact rather than inside it. */
+        UploadReportRequest: {
+            /**
+             * @description Calendar year the report covers. Authoritative — supplied by the caller, not derived from the file.
+             * @example 2026
+             */
+            report_year: number;
+            /**
+             * @description Calendar month (1-12) the report covers. Authoritative — supplied by the caller, not derived from the file.
+             * @example 5
+             */
+            report_month: number;
+            etlResult: components["schemas"]["EtlResultObject"];
+        };
+        /** @description Manual-mode ingest body. Field names use snake_case to mirror the ETL JSON style (the ETL author POSTs this directly from a Python `requests.post(...)` call). `report_year` / `report_month` are siblings of `etl_result` — admin tells the ETL author what month the file covers out-of-band; the ETL itself is unaware of them. */
+        IngestReportRequest: {
+            /**
+             * Format: uuid
+             * @description Tenant the records belong to. Supplied to the ETL author by an admin out-of-band (Slack/email) — there is no JWT to derive it from in manual mode.
+             * @example 00000000-0000-0000-0000-000000000001
+             */
+            tenant_id: string;
+            /**
+             * @description Calendar year the report covers. Authoritative — supplied by the caller, not derived from the file.
+             * @example 2026
+             */
+            report_year: number;
+            /**
+             * @description Calendar month (1-12) the report covers. Authoritative — supplied by the caller, not derived from the file.
+             * @example 5
+             */
+            report_month: number;
+            etl_result: components["schemas"]["EtlResultObject"];
+        };
+        UploadReportResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /**
+                 * Format: uuid
+                 * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                 */
+                batchId: string;
+                /**
+                 * @description Count of agent rows that were successfully persisted.
+                 * @example 63
+                 */
+                processed: number;
+                /**
+                 * @description Count of agent rows that were skipped (e.g. unmatched agentCode).
+                 * @example 2
+                 */
+                skipped: number;
+                errors: {
+                    /** @example T12345A */
+                    agentCode: string;
+                    /** @example User not found */
+                    reason: string;
+                }[];
+            };
+        };
+        /** @description Per-agent annual sales-report rollup. Combines the latest YTD snapshot of the year with monthly arrays. `id` is the `sales_report_ytd.id` of the latest month for that agent. `agent_id` is the public `users.id`. `imported_at` is the most recent time this YTD snapshot was written or overwritten — corrective re-uploads of the same (tenant, user, year, month) advance this without changing `created_at`. The four `month_*` arrays are 12-element, index 0 = January, index 11 = December; missing months are 0. */
+        SalesReport: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            agent_id: string;
+            /** @example T75040K */
+            agent_code: string;
+            /** @example MELISSA ADLINA */
+            agent_name: string;
+            /** @example 2026 */
+            year: number;
+            /**
+             * Format: date-time
+             * @description Most recent time this YTD snapshot was written or overwritten. Sourced from `sales_report_ytd.updated_at`; advances on every corrective re-upload while `created_at` stays fixed.
+             * @example 2026-04-29T16:01:33.000Z
+             */
+            imported_at: string;
+            /** @example 620000 */
+            ace_ytd: number;
+            /** @example 18 */
+            noc_ytd: number;
+            /** @example 295000 */
+            fyct_ytd: number;
+            /** @example 0.0132 */
+            fyct_pct: number;
+            /** @example 393112.13 */
+            mdrt_shortage_fyct: number;
+            /** @example 1222.11 */
+            fyc_ytd: number;
+            /** @example 0.0092 */
+            fyc_pct: number;
+            /** @example 131577.89 */
+            mdrt_shortage_fyc: number;
+            /**
+             * @example [
+             *       0,
+             *       0,
+             *       9118.64,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0
+             *     ]
+             */
+            month_ace: number[];
+            /**
+             * @example [
+             *       0,
+             *       0,
+             *       7,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0
+             *     ]
+             */
+            month_noc: number[];
+            /**
+             * @example [
+             *       0,
+             *       0,
+             *       5287.87,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0
+             *     ]
+             */
+            month_fyct: number[];
+            /**
+             * @example [
+             *       0,
+             *       0,
+             *       1222.11,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0,
+             *       0
+             *     ]
+             */
+            month_fyc: number[];
+        };
+        SalesReportListResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["SalesReport"][];
+        };
+        SalesReportSingleResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["SalesReport"];
+        };
+        /** @description Audit row for a past upload batch. `imported_at` maps from `upload_batches.created_at`. `uploader_name` is null when the upload was manual-mode (no JWT). */
+        UploadAuditEntry: {
+            /** Format: uuid */
+            id: string;
+            /** @example 2026 */
+            year: number;
+            /** @example 3 */
+            month: number;
+            /** @example input.xlsx */
+            file_name: string;
+            /** @example 65 */
+            rows_loaded: number;
+            /** @example 2 */
+            rows_skipped: number;
+            /**
+             * @example partial
+             * @enum {string}
+             */
+            status: "success" | "partial" | "failed";
+            /** @example Jane Doe */
+            uploader_name: string | null;
+            /**
+             * Format: date-time
+             * @example 2026-04-29T16:01:33.000Z
+             */
+            imported_at: string;
+        };
+        UploadAuditListResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["UploadAuditEntry"][];
+            meta: {
+                /** @example 1 */
+                page: number;
+                /** @example 50 */
+                pageSize: number;
+                /** @example 12 */
+                total: number;
+            };
+        };
+        /** @description Report-job record. The `reference` field is the public-facing, human-readable identifier used in URLs, ETL payloads, callbacks, and polling. The internal UUID `id` is intentionally omitted from external responses. */
+        ReportJobObject: {
+            /** @example SALES-REPORT-20260502143022873 */
+            reference?: string;
+            /** Format: uuid */
+            tenant_id?: string;
+            /** Format: uuid */
+            uploaded_by?: string;
+            storage_path?: string;
+            file_name?: string;
+            report_year?: number;
+            report_month?: number;
+            /** @enum {string} */
+            status?: "pending" | "processing" | "completed" | "failed";
+            /** Format: uuid */
+            batch_id?: string | null;
+            /** @description IUploadResult on success */
+            result?: Record<string, never> | null;
+            error_message?: string | null;
+            attempts?: number;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        ReportJobResponse: {
+            success: boolean;
+            data: components["schemas"]["ReportJobObject"];
+        };
+        EtlCallbackBody: {
+            /** @enum {string} */
+            status: "success" | "failed";
+            /** @description Required when status=success. Full etl_result.json shape. */
+            etl_result?: Record<string, never>;
+            /** @description Required when status=failed */
+            error?: string;
         };
     };
     responses: never;
