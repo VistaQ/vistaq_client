@@ -37,13 +37,14 @@ tags:
   - name: Public
     description: Public endpoints that do not require authentication
   - name: Internal
-    description: Service-to-service operations (cron, retention cleanup) authenticated via INTERNAL_API_KEY rather than user JWTs
+    description: Service-to-service operations (cron, retention cleanup) authenticated via ETL_API_KEY rather than user JWTs
 
 ################################################################################
 # Paths
 ################################################################################
 
 paths:
+
   ##############################################################################
   # HEALTH
   ##############################################################################
@@ -57,7 +58,7 @@ paths:
         required. Intended for uptime monitoring and load-balancer probes.
       security: []
       responses:
-        "200":
+        '200':
           description: API is healthy
           content:
             application/json:
@@ -71,13 +72,13 @@ paths:
                   timestamp:
                     type: string
                     format: date-time
-                    example: "2026-03-04T08:00:00.000Z"
-        "500":
+                    example: '2026-03-04T08:00:00.000Z'
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # AUTH
@@ -154,7 +155,7 @@ paths:
                   minLength: 1
                   example: Singapore
       responses:
-        "201":
+        '201':
           description: Registration successful
           content:
             application/json:
@@ -170,7 +171,7 @@ paths:
                     required: [user, token]
                     properties:
                       user:
-                        $ref: "#/components/schemas/UserObject"
+                        $ref: '#/components/schemas/UserObject'
                       token:
                         type: string
                         nullable: true
@@ -179,7 +180,7 @@ paths:
                           after registration failed — the account is still
                           created.
                         example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-        "400":
+        '400':
           description: >
             Bad request. Returned when the `X-Tenant-Slug` header is missing,
             request body fails validation, or the agent code is invalid or
@@ -188,8 +189,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/ErrorResponse"
-                  - $ref: "#/components/schemas/ValidationErrorResponse"
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
               examples:
                 missingHeader:
                   summary: Missing X-Tenant-Slug header
@@ -211,20 +212,20 @@ paths:
                         exact: false
                         message: Password must be at least 6 characters
                         path: [password]
-        "404":
+        '404':
           description: Tenant not found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Tenant not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/login:
     post:
@@ -264,7 +265,7 @@ paths:
                   type: string
                   example: Secret@1
       responses:
-        "200":
+        '200':
           description: Login successful
           content:
             application/json:
@@ -280,12 +281,12 @@ paths:
                     required: [user, token]
                     properties:
                       user:
-                        $ref: "#/components/schemas/UserObject"
+                        $ref: '#/components/schemas/UserObject'
                       token:
                         type: string
                         description: JWT session token.
                         example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-        "400":
+        '400':
           description: >
             Bad request. Returned when the `X-Tenant-Slug` header is missing,
             request body fails validation, or the supplied credentials are invalid.
@@ -293,8 +294,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/ErrorResponse"
-                  - $ref: "#/components/schemas/ValidationErrorResponse"
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
               examples:
                 missingHeader:
                   summary: Missing X-Tenant-Slug header
@@ -313,20 +314,20 @@ paths:
                         validation: email
                         message: Invalid email
                         path: [email]
-        "404":
+        '404':
           description: Tenant not found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Tenant not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/logout:
     post:
@@ -340,7 +341,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Logout successful
           content:
             application/json:
@@ -351,14 +352,14 @@ paths:
                   success:
                     type: boolean
                     example: true
-        "401":
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             does not start with `Bearer `, or the token portion is empty.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               examples:
                 missingHeader:
                   summary: Missing Authorization header
@@ -368,12 +369,12 @@ paths:
                   summary: Empty token in Authorization header
                   value:
                     message: Authorization token is required
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/me:
     get:
@@ -387,7 +388,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Authenticated user profile retrieved successfully
           content:
             application/json:
@@ -400,8 +401,8 @@ paths:
                     example: true
                   data:
                     nullable: true
-                    $ref: "#/components/schemas/UserObject"
-        "401":
+                    $ref: '#/components/schemas/UserObject'
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             does not start with `Bearer `, or the token portion is empty or
@@ -409,7 +410,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               examples:
                 missingHeader:
                   summary: Missing Authorization header
@@ -419,12 +420,12 @@ paths:
                   summary: Empty token in Authorization header
                   value:
                     message: Authorization token is required
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/forgot-password:
     post:
@@ -462,7 +463,7 @@ paths:
                   format: email
                   example: jane.smith@example.com
       responses:
-        "200":
+        '200':
           description: Password reset email sent (or email not found — response is identical to prevent enumeration)
           content:
             application/json:
@@ -476,7 +477,7 @@ paths:
                   message:
                     type: string
                     example: Password reset email sent
-        "400":
+        '400':
           description: >
             Bad request. Returned when the `X-Tenant-Slug` header is missing
             or not a string, or the request body fails validation.
@@ -484,8 +485,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/ErrorResponse"
-                  - $ref: "#/components/schemas/ValidationErrorResponse"
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
               examples:
                 missingHeader:
                   summary: Missing X-Tenant-Slug header
@@ -500,20 +501,20 @@ paths:
                         validation: email
                         message: Invalid email
                         path: [email]
-        "404":
+        '404':
           description: Tenant not found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Tenant not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /auth/reset-password:
     post:
@@ -554,7 +555,7 @@ paths:
                     character.
                   example: NewSecret@1
       responses:
-        "200":
+        '200':
           description: Password reset successful
           content:
             application/json:
@@ -568,7 +569,7 @@ paths:
                   message:
                     type: string
                     example: Password reset successful
-        "400":
+        '400':
           description: >
             Bad request. Returned when the request body fails validation
             (missing fields, password too short, or password does not meet
@@ -576,7 +577,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
+                $ref: '#/components/schemas/ValidationErrorResponse'
               example:
                 message: Validation failed
                 errors:
@@ -587,14 +588,14 @@ paths:
                     exact: false
                     message: Password must be at least 6 characters
                     path: [newPassword]
-        "500":
+        '500':
           description: >
             Internal server error. Also returned when the supplied token is
             invalid or has expired.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # USERS
@@ -627,11 +628,11 @@ paths:
                     The replacement password. Must be at least 6 characters and
                     contain at least one uppercase letter, one digit, and one
                     special (non-alphanumeric) character.
-                  example: "$Test1"
+                  example: '$Test1'
             example:
-              newPassword: "$Test1"
+              newPassword: '$Test1'
       responses:
-        "200":
+        '200':
           description: Password changed successfully
           content:
             application/json:
@@ -648,7 +649,7 @@ paths:
               example:
                 success: true
                 message: Password changed successfully
-        "400":
+        '400':
           description: >
             Bad request. Returned when the request body fails validation —
             for example when `newPassword` is absent, too short, or does not
@@ -656,7 +657,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
+                $ref: '#/components/schemas/ValidationErrorResponse'
               example:
                 message: Validation failed
                 errors:
@@ -667,22 +668,22 @@ paths:
                     exact: false
                     message: Password must be at least 6 characters
                     path: [newPassword]
-        "401":
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /users:
     get:
@@ -695,7 +696,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Users retrieved successfully
           content:
             application/json:
@@ -709,23 +710,23 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/UserObject"
-        "401":
+                      $ref: '#/components/schemas/UserObject'
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /users/{userId}:
     get:
@@ -748,7 +749,7 @@ paths:
             format: uuid
             example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
       responses:
-        "200":
+        '200':
           description: User retrieved successfully
           content:
             application/json:
@@ -760,33 +761,33 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/UserObject"
-        "401":
+                    $ref: '#/components/schemas/UserObject'
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "404":
+        '404':
           description: >
             Not found. Returned when no user exists for the given `userId`, or
             the user is not visible to the caller due to RLS.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: User not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
     put:
       tags: [Users]
@@ -828,7 +829,7 @@ paths:
                 phone:
                   type: string
                   minLength: 1
-                  example: "+6591234567"
+                  example: '+6591234567'
                 agency:
                   type: string
                   minLength: 1
@@ -852,7 +853,7 @@ paths:
                     include this field but it is silently stripped.
                   example: active
       responses:
-        "200":
+        '200':
           description: User updated successfully
           content:
             application/json:
@@ -864,56 +865,56 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/UserObject"
-        "400":
+                    $ref: '#/components/schemas/UserObject'
+        '400':
           description: >
             Bad request. Returned when the request body fails validation
             (e.g. no fields provided or invalid values).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
+                $ref: '#/components/schemas/ValidationErrorResponse'
               example:
                 message: Validation failed
                 errors:
                   - code: custom
                     message: At least one field must be provided
                     path: []
-        "401":
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: >
             Forbidden. Returned when a non-admin user attempts to update
             another user.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "404":
+        '404':
           description: >
             Not found. Returned when no user exists for the given `userId`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: User not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
     delete:
       tags: [Users]
@@ -935,7 +936,7 @@ paths:
             format: uuid
             example: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
       responses:
-        "200":
+        '200':
           description: User deleted successfully
           content:
             application/json:
@@ -947,32 +948,32 @@ paths:
                   success:
                     type: boolean
                     example: true
-        "401":
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "404":
+        '404':
           description: >
             Not found. Returned when no user exists for the given `userId`, or
             the user is not visible to the caller due to RLS.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: User not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
     post:
       tags: [Users]
@@ -1025,7 +1026,7 @@ paths:
                     by the client — never auto-generated by the server.
                   example: AGT-00123
       responses:
-        "201":
+        '201':
           description: User created successfully
           content:
             application/json:
@@ -1037,8 +1038,8 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/UserObject"
-        "400":
+                    $ref: '#/components/schemas/UserObject'
+        '400':
           description: >
             Bad request. Returned when the request body fails validation or
             the supplied agent code is invalid or already used.
@@ -1046,8 +1047,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/ValidationErrorResponse"
-                  - $ref: "#/components/schemas/ErrorResponse"
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
               examples:
                 validationFailure:
                   summary: Request body validation failure
@@ -1065,30 +1066,30 @@ paths:
                   summary: Invalid or already used agent code
                   value:
                     message: Invalid or already used agent code
-        "401":
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: Forbidden. Returned when the authenticated user is not an admin.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # GROUPS
@@ -1106,7 +1107,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Groups retrieved successfully
           content:
             application/json:
@@ -1120,23 +1121,23 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/GroupObject"
-        "401":
+                      $ref: '#/components/schemas/GroupObject'
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
     post:
       tags: [Groups]
@@ -1183,7 +1184,7 @@ paths:
                   example:
                     - 3fa85f64-5717-4562-b3fc-2c963f66afa6
       responses:
-        "201":
+        '201':
           description: Group created successfully
           content:
             application/json:
@@ -1195,8 +1196,8 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/GroupObject"
-        "400":
+                    $ref: '#/components/schemas/GroupObject'
+        '400':
           description: >
             Bad request. Returned when the request body fails validation or
             a domain rule is violated (e.g. invalid role for leader or trainer,
@@ -1205,8 +1206,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/ValidationErrorResponse"
-                  - $ref: "#/components/schemas/ErrorResponse"
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
               examples:
                 validationFailure:
                   summary: Request body validation failure
@@ -1232,30 +1233,30 @@ paths:
                   summary: Referenced user not found in tenant
                   value:
                     message: User not found in tenant
-        "401":
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: Forbidden. Returned when the authenticated user is not an admin.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /groups/{groupId}:
     get:
@@ -1278,7 +1279,7 @@ paths:
             format: uuid
             example: 7c9e6679-7425-40de-944b-e07fc1f90ae7
       responses:
-        "200":
+        '200':
           description: Group retrieved successfully
           content:
             application/json:
@@ -1290,31 +1291,31 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/GroupObject"
-        "401":
+                    $ref: '#/components/schemas/GroupObject'
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "404":
+        '404':
           description: Not found. Returned when no group exists for the given `groupId`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Group not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
     put:
       tags: [Groups]
@@ -1326,8 +1327,10 @@ paths:
         is supplied and differs from the current leader, the new leader is promoted
         to `group_leader` and the previous leader is demoted back to `agent`. When
         `trainer_ids` is supplied, the existing trainer assignments for the group are replaced with the provided set. When
-        `member_ids` is supplied, the `group_id` field on each referenced user is
-        set to this group. All referenced users must exist within the caller's tenant.
+        `member_ids` is supplied, the group's member set is **replaced** with the provided list — users currently in the
+        group but absent from the new list have their `group_id` set to `null` (unlinked). The current group leader is
+        always retained as a member regardless of whether their UUID appears in `member_ids`. Passing an empty array
+        (`[]`) unlinks all non-leader members. All provided UUIDs must exist within the caller's tenant.
       security:
         - bearerAuth: []
       parameters:
@@ -1377,19 +1380,19 @@ paths:
                     - 3fa85f64-5717-4562-b3fc-2c963f66afa6
                 member_ids:
                   type: array
-                  minItems: 1
                   items:
                     type: string
                     format: uuid
                   description: >
-                    Array of user UUIDs to assign to this group. Sets the
-                    `group_id` field on each referenced user. All provided IDs
+                    Replaces the full member set for the group. Users currently in the group but absent from this list
+                    have their `group_id` set to `null`. The current group leader is always retained regardless of
+                    whether their UUID is included. Pass `[]` to unlink all non-leader members. All provided UUIDs
                     must exist within the caller's tenant.
                   example:
                     - a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
                     - b1ccde11-8d1c-5fa9-cc7e-7cc0ce491b22
       responses:
-        "200":
+        '200':
           description: Group updated successfully
           content:
             application/json:
@@ -1401,8 +1404,8 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/GroupObject"
-        "400":
+                    $ref: '#/components/schemas/GroupObject'
+        '400':
           description: >
             Bad request. Returned when the request body fails validation (e.g. no
             fields provided or invalid values), or a domain rule is violated (e.g.
@@ -1412,8 +1415,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/ValidationErrorResponse"
-                  - $ref: "#/components/schemas/ErrorResponse"
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
               examples:
                 validationFailure:
                   summary: Request body validation failure
@@ -1435,32 +1438,32 @@ paths:
                   summary: One or more member_ids could not be found
                   value:
                     message: One or more members could not be found
-        "401":
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: Forbidden. Returned when the authenticated user is not an admin.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "404":
+        '404':
           description: >
             Not found. Returned when no group exists for the given `groupId`, or
             a referenced user (leader, trainer, or member) could not be found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               examples:
                 groupNotFound:
                   summary: Group not found
@@ -1470,12 +1473,12 @@ paths:
                   summary: Referenced user not found
                   value:
                     message: User not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /groups/stats:
     get:
@@ -1489,7 +1492,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Group statistics retrieved successfully
           content:
             application/json:
@@ -1503,23 +1506,23 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/GroupStatsObject"
-        "401":
+                      $ref: '#/components/schemas/GroupStatsObject'
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /groups/{groupId}/stats:
     get:
@@ -1542,7 +1545,7 @@ paths:
             format: uuid
             example: 7c9e6679-7425-40de-944b-e07fc1f90ae7
       responses:
-        "200":
+        '200':
           description: Group detail statistics retrieved successfully
           content:
             application/json:
@@ -1554,31 +1557,31 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/GroupDetailStatsObject"
-        "401":
+                    $ref: '#/components/schemas/GroupDetailStatsObject'
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "404":
+        '404':
           description: Not found. Returned when no group exists for the given `groupId`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Group not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # PROSPECTS
@@ -1596,7 +1599,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Prospects retrieved successfully
           content:
             application/json:
@@ -1610,23 +1613,23 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/ProspectObject"
-        "401":
+                      $ref: '#/components/schemas/ProspectObject'
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
     post:
       tags: [Prospects]
@@ -1658,14 +1661,14 @@ paths:
                 phoneNum:
                   type: string
                   description: Phone number of the prospect.
-                  example: "+6591234567"
+                  example: '+6591234567'
                 email:
                   type: string
                   format: email
                   description: Email address of the prospect.
                   example: alice.johnson@example.com
       responses:
-        "201":
+        '201':
           description: Prospect created successfully
           content:
             application/json:
@@ -1677,8 +1680,8 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/ProspectObject"
-        "400":
+                    $ref: '#/components/schemas/ProspectObject'
+        '400':
           description: >
             Bad request. Returned when the request body fails validation
             (e.g. `fullName` is missing or empty, or `email` is not a valid
@@ -1686,7 +1689,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
+                $ref: '#/components/schemas/ValidationErrorResponse'
               example:
                 message: Validation failed
                 errors:
@@ -1697,32 +1700,32 @@ paths:
                     exact: false
                     message: String must contain at least 1 character(s)
                     path: [fullName]
-        "401":
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: >
             Forbidden. Returned when the authenticated user does not have the
             `agent` or `group_leader` role.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /prospects/{prospectId}:
     get:
@@ -1745,7 +1748,7 @@ paths:
             format: uuid
             example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
       responses:
-        "200":
+        '200':
           description: Prospect retrieved successfully
           content:
             application/json:
@@ -1757,31 +1760,31 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/ProspectObject"
-        "401":
+                    $ref: '#/components/schemas/ProspectObject'
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "404":
+        '404':
           description: Not found. Returned when no prospect exists for the given `prospectId`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Prospect not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
     put:
       tags: [Prospects]
       summary: Update a prospect
@@ -1817,15 +1820,15 @@ paths:
                   type: string
                   format: date
                   description: Date of the appointment in YYYY-MM-DD format.
-                  example: "2026-04-01"
+                  example: '2026-04-01'
                 appointmentStartTime:
                   type: string
                   description: Start time of the appointment (e.g. "14:00").
-                  example: "14:00"
+                  example: '14:00'
                 appointmentEndTime:
                   type: string
                   description: End time of the appointment (e.g. "15:00").
-                  example: "15:00"
+                  example: '15:00'
                 appointmentLocation:
                   type: string
                   example: Raffles Place Office
@@ -1873,14 +1876,14 @@ paths:
                 phoneNum:
                   type: string
                   description: Phone number of the prospect. Maps to `prospect_phone`.
-                  example: "+6591234567"
+                  example: '+6591234567'
                 email:
                   type: string
                   format: email
                   description: Email address of the prospect. Maps to `prospect_email`.
                   example: jane.doe@example.com
       responses:
-        "200":
+        '200':
           description: Prospect updated successfully
           content:
             application/json:
@@ -1892,8 +1895,8 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/ProspectObject"
-        "400":
+                    $ref: '#/components/schemas/ProspectObject'
+        '400':
           description: >
             Bad request. Returned when the request body fails validation (e.g.
             no fields provided, invalid enum value, or `unsuccessfulReason` is
@@ -1902,8 +1905,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/ValidationErrorResponse"
-                  - $ref: "#/components/schemas/ErrorResponse"
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
               examples:
                 validationFailure:
                   summary: Request body validation failure
@@ -1921,40 +1924,40 @@ paths:
                       - code: custom
                         message: unsuccessfulReason is required when salesOutcome is unsuccessful
                         path: [unsuccessfulReason]
-        "401":
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: >
             Forbidden. Returned when the authenticated user does not have the
             `agent` or `group_leader` role.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "404":
+        '404':
           description: Not found. Returned when no prospect exists for the given `prospectId`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Prospect not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
       tags: [Prospects]
       summary: Delete a prospect
@@ -1975,7 +1978,7 @@ paths:
             format: uuid
             example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
       responses:
-        "200":
+        '200':
           description: Prospect deleted successfully
           content:
             application/json:
@@ -1987,42 +1990,42 @@ paths:
                   success:
                     type: boolean
                     example: true
-        "401":
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: >
             Forbidden. Returned when the authenticated user does not have the
             `agent` or `admin` role.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "404":
+        '404':
           description: >
             Not found. Returned when no prospect exists for the given `prospectId`,
             or the prospect is not visible to the caller due to RLS.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Prospect not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # EVENTS
@@ -2035,11 +2038,14 @@ paths:
       description: >
         Creates a new event scoped to the authenticated user's tenant. The caller
         must supply a valid Bearer token belonging to a user with the `admin`,
-        `master_trainer`, `trainer`, or `group_leader` role — `agent` users will
-        receive a 403. At least one of `groupIds` or `agentIds` must be provided.
-        For `trainer` users, all supplied `groupIds` must belong to groups that
-        the trainer manages via the `group_trainers` junction table; any unmanaged
-        group IDs result in a 400.
+        `master_trainer`, `trainer`, `group_leader`, or `agent` role. At least
+        one of `groupIds` or `agentIds` must be provided for non-`agent` roles —
+        `agent` users are automatically assigned to their own event and may omit
+        both fields. For `trainer` users, all supplied `groupIds` must belong to
+        groups that the trainer manages via the `group_trainers` junction table;
+        any unmanaged group IDs result in a 400. If `visibility` is not supplied,
+        it defaults to `public` for `agent` and `group_leader` roles, and
+        `private` for all other roles.
       security:
         - bearerAuth: []
       requestBody:
@@ -2067,14 +2073,14 @@ paths:
                   description: >
                     Start datetime as an ISO 8601 timestamp with timezone offset.
                     Cannot be in the past.
-                  example: "2026-04-15T09:00:00+08:00"
+                  example: '2026-04-15T09:00:00+08:00'
                 endDate:
                   type: string
                   format: date-time
                   description: >
                     End datetime as an ISO 8601 timestamp with timezone offset.
                     Must be after startDate.
-                  example: "2026-04-15T11:00:00+08:00"
+                  example: '2026-04-15T11:00:00+08:00'
                 status:
                   type: string
                   enum: [upcoming, completed, cancelled]
@@ -2083,16 +2089,16 @@ paths:
                   example: upcoming
                 type:
                   type: string
-                  enum: ["Face to Face", "Online"]
+                  enum: ['Face to Face', 'Online']
                   description: >
                     Delivery format of the event. Must be either `Face to Face`
                     or `Online`.
-                  example: "Face to Face"
+                  example: 'Face to Face'
                 link:
                   type: string
                   format: uri
                   description: Optional URL for the event (e.g. a video call link).
-                  example: "https://meet.example.com/q2-kickoff"
+                  example: 'https://meet.example.com/q2-kickoff'
                 venue:
                   type: string
                   description: Optional venue or location for the event.
@@ -2102,6 +2108,13 @@ paths:
                   minLength: 1
                   description: Description or agenda for the event.
                   example: Quarterly training kickoff covering Q2 targets and new product modules.
+                visibility:
+                  type: string
+                  enum: [public, private]
+                  description: >
+                    Visibility of the event. Optional. Defaults to `public` for `agent`
+                    and `group_leader` roles, `private` for all other roles.
+                  example: public
                 groupIds:
                   type: array
                   minItems: 1
@@ -2112,7 +2125,9 @@ paths:
                     Array of group UUIDs the event is associated with. Must
                     contain at least one UUID if provided, and must not contain
                     duplicates. For trainers, all IDs must be groups they manage.
-                    At least one of `groupIds` or `agentIds` must be supplied.
+                    At least one of `groupIds` or `agentIds` must be supplied
+                    (ignored for `agent` role — agents are always assigned to
+                    their own event automatically).
                   example:
                     - 7c9e6679-7425-40de-944b-e07fc1f90ae7
                 agentIds:
@@ -2125,11 +2140,13 @@ paths:
                     Array of agent user UUIDs to assign individually to the
                     event via the `event_agents` junction table. Must contain at
                     least one UUID if provided, and must not contain duplicates.
-                    At least one of `groupIds` or `agentIds` must be supplied.
+                    At least one of `groupIds` or `agentIds` must be supplied
+                    (ignored for `agent` role — agents are always assigned to
+                    their own event automatically).
                   example:
                     - a1b2c3d4-e5f6-7890-abcd-ef1234567890
       responses:
-        "201":
+        '201':
           description: Event created successfully
           content:
             application/json:
@@ -2141,8 +2158,8 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/EventObject"
-        "400":
+                    $ref: '#/components/schemas/EventObject'
+        '400':
           description: >
             Bad request. Returned when the request body fails validation (e.g.
             `title` is missing, `date` is in the past, neither `groupIds` nor
@@ -2152,8 +2169,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/ValidationErrorResponse"
-                  - $ref: "#/components/schemas/ErrorResponse"
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
               examples:
                 validationFailure:
                   summary: Request body validation failure
@@ -2179,32 +2196,31 @@ paths:
                   summary: Trainer supplied groups they do not manage
                   value:
                     message: Trainer does not manage one or more of the supplied groups
-        "401":
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: >
-            Forbidden. Returned when the authenticated user has the `agent`
-            role, which is not permitted to create events.
+            Forbidden — non-admin attempting to modify another user's event.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
     get:
       tags: [Events]
@@ -2216,7 +2232,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Events retrieved successfully
           content:
             application/json:
@@ -2230,23 +2246,23 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/EventObject"
-        "401":
+                      $ref: '#/components/schemas/EventObject'
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /events/{eventId}:
     get:
@@ -2268,7 +2284,7 @@ paths:
             format: uuid
             example: b2c3d4e5-f6a7-8901-bcde-f12345678901
       responses:
-        "200":
+        '200':
           description: Event retrieved successfully
           content:
             application/json:
@@ -2280,31 +2296,31 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/EventObject"
-        "401":
+                    $ref: '#/components/schemas/EventObject'
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "404":
+        '404':
           description: Not found. Returned when no event exists for the given `eventId`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Event not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
     put:
       tags: [Events]
@@ -2312,13 +2328,16 @@ paths:
       description: >
         Updates the event identified by `eventId`. The caller must supply a valid
         Bearer token belonging to a user with the `admin`, `master_trainer`,
-        `trainer`, or `group_leader` role — `agent` users will receive a 403.
-        All request body fields are optional, but at least one must be provided.
-        When `groupIds` is supplied, the existing `event_groups` entries for this
-        event are replaced entirely. When `agentIds` is supplied, the existing
-        `event_agents` entries for this event are replaced entirely. For `trainer`
-        users, all supplied `groupIds` must belong to groups they manage; any
-        unmanaged group IDs result in a 400.
+        `trainer`, `group_leader`, or `agent` role. All request body fields are
+        optional, but at least one must be provided. Non-admin users may only
+        update events they created — attempting to modify another user's event
+        returns a 403. `agent` users always remain the sole assigned agent;
+        supplied `groupIds` and `agentIds` are ignored and replaced with the
+        agent's own ID. When `groupIds` is supplied (non-`agent` roles), the
+        existing `event_groups` entries for this event are replaced entirely.
+        When `agentIds` is supplied, the existing `event_agents` entries for this
+        event are replaced entirely. For `trainer` users, all supplied `groupIds`
+        must belong to groups they manage; any unmanaged group IDs result in a 400.
       security:
         - bearerAuth: []
       parameters:
@@ -2348,14 +2367,14 @@ paths:
                   format: date-time
                   description: >
                     Start datetime as an ISO 8601 timestamp with timezone offset.
-                  example: "2026-04-20T10:00:00+08:00"
+                  example: '2026-04-20T10:00:00+08:00'
                 endDate:
                   type: string
                   format: date-time
                   description: >
                     End datetime as an ISO 8601 timestamp with timezone offset.
                     Must be after startDate.
-                  example: "2026-04-20T12:00:00+08:00"
+                  example: '2026-04-20T12:00:00+08:00'
                 status:
                   type: string
                   enum: [upcoming, completed, cancelled]
@@ -2363,14 +2382,14 @@ paths:
                   example: completed
                 type:
                   type: string
-                  enum: ["Face to Face", "Online"]
+                  enum: ['Face to Face', 'Online']
                   description: Updated delivery format of the event.
                   example: Online
                 link:
                   type: string
                   format: uri
                   description: Updated URL for the event.
-                  example: "https://meet.example.com/q2-kickoff-revised"
+                  example: 'https://meet.example.com/q2-kickoff-revised'
                 venue:
                   type: string
                   description: Updated venue or location for the event.
@@ -2380,6 +2399,14 @@ paths:
                   minLength: 1
                   description: Updated description or agenda for the event.
                   example: Updated agenda covering revised Q2 targets.
+                visibility:
+                  type: string
+                  enum: [public, private]
+                  description: >
+                    Updated visibility of the event. Optional. Defaults to `public`
+                    for `agent` and `group_leader` roles, `private` for all other
+                    roles when not supplied on creation.
+                  example: public
                 groupIds:
                   type: array
                   minItems: 1
@@ -2390,7 +2417,7 @@ paths:
                     Replacement set of group UUIDs for the event. Existing
                     `event_groups` entries are deleted and replaced with these
                     values. Must not contain duplicates. For trainers, all IDs
-                    must be groups they manage.
+                    must be groups they manage. Ignored for `agent` role.
                   example:
                     - 7c9e6679-7425-40de-944b-e07fc1f90ae7
                 agentIds:
@@ -2402,11 +2429,11 @@ paths:
                   description: >
                     Replacement set of agent user UUIDs for the event. Existing
                     `event_agents` entries are deleted and replaced with these
-                    values. Must not contain duplicates.
+                    values. Must not contain duplicates. Ignored for `agent` role.
                   example:
                     - a1b2c3d4-e5f6-7890-abcd-ef1234567890
       responses:
-        "200":
+        '200':
           description: Event updated successfully
           content:
             application/json:
@@ -2418,8 +2445,8 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/EventObject"
-        "400":
+                    $ref: '#/components/schemas/EventObject'
+        '400':
           description: >
             Bad request. Returned when the request body fails validation (e.g.
             no fields provided, `startDate` is in the past, `endDate` is not
@@ -2429,8 +2456,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/ValidationErrorResponse"
-                  - $ref: "#/components/schemas/ErrorResponse"
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
               examples:
                 validationFailure:
                   summary: Request body validation failure
@@ -2452,40 +2479,173 @@ paths:
                   summary: Trainer supplied groups they do not manage
                   value:
                     message: Trainer does not manage one or more of the supplied groups
-        "401":
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: >
-            Forbidden. Returned when the authenticated user has the `agent`
-            role, which is not permitted to update events.
+            Forbidden — non-admin attempting to modify another user's event.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "404":
+        '404':
           description: Not found. Returned when no event exists for the given `eventId`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Event not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Events]
+      summary: Delete an event
+      description: >
+        Permanently deletes the event identified by `eventId`. The caller must
+        supply a valid Bearer token. Admin users may delete any event within
+        the tenant. Non-admin users may only delete events they themselves
+        created — attempting to delete another user's event returns a 403.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          description: UUID of the event to delete.
+          schema:
+            type: string
+            format: uuid
+            example: b2c3d4e5-f6a7-8901-bcde-f12345678901
+      responses:
+        '204':
+          description: Event deleted successfully. No response body is returned.
+        '401':
+          description: >
+            Unauthorized. Returned when the `Authorization` header is absent,
+            malformed, or contains an invalid token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: Unauthorized
+        '403':
+          description: >
+            Forbidden — non-admin attempting to delete another user's event.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: Forbidden
+        '404':
+          description: Not found. Returned when no event exists for the given `eventId`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: Event not found
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /events/{eventId}/public:
+    get:
+      tags: [Events]
+      summary: Get public event details
+      description: >
+        Returns publicly visible details for a single event. No authentication
+        is required. Returns 404 if the event does not exist, has been cancelled,
+        or has `visibility` set to `private`. Successful responses include a
+        `Cache-Control: public, max-age=60` header.
+      security: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          description: UUID of the event to retrieve.
+          schema:
+            type: string
+            format: uuid
+            example: b2c3d4e5-f6a7-8901-bcde-f12345678901
+      responses:
+        '200':
+          description: Public event details retrieved successfully.
+          headers:
+            Cache-Control:
+              description: Instructs clients and proxies to cache the response for 60 seconds.
+              schema:
+                type: string
+                example: 'public, max-age=60'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/PublicEventObject'
+              example:
+                success: true
+                data:
+                  id: b2c3d4e5-f6a7-8901-bcde-f12345678901
+                  event_title: Q2 Agent Networking Night
+                  description: A networking event open to all agents in the region.
+                  start_date: '2026-06-01T18:00:00.000Z'
+                  end_date: '2026-06-01T21:00:00.000Z'
+                  type: 'Face to Face'
+                  venue: Marina Bay Sands Convention Centre
+                  meeting_link: null
+                  created_by_name: Jane Doe
+                  status: upcoming
+        '404':
+          description: >
+            Not found. Returned when no event exists for the given `eventId`,
+            the event has been cancelled, or the event is not public.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, message]
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: Event not found
+              example:
+                success: false
+                message: Event not found
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # DASHBOARD
@@ -2504,7 +2664,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Dashboard statistics retrieved successfully
           content:
             application/json:
@@ -2516,23 +2676,23 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/DashboardStatsObject"
-        "401":
+                    $ref: '#/components/schemas/DashboardStatsObject'
+        '401':
           description: >
             Unauthorized. Returned when the `Authorization` header is absent,
             malformed, or contains an invalid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # POINT ACTIVITY TYPES
@@ -2549,7 +2709,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Point activity types retrieved successfully
           content:
             application/json:
@@ -2563,13 +2723,13 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/PointActivityTypeObject"
-        "500":
+                      $ref: '#/components/schemas/PointActivityTypeObject'
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # POINT CONFIGS
@@ -2608,7 +2768,7 @@ paths:
                   description: Points awarded for the activity. Must be a positive integer.
                   example: 10
       responses:
-        "201":
+        '201':
           description: Point config created successfully
           content:
             application/json:
@@ -2620,8 +2780,8 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/PointConfigObject"
-        "400":
+                    $ref: '#/components/schemas/PointConfigObject'
+        '400':
           description: >
             Bad request. Returned when request body fails validation or a config
             already exists for the given activity within this tenant.
@@ -2629,8 +2789,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/ErrorResponse"
-                  - $ref: "#/components/schemas/ValidationErrorResponse"
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
               examples:
                 duplicate:
                   summary: Config already exists for this activity
@@ -2648,20 +2808,20 @@ paths:
                       - code: invalid_type
                         path: [activity]
                         message: Required
-        "403":
+        '403':
           description: Forbidden. The authenticated user does not have the `admin` role.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
     get:
       tags: [Point Configs]
@@ -2673,7 +2833,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Point configs retrieved successfully
           content:
             application/json:
@@ -2687,21 +2847,21 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/PointConfigObject"
-        "403":
+                      $ref: '#/components/schemas/PointConfigObject'
+        '403':
           description: Forbidden. The authenticated user does not have the `admin` role.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /point-configs/{activity}:
     put:
@@ -2739,7 +2899,7 @@ paths:
                   description: New points value for the activity. Must be a positive integer.
                   example: 20
       responses:
-        "200":
+        '200':
           description: Point config updated successfully
           content:
             application/json:
@@ -2751,13 +2911,13 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/PointConfigObject"
-        "400":
+                    $ref: '#/components/schemas/PointConfigObject'
+        '400':
           description: Bad request. Returned when request body fails validation.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
+                $ref: '#/components/schemas/ValidationErrorResponse'
               example:
                 message: Validation failed
                 errors:
@@ -2768,30 +2928,30 @@ paths:
                     exact: false
                     message: Points must be greater than 0
                     path: [points]
-        "403":
+        '403':
           description: Forbidden. The authenticated user does not have the `admin` role.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "404":
+        '404':
           description: >
             Not found. No point configuration exists for the given activity
             within the authenticated user's tenant.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Point config not found.
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # LEADERBOARD
@@ -2809,7 +2969,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Leaderboard retrieved successfully
           content:
             application/json:
@@ -2823,21 +2983,21 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/LeaderboardEntryObject"
-        "401":
+                      $ref: '#/components/schemas/LeaderboardEntryObject'
+        '401':
           description: Unauthorized. No token or invalid token supplied.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /leaderboard/stats:
     get:
@@ -2865,7 +3025,7 @@ paths:
               - ytd
             example: mtd
       responses:
-        "200":
+        '200':
           description: Leaderboard stats retrieved successfully
           content:
             application/json:
@@ -2887,38 +3047,38 @@ paths:
                       generated_at:
                         type: string
                         format: date-time
-                        example: "2026-03-30T08:00:00Z"
+                        example: '2026-03-30T08:00:00Z'
                       individual:
                         type: array
                         items:
-                          $ref: "#/components/schemas/LeaderboardStatsIndividualObject"
+                          $ref: '#/components/schemas/LeaderboardStatsIndividualObject'
                       groups:
                         type: array
                         items:
-                          $ref: "#/components/schemas/LeaderboardStatsGroupObject"
-        "400":
+                          $ref: '#/components/schemas/LeaderboardStatsGroupObject'
+        '400':
           description: Validation failed. The `period` query parameter is missing or invalid.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
+                $ref: '#/components/schemas/ValidationErrorResponse'
               example:
                 message: Validation failed
                 errors: []
-        "401":
+        '401':
           description: Unauthorized. No token or invalid token supplied.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # AGENT POINTS
@@ -2968,7 +3128,7 @@ paths:
             default: 20
             example: 20
       responses:
-        "200":
+        '200':
           description: Agent points retrieved successfully
           content:
             application/json:
@@ -2980,40 +3140,40 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/AgentPointsObject"
-        "400":
+                    $ref: '#/components/schemas/AgentPointsObject'
+        '400':
           description: Validation failed. One or more query parameters are invalid.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
+                $ref: '#/components/schemas/ValidationErrorResponse'
               example:
                 message: Validation failed
                 errors: []
-        "401":
+        '401':
           description: Unauthorized. No token or invalid token supplied.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: >
             Forbidden. An agent supplied a `userId` belonging to a different
             user.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # COACHING SESSIONS
@@ -3039,7 +3199,7 @@ paths:
               required: [coachingType, title, startDate, endDate, trainingMode]
               properties:
                 coachingType:
-                  $ref: "#/components/schemas/CoachingTypeEnum"
+                  $ref: '#/components/schemas/CoachingTypeEnum'
                 title:
                   type: string
                   minLength: 1
@@ -3053,22 +3213,22 @@ paths:
                   description: >
                     Start datetime as an ISO 8601 timestamp with timezone offset.
                     Cannot be in the past.
-                  example: "2026-04-15T10:00:00+08:00"
+                  example: '2026-04-15T10:00:00+08:00'
                 endDate:
                   type: string
                   format: date-time
                   description: >
                     End datetime as an ISO 8601 timestamp with timezone offset.
                     Must be after startDate.
-                  example: "2026-04-15T12:00:00+08:00"
+                  example: '2026-04-15T12:00:00+08:00'
                 trainingMode:
-                  $ref: "#/components/schemas/TrainingModeEnum"
+                  $ref: '#/components/schemas/TrainingModeEnum'
                 link:
                   type: string
                   description: Meeting link (e.g. Zoom, Google Meet).
                   example: https://zoom.us/j/123456789
                 status:
-                  $ref: "#/components/schemas/SessionStatusEnum"
+                  $ref: '#/components/schemas/SessionStatusEnum'
                 groupIds:
                   type: array
                   items:
@@ -3088,7 +3248,7 @@ paths:
                   example:
                     - 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
       responses:
-        "201":
+        '201':
           description: Coaching session created successfully
           content:
             application/json:
@@ -3100,40 +3260,40 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/CoachingSessionObject"
-        "400":
+                    $ref: '#/components/schemas/CoachingSessionObject'
+        '400':
           description: >
             Validation failed, invalid group IDs, invalid agent IDs, or
             unauthorized group access.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
+                $ref: '#/components/schemas/ValidationErrorResponse'
               example:
                 message: Validation failed
                 errors: []
-        "401":
+        '401':
           description: Unauthorized. No token or invalid token supplied.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: Forbidden. The user's role does not permit this action.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
     get:
       tags: [Coaching Sessions]
@@ -3145,7 +3305,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Coaching sessions retrieved successfully
           content:
             application/json:
@@ -3159,21 +3319,21 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/CoachingSessionObject"
-        "401":
+                      $ref: '#/components/schemas/CoachingSessionObject'
+        '401':
           description: Unauthorized. No token or invalid token supplied.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /coaching-sessions/{sessionId}:
     parameters:
@@ -3195,7 +3355,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Coaching session retrieved successfully
           content:
             application/json:
@@ -3207,29 +3367,29 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/CoachingSessionObject"
-        "401":
+                    $ref: '#/components/schemas/CoachingSessionObject'
+        '401':
           description: Unauthorized. No token or invalid token supplied.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "404":
+        '404':
           description: Coaching session not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Coaching session not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
     put:
       tags: [Coaching Sessions]
@@ -3250,7 +3410,7 @@ paths:
               minProperties: 1
               properties:
                 coachingType:
-                  $ref: "#/components/schemas/CoachingTypeEnum"
+                  $ref: '#/components/schemas/CoachingTypeEnum'
                 title:
                   type: string
                   minLength: 1
@@ -3263,21 +3423,21 @@ paths:
                   format: date-time
                   description: >
                     Start datetime as an ISO 8601 timestamp with timezone offset.
-                  example: "2026-04-20T14:00:00+08:00"
+                  example: '2026-04-20T14:00:00+08:00'
                 endDate:
                   type: string
                   format: date-time
                   description: >
                     End datetime as an ISO 8601 timestamp with timezone offset.
                     Must be after startDate.
-                  example: "2026-04-20T16:00:00+08:00"
+                  example: '2026-04-20T16:00:00+08:00'
                 trainingMode:
-                  $ref: "#/components/schemas/TrainingModeEnum"
+                  $ref: '#/components/schemas/TrainingModeEnum'
                 link:
                   type: string
                   example: https://zoom.us/j/987654321
                 status:
-                  $ref: "#/components/schemas/SessionStatusEnum"
+                  $ref: '#/components/schemas/SessionStatusEnum'
                 groupIds:
                   type: array
                   items:
@@ -3293,7 +3453,7 @@ paths:
                   minItems: 1
                   description: Updated target agent UUIDs.
       responses:
-        "200":
+        '200':
           description: Coaching session updated successfully
           content:
             application/json:
@@ -3305,8 +3465,8 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/CoachingSessionObject"
-        "400":
+                    $ref: '#/components/schemas/CoachingSessionObject'
+        '400':
           description: >
             Validation failed, invalid group IDs, invalid agent IDs,
             unauthorized group access, or `endDate` is not after `startDate`.
@@ -3314,8 +3474,8 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/ValidationErrorResponse"
-                  - $ref: "#/components/schemas/ErrorResponse"
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
               examples:
                 validationFailure:
                   summary: Request body validation failure
@@ -3326,38 +3486,38 @@ paths:
                   summary: endDate is not after startDate
                   value:
                     message: endDate must be after startDate
-        "401":
+        '401':
           description: Unauthorized. No token or invalid token supplied.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: >
             Forbidden. The user's role does not permit this action or the user
             is not the session creator.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "404":
+        '404':
           description: Coaching session not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Coaching session not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
     delete:
       tags: [Coaching Sessions]
@@ -3369,7 +3529,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Coaching session deleted successfully
           content:
             application/json:
@@ -3380,38 +3540,38 @@ paths:
                   success:
                     type: boolean
                     example: true
-        "401":
+        '401':
           description: Unauthorized. No token or invalid token supplied.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: >
             Forbidden. The user's role does not permit this action or the user
             is not the session creator.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "404":
+        '404':
           description: Coaching session not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Coaching session not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /coaching-sessions/{sessionId}/join:
     post:
@@ -3433,7 +3593,7 @@ paths:
             format: uuid
             example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
       responses:
-        "200":
+        '200':
           description: Successfully joined (or already joined) the session
           content:
             application/json:
@@ -3445,29 +3605,29 @@ paths:
                     type: boolean
                     example: true
                   data:
-                    $ref: "#/components/schemas/AttendanceRecordObject"
-        "401":
+                    $ref: '#/components/schemas/AttendanceRecordObject'
+        '401':
           description: Unauthorized. No token or invalid token supplied.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "404":
+        '404':
           description: Coaching session not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Coaching session not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /coaching-sessions/{sessionId}/mark-non-attendees:
     post:
@@ -3489,7 +3649,7 @@ paths:
             format: uuid
             example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
       responses:
-        "200":
+        '200':
           description: Non-attendees marked successfully
           content:
             application/json:
@@ -3500,38 +3660,38 @@ paths:
                   success:
                     type: boolean
                     example: true
-        "401":
+        '401':
           description: Unauthorized. No token or invalid token supplied.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Unauthorized
-        "403":
+        '403':
           description: >
             Forbidden. The user is not the session creator and does not have
             an admin or master_trainer role.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Forbidden
-        "404":
+        '404':
           description: Coaching session not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Coaching session not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # PUBLIC
@@ -3559,7 +3719,7 @@ paths:
             type: string
             example: acme-insurance
       responses:
-        "200":
+        '200':
           description: Groups retrieved successfully
           content:
             application/json:
@@ -3583,30 +3743,30 @@ paths:
                         name:
                           type: string
                           example: MDRT Stars
-        "400":
+        '400':
           description: >
             Bad request. Returned when the `X-Tenant-Slug` header is missing or
             not a valid string value.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: X-Tenant-Slug header is required
-        "404":
+        '404':
           description: Tenant not found.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: Tenant not found
-        "500":
+        '500':
           description: Internal server error
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   ##############################################################################
   # SALES REPORTS
@@ -3632,9 +3792,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UploadReportRequest"
+              $ref: '#/components/schemas/UploadReportRequest'
       responses:
-        "200":
+        '200':
           description: >
             Upload completed. Partial success is allowed: rows that failed
             validation or whose `agentCode` did not resolve to a user are
@@ -3642,42 +3802,42 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UploadReportResponse"
-        "400":
+                $ref: '#/components/schemas/UploadReportResponse'
+        '400':
           description: Validation failed (Zod schema mismatch or invalid ETL data).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
-        "401":
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
           description: Missing or invalid bearer token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
           description: Caller is not a manager.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
           description: Non-consecutive month upload (e.g. month 4 when latest is month 2).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
           description: Internal server error.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /reports/ingest:
     post:
       tags: [Sales Reports]
-      summary: Manual ETL ingest (interim — INTERNAL_API_KEY auth, NOT user JWT)
+      summary: Manual ETL ingest (interim — ETL_API_KEY auth, NOT user JWT)
       description: >
         Manual-mode endpoint used while the production HTTP-hosted ETL is
         being built. The ETL author runs the local Python pipeline on their
@@ -3685,7 +3845,7 @@ paths:
         `report_jobs` lifecycle and Storage round-trip entirely; just persists
         the same audit + YTD/MTD rows that `/reports/upload` does.
 
-        Authenticated with `Authorization: Bearer <INTERNAL_API_KEY>` (the same
+        Authenticated with `Authorization: Bearer <ETL_API_KEY>` (the same
         shared secret the ETL uses for `/reports/jobs/{reference}/complete`).
         Because there is no JWT, `tenant_id` is supplied in the request body
         and `uploaded_by` is intentionally recorded as NULL. The
@@ -3698,40 +3858,40 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/IngestReportRequest"
+              $ref: '#/components/schemas/IngestReportRequest'
       responses:
-        "200":
+        '200':
           description: >
             Upload completed. Partial success is allowed: rows whose
             `agentCode` did not resolve to a user are reported in `errors`.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UploadReportResponse"
-        "400":
+                $ref: '#/components/schemas/UploadReportResponse'
+        '400':
           description: Validation failed (Zod schema mismatch or invalid ETL data).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
-        "401":
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
           description: Missing or wrong internal key.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
           description: Non-consecutive month upload (e.g. month 4 when latest is month 2).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
           description: Internal server error.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /sales-reports:
     get:
@@ -3766,36 +3926,36 @@ paths:
             maximum: 2100
             example: 2026
       responses:
-        "200":
+        '200':
           description: Array of per-agent year rollups for the tenant.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SalesReportListResponse"
-        "400":
+                $ref: '#/components/schemas/SalesReportListResponse'
+        '400':
           description: Invalid query parameter.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
-        "401":
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
           description: Missing or invalid bearer token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
           description: Caller's role is not entitled to this endpoint (e.g. agent).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
           description: Internal server error.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /sales-reports/me:
     get:
@@ -3818,38 +3978,38 @@ paths:
             maximum: 2100
             example: 2026
       responses:
-        "200":
+        '200':
           description: The caller's per-agent year rollup.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SalesReportSingleResponse"
-        "400":
+                $ref: '#/components/schemas/SalesReportSingleResponse'
+        '400':
           description: Invalid query parameter.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
-        "401":
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
           description: Missing or invalid bearer token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
           description: No sales report exists for the calling user in that year.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
               example:
                 message: No sales report for this year
-        "500":
+        '500':
           description: Internal server error.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /sales-reports/uploads:
     get:
@@ -3898,36 +4058,36 @@ paths:
             maximum: 200
             default: 50
       responses:
-        "200":
+        '200':
           description: Paginated audit entries with `meta` for pagination state.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UploadAuditListResponse"
-        "400":
+                $ref: '#/components/schemas/UploadAuditListResponse'
+        '400':
           description: Invalid query parameter.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ValidationErrorResponse"
-        "401":
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
           description: Missing or invalid bearer token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
           description: Caller is not a manager.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
           description: Internal server error.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /reports/jobs:
     post:
@@ -3961,7 +4121,7 @@ paths:
                   minimum: 1
                   maximum: 12
       responses:
-        "202":
+        '202':
           description: Job accepted; processing asynchronously
           content:
             application/json:
@@ -3976,16 +4136,15 @@ paths:
                         type: string
                         pattern: '^SALES-REPORT-\d{17}$'
                         example: SALES-REPORT-20260502143022873
-        "400":
-          { description: Missing file, invalid year/month, or file too large }
-        "401": { description: Missing or invalid bearer token }
-        "403": { description: Caller is not a manager }
-        "409":
+        '400': { description: Missing file, invalid year/month, or file too large }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Caller is not a manager }
+        '409':
           description: Non-consecutive month upload (e.g. month 4 when latest is month 2).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
   /reports/jobs/{reference}:
     get:
@@ -4002,18 +4161,15 @@ paths:
             pattern: '^SALES-REPORT-\d{17}$'
           example: SALES-REPORT-20260502143022873
       responses:
-        "200":
+        '200':
           description: Job state
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ReportJobResponse"
-        "401": { description: Missing or invalid bearer token }
-        "403":
-          {
-            description: Job belongs to another tenant or caller is not a manager,
-          }
-        "404": { description: Job not found }
+                $ref: '#/components/schemas/ReportJobResponse'
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Job belongs to another tenant or caller is not a manager }
+        '404': { description: Job not found }
 
   /reports/jobs/{reference}/complete:
     post:
@@ -4021,7 +4177,7 @@ paths:
       summary: ETL callback (internal-key auth, NOT user JWT)
       description: >
         Called by the Python ETL service when processing finishes. Authenticated
-        with `Authorization: Bearer <INTERNAL_API_KEY>`. Triggers persistence
+        with `Authorization: Bearer <ETL_API_KEY>`. Triggers persistence
         on success or marks the job failed on error.
       security:
         - bearerAuth: []
@@ -4038,12 +4194,12 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/EtlCallbackBody"
+              $ref: '#/components/schemas/EtlCallbackBody'
       responses:
-        "204": { description: Callback accepted }
-        "400": { description: Validation failed }
-        "401": { description: Missing or wrong internal key }
-        "404": { description: Job not found }
+        '204': { description: Callback accepted }
+        '400': { description: Validation failed }
+        '401': { description: Missing or wrong internal key }
+        '404': { description: Job not found }
 
   /reports/jobs/{reference}/retry:
     post:
@@ -4063,7 +4219,7 @@ paths:
             pattern: '^SALES-REPORT-\d{17}$'
           example: SALES-REPORT-20260502143022873
       responses:
-        "202":
+        '202':
           description: Retry kicked off
           content:
             application/json:
@@ -4077,13 +4233,10 @@ paths:
                       reference:
                         type: string
                         pattern: '^SALES-REPORT-\d{17}$'
-        "401": { description: Missing or invalid bearer token }
-        "403":
-          {
-            description: Caller is not a manager or job belongs to another tenant,
-          }
-        "404": { description: Job not found }
-        "409": { description: Job is not in failed status }
+        '401': { description: Missing or invalid bearer token }
+        '403': { description: Caller is not a manager or job belongs to another tenant }
+        '404': { description: Job not found }
+        '409': { description: Job is not in failed status }
 
   ##############################################################################
   # INTERNAL
@@ -4092,14 +4245,14 @@ paths:
   /internal/cleanup-old-report-files:
     post:
       tags: [Internal]
-      summary: Retention cleanup for raw report files (INTERNAL_API_KEY auth)
+      summary: Retention cleanup for raw report files (ETL_API_KEY auth)
       description: >
         Deletes raw xlsx files in the `reports-raw` Storage bucket attached to
         completed `report_jobs` whose `created_at` is older than 30 days, then
         clears the `report_jobs.storage_path` for those rows so the same files
         are not re-queued on subsequent runs. The audit row itself is retained.
 
-        Authenticated with `Authorization: Bearer <INTERNAL_API_KEY>`. Designed
+        Authenticated with `Authorization: Bearer <ETL_API_KEY>`. Designed
         to be invoked by an external scheduler (Vercel Cron, GitHub Actions,
         etc.) once per day. Replaces an earlier pg_cron-based approach which
         deleted only `storage.objects` metadata rows and orphaned the file
@@ -4112,7 +4265,7 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        "200":
+        '200':
           description: Cleanup completed (possibly with per-chunk failures, see response).
           content:
             application/json:
@@ -4131,13 +4284,13 @@ paths:
                         type: integer
                         minimum: 0
                         description: Number of report-job files that failed to remove and remain queued for the next run.
-        "401": { description: Missing or wrong internal key }
-        "500":
+        '401': { description: Missing or wrong internal key }
+        '500':
           description: Internal server error (unexpected — per-chunk failures are reported in the 200 body, not surfaced as 500).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
 
 ################################################################################
 # Components
@@ -4151,6 +4304,7 @@ components:
       bearerFormat: JWT
 
   schemas:
+
     UserObject:
       type: object
       required:
@@ -4203,11 +4357,11 @@ components:
         created_at:
           type: string
           format: date-time
-          example: "2026-03-07T08:00:00.000Z"
+          example: '2026-03-07T08:00:00.000Z'
         updated_at:
           type: string
           format: date-time
-          example: "2026-03-07T08:00:00.000Z"
+          example: '2026-03-07T08:00:00.000Z'
         managed_group_ids:
           type: array
           items:
@@ -4253,11 +4407,11 @@ components:
         created_at:
           type: string
           format: date-time
-          example: "2026-03-10T08:00:00.000Z"
+          example: '2026-03-10T08:00:00.000Z'
         updated_at:
           type: string
           format: date-time
-          example: "2026-03-10T08:00:00.000Z"
+          example: '2026-03-10T08:00:00.000Z'
 
     GroupStatsObject:
       type: object
@@ -4322,14 +4476,14 @@ components:
           type: string
           example: Alpha Team
         ytd:
-          $ref: "#/components/schemas/DashboardStatsPeriod"
+          $ref: '#/components/schemas/DashboardStatsPeriod'
         mtd:
-          $ref: "#/components/schemas/GroupDetailStatsMtdPeriod"
+          $ref: '#/components/schemas/GroupDetailStatsMtdPeriod'
         agents:
           type: array
           description: List of individual agent statistics for the group.
           items:
-            $ref: "#/components/schemas/AgentStats"
+            $ref: '#/components/schemas/AgentStats'
 
     GroupDetailStatsMtdPeriod:
       type: object
@@ -4476,7 +4630,7 @@ components:
         prospect_phone:
           type: string
           nullable: true
-          example: "+6591234567"
+          example: '+6591234567'
         current_stage:
           type: string
           enum: [prospect, appointment, sales]
@@ -4490,20 +4644,20 @@ components:
         prospect_entered_at:
           type: string
           format: date-time
-          example: "2026-03-12T08:00:00.000Z"
+          example: '2026-03-12T08:00:00.000Z'
         appointment_date:
           type: string
           format: date
           nullable: true
-          example: "2026-04-01"
+          example: '2026-04-01'
         appointment_start_time:
           type: string
           nullable: true
-          example: "14:00"
+          example: '14:00'
         appointment_end_time:
           type: string
           nullable: true
-          example: "15:00"
+          example: '15:00'
         appointment_location:
           type: string
           nullable: true
@@ -4517,7 +4671,7 @@ components:
           type: string
           format: date-time
           nullable: true
-          example: "2026-04-01T15:00:00.000Z"
+          example: '2026-04-01T15:00:00.000Z'
         sales_parts_completed:
           type: array
           items:
@@ -4556,15 +4710,15 @@ components:
           type: string
           format: date-time
           nullable: true
-          example: "2026-04-10T10:00:00.000Z"
+          example: '2026-04-10T10:00:00.000Z'
         created_at:
           type: string
           format: date-time
-          example: "2026-03-12T08:00:00.000Z"
+          example: '2026-03-12T08:00:00.000Z'
         updated_at:
           type: string
           format: date-time
-          example: "2026-03-12T08:00:00.000Z"
+          example: '2026-03-12T08:00:00.000Z'
 
     EventObject:
       type: object
@@ -4597,7 +4751,7 @@ components:
           description: >
             Start date and time of the event stored as a TIMESTAMPTZ value.
             Value of the `startDate` field supplied in the request.
-          example: "2026-04-15T09:00:00.000Z"
+          example: '2026-04-15T09:00:00.000Z'
         end_date:
           type: string
           format: date-time
@@ -4605,7 +4759,7 @@ components:
           description: >
             End date and time of the event stored as a TIMESTAMPTZ value.
             Value of the `endDate` field supplied in the request.
-          example: "2026-04-15T11:00:00.000Z"
+          example: '2026-04-15T11:00:00.000Z'
         status:
           type: string
           enum: [upcoming, completed, cancelled]
@@ -4613,9 +4767,9 @@ components:
           example: upcoming
         type:
           type: string
-          enum: ["Face to Face", "Online"]
+          enum: ['Face to Face', 'Online']
           description: Delivery format of the event.
-          example: "Face to Face"
+          example: 'Face to Face'
         description:
           type: string
           nullable: true
@@ -4623,7 +4777,7 @@ components:
         meeting_link:
           type: string
           nullable: true
-          example: "https://meet.example.com/q2-kickoff"
+          example: 'https://meet.example.com/q2-kickoff'
         venue:
           type: string
           nullable: true
@@ -4640,11 +4794,16 @@ components:
         created_at:
           type: string
           format: date-time
-          example: "2026-03-14T08:00:00.000Z"
+          example: '2026-03-14T08:00:00.000Z'
         updated_at:
           type: string
           format: date-time
-          example: "2026-03-14T08:00:00.000Z"
+          example: '2026-03-14T08:00:00.000Z'
+        visibility:
+          type: string
+          enum: [public, private]
+          description: Visibility of the event. Defaults to `public` for `agent` and `group_leader` roles, `private` for all other roles.
+          example: private
         groupIds:
           type: array
           items:
@@ -4664,14 +4823,64 @@ components:
             - d4e5f6a7-b8c9-0123-def0-234567890123
             - e5f6a7b8-c9d0-1234-ef01-345678901234
 
+    PublicEventObject:
+      type: object
+      required:
+        - id
+        - event_title
+        - start_date
+        - type
+        - created_by_name
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: b2c3d4e5-f6a7-8901-bcde-f12345678901
+        event_title:
+          type: string
+          example: Q2 Agent Networking Night
+        description:
+          type: string
+          nullable: true
+          example: A networking event open to all agents in the region.
+        start_date:
+          type: string
+          format: date-time
+          example: '2026-06-01T18:00:00.000Z'
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-06-01T21:00:00.000Z'
+        type:
+          type: string
+          enum: ['Online', 'Face to Face']
+          example: 'Face to Face'
+        venue:
+          type: string
+          nullable: true
+          example: Marina Bay Sands Convention Centre
+        meeting_link:
+          type: string
+          nullable: true
+          example: 'https://meet.example.com/q2-networking'
+        created_by_name:
+          type: string
+          example: Jane Doe
+        status:
+          type: string
+          enum: [upcoming, completed]
+          example: upcoming
+
     DashboardStatsObject:
       type: object
       required: [ytd, mtd]
       properties:
         ytd:
-          $ref: "#/components/schemas/DashboardStatsPeriod"
+          $ref: '#/components/schemas/DashboardStatsPeriod'
         mtd:
-          $ref: "#/components/schemas/DashboardStatsPeriod"
+          $ref: '#/components/schemas/DashboardStatsPeriod'
 
     DashboardStatsPeriod:
       type: object
@@ -4772,11 +4981,11 @@ components:
         created_at:
           type: string
           format: date-time
-          example: "2026-03-29T08:00:00.000Z"
+          example: '2026-03-29T08:00:00.000Z'
         updated_at:
           type: string
           format: date-time
-          example: "2026-03-29T08:00:00.000Z"
+          example: '2026-03-29T08:00:00.000Z'
 
     LeaderboardEntryObject:
       type: object
@@ -4946,9 +5155,9 @@ components:
           type: array
           description: Paginated list of individual point transactions.
           items:
-            $ref: "#/components/schemas/AgentPointsBreakdownItem"
+            $ref: '#/components/schemas/AgentPointsBreakdownItem'
         pagination:
-          $ref: "#/components/schemas/PaginationObject"
+          $ref: '#/components/schemas/PaginationObject'
 
     AgentPointsBreakdownItem:
       type: object
@@ -4963,7 +5172,7 @@ components:
           type: string
           format: date-time
           description: Timestamp at which the points were awarded.
-          example: "2026-03-30T10:00:00.000Z"
+          example: '2026-03-30T10:00:00.000Z'
         category:
           type: string
           description: Category the points belong to.
@@ -5074,7 +5283,7 @@ components:
           format: uuid
           example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
         coaching_type:
-          $ref: "#/components/schemas/CoachingTypeEnum"
+          $ref: '#/components/schemas/CoachingTypeEnum'
         title:
           type: string
           example: Weekly Group Coaching
@@ -5088,7 +5297,7 @@ components:
           description: >
             Start date and time of the session stored as a TIMESTAMPTZ value.
             Value of the `startDate` field supplied in the request.
-          example: "2026-04-15T10:00:00.000Z"
+          example: '2026-04-15T10:00:00.000Z'
         end_date:
           type: string
           format: date-time
@@ -5096,16 +5305,16 @@ components:
           description: >
             End date and time of the session stored as a TIMESTAMPTZ value.
             Value of the `endDate` field supplied in the request.
-          example: "2026-04-15T12:00:00.000Z"
+          example: '2026-04-15T12:00:00.000Z'
         training_mode:
-          $ref: "#/components/schemas/TrainingModeEnum"
+          $ref: '#/components/schemas/TrainingModeEnum'
         link:
           type: string
           nullable: true
           description: Meeting link (e.g. Zoom, Google Meet).
           example: https://zoom.us/j/123456789
         status:
-          $ref: "#/components/schemas/SessionStatusEnum"
+          $ref: '#/components/schemas/SessionStatusEnum'
         created_by:
           type: string
           format: uuid
@@ -5122,11 +5331,11 @@ components:
         created_at:
           type: string
           format: date-time
-          example: "2026-04-01T08:00:00.000Z"
+          example: '2026-04-01T08:00:00.000Z'
         updated_at:
           type: string
           format: date-time
-          example: "2026-04-01T08:00:00.000Z"
+          example: '2026-04-01T08:00:00.000Z'
         targetGroupIds:
           type: array
           items:
@@ -5145,7 +5354,7 @@ components:
         attendance:
           type: array
           items:
-            $ref: "#/components/schemas/AttendanceRecordObject"
+            $ref: '#/components/schemas/AttendanceRecordObject'
           description: Attendance records for this session.
 
     AttendanceRecordObject:
@@ -5193,21 +5402,21 @@ components:
           description: Name of the agent's group. Null if the agent is not in a group.
           example: Team Alpha
         status:
-          $ref: "#/components/schemas/AttendanceStatusEnum"
+          $ref: '#/components/schemas/AttendanceStatusEnum'
         joined_at:
           type: string
           format: date-time
           nullable: true
           description: Timestamp when the agent joined the session. Null if not yet joined.
-          example: "2026-04-15T10:05:00.000Z"
+          example: '2026-04-15T10:05:00.000Z'
         created_at:
           type: string
           format: date-time
-          example: "2026-04-15T08:00:00.000Z"
+          example: '2026-04-15T08:00:00.000Z'
         updated_at:
           type: string
           format: date-time
-          example: "2026-04-15T10:05:00.000Z"
+          example: '2026-04-15T10:05:00.000Z'
 
     ValidationErrorResponse:
       type: object
@@ -5252,7 +5461,7 @@ components:
           type: string
           format: date-time
           description: Timestamp the ETL pipeline produced this result. Informational only — not used to derive year/month.
-          example: "2026-04-29T16:01:33.114596+00:00"
+          example: '2026-04-29T16:01:33.114596+00:00'
         rows_loaded:
           type: integer
           minimum: 0
@@ -5332,7 +5541,7 @@ components:
           description: Calendar month (1-12) the report covers. Authoritative — supplied by the caller, not derived from the file.
           example: 5
         etlResult:
-          $ref: "#/components/schemas/EtlResultObject"
+          $ref: '#/components/schemas/EtlResultObject'
 
     IngestReportRequest:
       type: object
@@ -5366,7 +5575,7 @@ components:
           description: Calendar month (1-12) the report covers. Authoritative — supplied by the caller, not derived from the file.
           example: 5
         etl_result:
-          $ref: "#/components/schemas/EtlResultObject"
+          $ref: '#/components/schemas/EtlResultObject'
 
     UploadReportResponse:
       type: object
@@ -5517,7 +5726,7 @@ components:
         data:
           type: array
           items:
-            $ref: "#/components/schemas/SalesReport"
+            $ref: '#/components/schemas/SalesReport'
 
     SalesReportSingleResponse:
       type: object
@@ -5527,7 +5736,7 @@ components:
           type: boolean
           example: true
         data:
-          $ref: "#/components/schemas/SalesReport"
+          $ref: '#/components/schemas/SalesReport'
 
     UploadAuditEntry:
       type: object
@@ -5589,7 +5798,7 @@ components:
         data:
           type: array
           items:
-            $ref: "#/components/schemas/UploadAuditEntry"
+            $ref: '#/components/schemas/UploadAuditEntry'
         meta:
           type: object
           required: [page, pageSize, total]
@@ -5645,7 +5854,7 @@ components:
       required: [success, data]
       properties:
         success: { type: boolean }
-        data: { $ref: "#/components/schemas/ReportJobObject" }
+        data: { $ref: '#/components/schemas/ReportJobObject' }
 
     EtlCallbackBody:
       type: object

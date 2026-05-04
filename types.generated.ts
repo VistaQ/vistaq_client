@@ -1375,7 +1375,7 @@ export interface paths {
         };
         /**
          * Update a group (admin only)
-         * @description Updates the group identified by `groupId`. The caller must supply a valid Bearer token belonging to a user with the `admin` role. All request body fields are optional, but at least one must be provided. When `leader_id` is supplied and differs from the current leader, the new leader is promoted to `group_leader` and the previous leader is demoted back to `agent`. When `trainer_ids` is supplied, the existing trainer assignments for the group are replaced with the provided set. When `member_ids` is supplied, the `group_id` field on each referenced user is set to this group. All referenced users must exist within the caller's tenant.
+         * @description Updates the group identified by `groupId`. The caller must supply a valid Bearer token belonging to a user with the `admin` role. All request body fields are optional, but at least one must be provided. When `leader_id` is supplied and differs from the current leader, the new leader is promoted to `group_leader` and the previous leader is demoted back to `agent`. When `trainer_ids` is supplied, the existing trainer assignments for the group are replaced with the provided set. When `member_ids` is supplied, the group's member set is **replaced** with the provided list — users currently in the group but absent from the new list have their `group_id` set to `null` (unlinked). The current group leader is always retained as a member regardless of whether their UUID appears in `member_ids`. Passing an empty array (`[]`) unlinks all non-leader members. All provided UUIDs must exist within the caller's tenant.
          */
         put: {
             parameters: {
@@ -1411,7 +1411,7 @@ export interface paths {
                          */
                         trainer_ids?: string[];
                         /**
-                         * @description Array of user UUIDs to assign to this group. Sets the `group_id` field on each referenced user. All provided IDs must exist within the caller's tenant.
+                         * @description Replaces the full member set for the group. Users currently in the group but absent from this list have their `group_id` set to `null`. The current group leader is always retained regardless of whether their UUID is included. Pass `[]` to unlink all non-leader members. All provided UUIDs must exist within the caller's tenant.
                          * @example [
                          *       "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
                          *       "b1ccde11-8d1c-5fa9-cc7e-7cc0ce491b22"
@@ -2214,7 +2214,7 @@ export interface paths {
         put?: never;
         /**
          * Create an event
-         * @description Creates a new event scoped to the authenticated user's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin`, `master_trainer`, `trainer`, or `group_leader` role — `agent` users will receive a 403. At least one of `groupIds` or `agentIds` must be provided. For `trainer` users, all supplied `groupIds` must belong to groups that the trainer manages via the `group_trainers` junction table; any unmanaged group IDs result in a 400.
+         * @description Creates a new event scoped to the authenticated user's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin`, `master_trainer`, `trainer`, `group_leader`, or `agent` role. At least one of `groupIds` or `agentIds` must be provided for non-`agent` roles — `agent` users are automatically assigned to their own event and may omit both fields. For `trainer` users, all supplied `groupIds` must belong to groups that the trainer manages via the `group_trainers` junction table; any unmanaged group IDs result in a 400. If `visibility` is not supplied, it defaults to `public` for `agent` and `group_leader` roles, and `private` for all other roles.
          */
         post: {
             parameters: {
@@ -2272,14 +2272,20 @@ export interface paths {
                          */
                         description: string;
                         /**
-                         * @description Array of group UUIDs the event is associated with. Must contain at least one UUID if provided, and must not contain duplicates. For trainers, all IDs must be groups they manage. At least one of `groupIds` or `agentIds` must be supplied.
+                         * @description Visibility of the event. Optional. Defaults to `public` for `agent` and `group_leader` roles, `private` for all other roles.
+                         * @example public
+                         * @enum {string}
+                         */
+                        visibility?: "public" | "private";
+                        /**
+                         * @description Array of group UUIDs the event is associated with. Must contain at least one UUID if provided, and must not contain duplicates. For trainers, all IDs must be groups they manage. At least one of `groupIds` or `agentIds` must be supplied (ignored for `agent` role — agents are always assigned to their own event automatically).
                          * @example [
                          *       "7c9e6679-7425-40de-944b-e07fc1f90ae7"
                          *     ]
                          */
                         groupIds?: string[];
                         /**
-                         * @description Array of agent user UUIDs to assign individually to the event via the `event_agents` junction table. Must contain at least one UUID if provided, and must not contain duplicates. At least one of `groupIds` or `agentIds` must be supplied.
+                         * @description Array of agent user UUIDs to assign individually to the event via the `event_agents` junction table. Must contain at least one UUID if provided, and must not contain duplicates. At least one of `groupIds` or `agentIds` must be supplied (ignored for `agent` role — agents are always assigned to their own event automatically).
                          * @example [
                          *       "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                          *     ]
@@ -2325,7 +2331,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Forbidden. Returned when the authenticated user has the `agent` role, which is not permitted to create events. */
+                /** @description Forbidden — non-admin attempting to modify another user's event. */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -2433,7 +2439,7 @@ export interface paths {
         };
         /**
          * Update an event
-         * @description Updates the event identified by `eventId`. The caller must supply a valid Bearer token belonging to a user with the `admin`, `master_trainer`, `trainer`, or `group_leader` role — `agent` users will receive a 403. All request body fields are optional, but at least one must be provided. When `groupIds` is supplied, the existing `event_groups` entries for this event are replaced entirely. When `agentIds` is supplied, the existing `event_agents` entries for this event are replaced entirely. For `trainer` users, all supplied `groupIds` must belong to groups they manage; any unmanaged group IDs result in a 400.
+         * @description Updates the event identified by `eventId`. The caller must supply a valid Bearer token belonging to a user with the `admin`, `master_trainer`, `trainer`, `group_leader`, or `agent` role. All request body fields are optional, but at least one must be provided. Non-admin users may only update events they created — attempting to modify another user's event returns a 403. `agent` users always remain the sole assigned agent; supplied `groupIds` and `agentIds` are ignored and replaced with the agent's own ID. When `groupIds` is supplied (non-`agent` roles), the existing `event_groups` entries for this event are replaced entirely. When `agentIds` is supplied, the existing `event_agents` entries for this event are replaced entirely. For `trainer` users, all supplied `groupIds` must belong to groups they manage; any unmanaged group IDs result in a 400.
          */
         put: {
             parameters: {
@@ -2494,14 +2500,20 @@ export interface paths {
                          */
                         description?: string;
                         /**
-                         * @description Replacement set of group UUIDs for the event. Existing `event_groups` entries are deleted and replaced with these values. Must not contain duplicates. For trainers, all IDs must be groups they manage.
+                         * @description Updated visibility of the event. Optional. Defaults to `public` for `agent` and `group_leader` roles, `private` for all other roles when not supplied on creation.
+                         * @example public
+                         * @enum {string}
+                         */
+                        visibility?: "public" | "private";
+                        /**
+                         * @description Replacement set of group UUIDs for the event. Existing `event_groups` entries are deleted and replaced with these values. Must not contain duplicates. For trainers, all IDs must be groups they manage. Ignored for `agent` role.
                          * @example [
                          *       "7c9e6679-7425-40de-944b-e07fc1f90ae7"
                          *     ]
                          */
                         groupIds?: string[];
                         /**
-                         * @description Replacement set of agent user UUIDs for the event. Existing `event_agents` entries are deleted and replaced with these values. Must not contain duplicates.
+                         * @description Replacement set of agent user UUIDs for the event. Existing `event_agents` entries are deleted and replaced with these values. Must not contain duplicates. Ignored for `agent` role.
                          * @example [
                          *       "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                          *     ]
@@ -2547,7 +2559,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Forbidden. Returned when the authenticated user has the `agent` role, which is not permitted to update events. */
+                /** @description Forbidden — non-admin attempting to modify another user's event. */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -2586,6 +2598,175 @@ export interface paths {
                 };
             };
         };
+        post?: never;
+        /**
+         * Delete an event
+         * @description Permanently deletes the event identified by `eventId`. The caller must supply a valid Bearer token. Admin users may delete any event within the tenant. Non-admin users may only delete events they themselves created — attempting to delete another user's event returns a 403.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID of the event to delete. */
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Event deleted successfully. No response body is returned. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden — non-admin attempting to delete another user's event. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Not found. Returned when no event exists for the given `eventId`. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Event not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{eventId}/public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get public event details
+         * @description Returns publicly visible details for a single event. No authentication is required. Returns 404 if the event does not exist, has been cancelled, or has `visibility` set to `private`. Successful responses include a `Cache-Control: public, max-age=60` header.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID of the event to retrieve. */
+                    eventId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Public event details retrieved successfully. */
+                200: {
+                    headers: {
+                        /** @description Instructs clients and proxies to cache the response for 60 seconds. */
+                        "Cache-Control"?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true,
+                         *       "data": {
+                         *         "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                         *         "event_title": "Q2 Agent Networking Night",
+                         *         "description": "A networking event open to all agents in the region.",
+                         *         "start_date": "2026-06-01T18:00:00.000Z",
+                         *         "end_date": "2026-06-01T21:00:00.000Z",
+                         *         "type": "Face to Face",
+                         *         "venue": "Marina Bay Sands Convention Centre",
+                         *         "meeting_link": null,
+                         *         "created_by_name": "Jane Doe",
+                         *         "status": "upcoming"
+                         *       }
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["PublicEventObject"];
+                        };
+                    };
+                };
+                /** @description Not found. Returned when no event exists for the given `eventId`, the event has been cancelled, or the event is not public. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": false,
+                         *       "message": "Event not found"
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example false */
+                            success: boolean;
+                            /** @example Event not found */
+                            message: string;
+                        };
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -4078,9 +4259,9 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Manual ETL ingest (interim — INTERNAL_API_KEY auth, NOT user JWT)
+         * Manual ETL ingest (interim — ETL_API_KEY auth, NOT user JWT)
          * @description Manual-mode endpoint used while the production HTTP-hosted ETL is being built. The ETL author runs the local Python pipeline on their laptop and POSTs the resulting `etl_result` here directly. Skips the `report_jobs` lifecycle and Storage round-trip entirely; just persists the same audit + YTD/MTD rows that `/reports/upload` does.
-         *     Authenticated with `Authorization: Bearer <INTERNAL_API_KEY>` (the same shared secret the ETL uses for `/reports/jobs/{reference}/complete`). Because there is no JWT, `tenant_id` is supplied in the request body and `uploaded_by` is intentionally recorded as NULL. The consecutive-month guard (409) is inherited from the shared service layer.
+         *     Authenticated with `Authorization: Bearer <ETL_API_KEY>` (the same shared secret the ETL uses for `/reports/jobs/{reference}/complete`). Because there is no JWT, `tenant_id` is supplied in the request body and `uploaded_by` is intentionally recorded as NULL. The consecutive-month guard (409) is inherited from the shared service layer.
          */
         post: {
             parameters: {
@@ -4554,7 +4735,7 @@ export interface paths {
         put?: never;
         /**
          * ETL callback (internal-key auth, NOT user JWT)
-         * @description Called by the Python ETL service when processing finishes. Authenticated with `Authorization: Bearer <INTERNAL_API_KEY>`. Triggers persistence on success or marks the job failed on error.
+         * @description Called by the Python ETL service when processing finishes. Authenticated with `Authorization: Bearer <ETL_API_KEY>`. Triggers persistence on success or marks the job failed on error.
          */
         post: {
             parameters: {
@@ -4693,9 +4874,9 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Retention cleanup for raw report files (INTERNAL_API_KEY auth)
+         * Retention cleanup for raw report files (ETL_API_KEY auth)
          * @description Deletes raw xlsx files in the `reports-raw` Storage bucket attached to completed `report_jobs` whose `created_at` is older than 30 days, then clears the `report_jobs.storage_path` for those rows so the same files are not re-queued on subsequent runs. The audit row itself is retained.
-         *     Authenticated with `Authorization: Bearer <INTERNAL_API_KEY>`. Designed to be invoked by an external scheduler (Vercel Cron, GitHub Actions, etc.) once per day. Replaces an earlier pg_cron-based approach which deleted only `storage.objects` metadata rows and orphaned the file bytes — this endpoint goes through the Storage HTTP admin API which actually removes the backing bytes.
+         *     Authenticated with `Authorization: Bearer <ETL_API_KEY>`. Designed to be invoked by an external scheduler (Vercel Cron, GitHub Actions, etc.) once per day. Replaces an earlier pg_cron-based approach which deleted only `storage.objects` metadata rows and orphaned the file bytes — this endpoint goes through the Storage HTTP admin API which actually removes the backing bytes.
          *     The endpoint never throws on per-chunk failures. `failedCount > 0` indicates a partial failure and the next run will retry the affected files (they retain their `storage_path`).
          */
         post: {
@@ -5147,6 +5328,12 @@ export interface components {
              */
             updated_at: string;
             /**
+             * @description Visibility of the event. Defaults to `public` for `agent` and `group_leader` roles, `private` for all other roles.
+             * @example private
+             * @enum {string}
+             */
+            visibility?: "public" | "private";
+            /**
              * @description IDs of groups assigned to this event
              * @example [
              *       "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
@@ -5162,6 +5349,43 @@ export interface components {
              *     ]
              */
             agentIds: string[];
+        };
+        PublicEventObject: {
+            /**
+             * Format: uuid
+             * @example b2c3d4e5-f6a7-8901-bcde-f12345678901
+             */
+            id: string;
+            /** @example Q2 Agent Networking Night */
+            event_title: string;
+            /** @example A networking event open to all agents in the region. */
+            description?: string | null;
+            /**
+             * Format: date-time
+             * @example 2026-06-01T18:00:00.000Z
+             */
+            start_date: string;
+            /**
+             * Format: date-time
+             * @example 2026-06-01T21:00:00.000Z
+             */
+            end_date?: string | null;
+            /**
+             * @example Face to Face
+             * @enum {string}
+             */
+            type: "Online" | "Face to Face";
+            /** @example Marina Bay Sands Convention Centre */
+            venue?: string | null;
+            /** @example https://meet.example.com/q2-networking */
+            meeting_link?: string | null;
+            /** @example Jane Doe */
+            created_by_name: string;
+            /**
+             * @example upcoming
+             * @enum {string}
+             */
+            status: "upcoming" | "completed";
         };
         DashboardStatsObject: {
             ytd: components["schemas"]["DashboardStatsPeriod"];
