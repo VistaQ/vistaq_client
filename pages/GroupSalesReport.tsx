@@ -53,55 +53,6 @@ const MdrtBar: React.FC<{ label: string; value: number; target: number }> = ({ l
   );
 };
 
-// ─── mock data for demo mode ─────────────────────────────────────────────────
-
-const MOCK_GROUP_REPORTS: SalesReportType[] = [
-  {
-    id: 'mock-g1', agent_id: 'mock-a1', agent_code: 'T75040K', agent_name: 'Sarah Tan Mei Ling',
-    year: new Date().getFullYear(), imported_at: new Date().toISOString(),
-    fyct_ytd: 156_000, fyct_pct: 39.0, mdrt_shortage_fyct: 244_000,
-    fyc_ytd: 148_200, fyc_pct: 37.05, mdrt_shortage_fyc: 251_800,
-    ace_ytd: 312_500, noc_ytd: 9,
-    month_ace:  [48000, 55000, 70000, 82000, 57500, 0,0,0,0,0,0,0],
-    month_noc:  [1, 2, 2, 3, 1, 0,0,0,0,0,0,0],
-    month_fyct: [28000, 31000, 38500, 40000, 18500, 0,0,0,0,0,0,0],
-    month_fyc:  [24000, 28500, 36000, 38200, 21500, 0,0,0,0,0,0,0],
-  },
-  {
-    id: 'mock-g2', agent_id: 'mock-a2', agent_code: 'T84012A', agent_name: 'Ahmad Zulkifli',
-    year: new Date().getFullYear(), imported_at: new Date().toISOString(),
-    fyct_ytd: 220_000, fyct_pct: 55.0, mdrt_shortage_fyct: 180_000,
-    fyc_ytd: 210_500, fyc_pct: 52.6, mdrt_shortage_fyc: 189_500,
-    ace_ytd: 440_000, noc_ytd: 14,
-    month_ace:  [72000, 88000, 92000, 95000, 93000, 0,0,0,0,0,0,0],
-    month_noc:  [2, 3, 3, 3, 3, 0,0,0,0,0,0,0],
-    month_fyct: [38000, 44000, 48000, 47000, 43000, 0,0,0,0,0,0,0],
-    month_fyc:  [36000, 42000, 46000, 45000, 41500, 0,0,0,0,0,0,0],
-  },
-  {
-    id: 'mock-g3', agent_id: 'mock-a3', agent_code: 'T91233B', agent_name: 'Nurul Izzati Razak',
-    year: new Date().getFullYear(), imported_at: new Date().toISOString(),
-    fyct_ytd: 88_000, fyct_pct: 22.0, mdrt_shortage_fyct: 312_000,
-    fyc_ytd: 82_000, fyc_pct: 20.5, mdrt_shortage_fyc: 318_000,
-    ace_ytd: 175_000, noc_ytd: 5,
-    month_ace:  [30000, 38000, 42000, 35000, 30000, 0,0,0,0,0,0,0],
-    month_noc:  [1, 1, 1, 1, 1, 0,0,0,0,0,0,0],
-    month_fyct: [15000, 18500, 21000, 18000, 15500, 0,0,0,0,0,0,0],
-    month_fyc:  [14000, 17000, 19500, 16500, 15000, 0,0,0,0,0,0,0],
-  },
-  {
-    id: 'mock-g4', agent_id: 'mock-a4', agent_code: 'T66701C', agent_name: 'Lee Chun Wei',
-    year: new Date().getFullYear(), imported_at: new Date().toISOString(),
-    fyct_ytd: 310_000, fyct_pct: 77.5, mdrt_shortage_fyct: 90_000,
-    fyc_ytd: 295_000, fyc_pct: 73.75, mdrt_shortage_fyc: 105_000,
-    ace_ytd: 620_000, noc_ytd: 18,
-    month_ace:  [110000, 120000, 130000, 135000, 125000, 0,0,0,0,0,0,0],
-    month_noc:  [3, 4, 4, 4, 3, 0,0,0,0,0,0,0],
-    month_fyct: [58000, 63000, 66000, 65000, 58000, 0,0,0,0,0,0,0],
-    month_fyc:  [55000, 60000, 63000, 62000, 55000, 0,0,0,0,0,0,0],
-  },
-];
-
 // ─── main page ───────────────────────────────────────────────────────────────
 
 const GroupSalesReport: React.FC = () => {
@@ -114,16 +65,9 @@ const GroupSalesReport: React.FC = () => {
   const n = currentMonth;
 
   const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [demoMode, setDemoMode] = useState(true);
   const [kpiMetric, setKpiMetric] = useState<'fyc' | 'fyct' | 'ace' | 'noc'>('fyc');
 
   useEffect(() => { refetchSalesReports(selectedYear); }, [selectedYear]);
-
-  useEffect(() => {
-    if (salesReports.length > 0 && !isLoadingSalesReports) {
-      setDemoMode(false);
-    }
-  }, [salesReports, isLoadingSalesReports]);
 
   if (!currentUser) return null;
 
@@ -142,8 +86,8 @@ const GroupSalesReport: React.FC = () => {
     );
   }
 
-  const hasRealData = salesReports.length > 0;
-  const reports: SalesReportType[] = demoMode || !hasRealData ? MOCK_GROUP_REPORTS : salesReports;
+  const reports: SalesReportType[] = salesReports;
+  const hasData = reports.length > 0;
 
   // ── Aggregate stats ──────────────────────────────────────────────────────
 
@@ -174,12 +118,15 @@ const GroupSalesReport: React.FC = () => {
 
   const agentChartData = [...reports]
     .sort((a, b) => (b[chartMetricKey[kpiMetric]] as number) - (a[chartMetricKey[kpiMetric]] as number))
-    .map(r => ({
-      name: r.agent_name.split(' ')[0], // first name only for chart label
-      fullName: r.agent_name,
-      value: r[chartMetricKey[kpiMetric]] as number,
-      mdrtPct: r.fyc_pct,
-    }));
+    .map(r => {
+      const parts = r.agent_name.trim().split(/\s+/);
+      return {
+        name: parts[parts.length - 1], // last name — distinctive, fits horizontally
+        fullName: r.agent_name,
+        value: r[chartMetricKey[kpiMetric]] as number,
+        mdrtPct: r.fyc_pct,
+      };
+    });
 
   // ── Download ─────────────────────────────────────────────────────────────
 
@@ -259,18 +206,6 @@ const GroupSalesReport: React.FC = () => {
             ))}
           </select>
 
-          {/* Demo toggle */}
-          {hasRealData && (
-            <button
-              onClick={() => setDemoMode(v => !v)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${
-                demoMode ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
-              }`}
-            >
-              {demoMode ? '⚠ Demo On' : 'Demo'}
-            </button>
-          )}
-
           {/* Download */}
           <div className="relative group">
             <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm">
@@ -290,26 +225,6 @@ const GroupSalesReport: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Demo banner ── */}
-      {(!hasRealData || demoMode) && (
-        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-500" />
-            <span>
-              {demoMode
-                ? 'Demo mode — showing sample group data.'
-                : 'No ETL data uploaded yet — showing sample data so you can preview all widgets.'}
-            </span>
-          </div>
-          <button
-            onClick={() => setDemoMode(v => !v)}
-            className="flex-shrink-0 px-3 py-1 rounded-lg text-xs font-bold border bg-amber-200 text-amber-800 border-amber-300 hover:bg-amber-300 transition-colors"
-          >
-            {demoMode ? 'Exit Demo' : 'View Demo'}
-          </button>
-        </div>
-      )}
-
       {/* ── Loading ── */}
       {isLoadingSalesReports && (
         <div className="flex items-center justify-center gap-2 py-8 text-gray-400">
@@ -317,6 +232,19 @@ const GroupSalesReport: React.FC = () => {
           <span className="text-sm">Loading group sales data…</span>
         </div>
       )}
+
+      {/* ── Empty state ── */}
+      {!isLoadingSalesReports && !hasData && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+          <AlertCircle className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+          <p className="font-medium text-gray-700">No sales data for {selectedYear} yet.</p>
+          <p className="text-sm text-gray-400 mt-1">Group sales analytics will appear once an ETL upload has been processed.</p>
+        </div>
+      )}
+
+      {!isLoadingSalesReports && hasData && (
+        <>
+        {/* group widgets below */}
 
       {/* ── Group aggregate stat cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -423,7 +351,7 @@ const GroupSalesReport: React.FC = () => {
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={agentChartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <XAxis dataKey="name" tick={false} tickLine={false} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={v => isMonetary && v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
               <Tooltip
                 formatter={(v: number) => [isMonetary ? rm(v) : String(v), metricLabel[kpiMetric]]}
@@ -459,6 +387,8 @@ const GroupSalesReport: React.FC = () => {
           </ResponsiveContainer>
         </div>
       </div>
+      </>
+      )}
 
     </div>
   );

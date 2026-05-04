@@ -138,61 +138,11 @@ export const TRAINING_MODE_LABELS: Record<TrainingMode, string> = {
 
 // ─── Sales Report (ETL Import) ───────────────────────────────────────────────
 
-/** One row in the sales_reports table — one record per agent per year */
-export interface SalesReport {
-  id: string;
-  agent_id: string | null;   // null if agent_code not matched to a user
-  agent_code: string;
-  agent_name: string;
-  year: number;
-  imported_at: string;       // ISO timestamp of when this ETL was uploaded
-  // YTD summary
-  ace_ytd: number;           // Total premium amount YTD
-  noc_ytd: number;           // Number of cases YTD
-  fyct_ytd: number;          // First Year Commission Takaful YTD
-  fyct_pct: number;          // % of MDRT target (FYCT basis)
-  mdrt_shortage_fyct: number;// Remaining to MDRT (FYCT basis)
-  fyc_ytd: number;           // First Year Commission YTD
-  fyc_pct: number;           // % of MDRT target (FYC basis)
-  mdrt_shortage_fyc: number; // Remaining to MDRT (FYC basis)
-  // Monthly breakdown — index 0 = January, 11 = December
-  month_ace: number[];       // length 12
-  month_noc: number[];       // length 12
-  month_fyct: number[];      // length 12 — backend to populate
-  month_fyc: number[];       // length 12 — backend to populate
-}
+/** Per-agent annual sales-report rollup. See GET /api/sales-reports and /me. */
+export type SalesReport = components['schemas']['SalesReport'];
 
-/** Aggregated summary returned by GET /sales-reports/summary */
-export interface SalesReportSummary {
-  mtd: {
-    ace: number;
-    noc: number;
-    month: number; // 1–12
-    year: number;
-  };
-  ytd: {
-    ace: number;
-    noc: number;
-    fyc_ytd: number;
-    fyct_ytd: number;
-    fyc_mdrt_pct: number;
-    fyct_mdrt_pct: number;
-    fyc_mdrt_shortage: number;
-    fyct_mdrt_shortage: number;
-  };
-}
-
-/** Audit record of a past ETL upload */
-export interface SalesImportRecord {
-  id: string;
-  year: number;
-  month: number;
-  rows_imported: number;
-  rows_skipped: number;
-  imported_at: string;
-  imported_by_name: string;
-  status: 'success' | 'partial' | 'failed';
-}
+/** Audit row for a past upload batch. See GET /api/sales-reports/uploads. */
+export type UploadAuditEntry = components['schemas']['UploadAuditEntry'];
 
 export const MDRT_TARGET = 400_000; // RM — fixed for all agents
 export const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
