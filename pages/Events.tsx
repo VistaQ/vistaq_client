@@ -537,6 +537,8 @@ const Events: React.FC = () => {
         visibility: 'public' as 'public' | 'private',
     });
     const [agentSearch, setAgentSearch] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     if (!currentUser) return null;
     if (isLoadingEvents) return (
@@ -634,24 +636,25 @@ const Events: React.FC = () => {
     };
 
     const handleSave = async () => {
+        setSaveError(null);
         if (!formData.eventTitle || !formData.date || !formData.startTime || !formData.description) {
-            alert('Please fill in all required fields (Title, Date, Start Time, Description).');
+            setSaveError('Please fill in all required fields: Title, Date, Start Time, and Description.');
             return;
         }
         const isAgentPersonal = currentUser.role === UserRole.AGENT;
         // Venue/link are optional for agents (personal calendar events)
         if (!isAgentPersonal && formData.eventType === 'face-to-face' && !formData.venue) {
-            alert('Please enter a Venue / Location for a Face to Face event.');
+            setSaveError('Please enter a Venue / Location for a Face to Face event.');
             return;
         }
         if (!isAgentPersonal && formData.eventType === 'online' && !formData.meetingLink) {
-            alert('Please enter a Meeting URL for an Online event.');
+            setSaveError('Please enter a Meeting URL for an Online event.');
             return;
         }
         const hasGroupTarget = formData.groupIds.length > 0;
         const hasAgentTarget = formData.targetAgentIds.length > 0;
         if (!isAgentPersonal && !hasGroupTarget && !hasAgentTarget && currentUser.role !== UserRole.GROUP_LEADER) {
-            alert('Please select at least one group or agent to share this event with.');
+            setSaveError('Please select at least one group or agent to share this event with.');
             return;
         }
         const eventData: Record<string, unknown> = {
@@ -672,14 +675,23 @@ const Events: React.FC = () => {
             eventData.groupIds = formData.groupIds;
             if (formData.targetAgentIds.length > 0) eventData.agentIds = formData.targetAgentIds;
         }
-        if (editingEventId) {
-            await updateEvent(editingEventId, eventData);
-        } else {
-            await addEvent(eventData);
+        setIsSaving(true);
+        try {
+            if (editingEventId) {
+                await updateEvent(editingEventId, eventData);
+            } else {
+                await addEvent(eventData);
+            }
+            setIsModalOpen(false);
+            setEditingEventId(null);
+            setSaveError(null);
+            setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: [], targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming', visibility: 'public' });
+        } catch (err: any) {
+            const msg = err?.response?.data?.message || err?.message || 'Something went wrong. Please try again.';
+            setSaveError(msg);
+        } finally {
+            setIsSaving(false);
         }
-        setIsModalOpen(false);
-        setEditingEventId(null);
-        setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: [], targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming', visibility: 'public' });
     };
 
     const toggleGroup = (id: string) => {
@@ -1196,16 +1208,24 @@ const Events: React.FC = () => {
                         </div>
 
                         {/* Footer */}
-                        <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-                            <button type="button" onClick={() => setIsModalOpen(false)}
-                                className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl transition-all">
-                                Cancel
-                            </button>
-                            <button onClick={handleSave}
-                                className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-md shadow-blue-500/20">
-                                <Check className="w-4 h-4" />
-                                {editingEventId ? 'Update Event' : 'Publish Event'}
-                            </button>
+                        <div className="p-6 border-t border-gray-100 bg-gray-50 space-y-3">
+                            {saveError && (
+                                <div className="flex items-start gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                    <span>{saveError}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-end gap-3">
+                                <button type="button" onClick={() => { setIsModalOpen(false); setSaveError(null); }}
+                                    className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl transition-all">
+                                    Cancel
+                                </button>
+                                <button onClick={handleSave} disabled={isSaving}
+                                    className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed rounded-xl transition-all shadow-md shadow-blue-500/20">
+                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                    {isSaving ? 'Saving…' : editingEventId ? 'Update Event' : 'Publish Event'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
