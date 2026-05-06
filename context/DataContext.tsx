@@ -372,22 +372,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const date: string = (evt as any).date;
     const startTime: string = (evt as any).startTime;
     const endTime: string = (evt as any).endTime;
+    const isAgent = (evt as any).isAgent as boolean | undefined;
     const payload: Record<string, unknown> = {
       title: evt.event_title || 'New Event',
       description: evt.description || '',
-      groupIds: evt.groupIds || [],
       startDate: toLocalISO(date, startTime),
     };
     if (endTime) payload.endDate = toLocalISO(date, endTime);
     if (evt.type) payload.type = evt.type;
     if (evt.meeting_link) payload.link = evt.meeting_link;
     if (evt.venue) payload.venue = evt.venue;
-    if (evt.agentIds?.length) payload.agentIds = evt.agentIds;
+    if (evt.visibility) payload.visibility = evt.visibility;
+    // Agents: omit groupIds/agentIds — server auto-assigns self
+    if (!isAgent) {
+      payload.groupIds = evt.groupIds || [];
+      if (evt.agentIds?.length) payload.agentIds = evt.agentIds;
+    }
     await apiCall('/events', { method: 'POST', data: payload });
     await fetchEvents();
   };
 
   const updateEvent = async (id: string, evt: Partial<Event>) => {
+    const isAgent = (evt as any).isAgent as boolean | undefined;
     const payload: Record<string, unknown> = {};
     if (evt.event_title) payload.title = evt.event_title;
     const date: string = (evt as any).date;
@@ -401,8 +407,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (evt.type) payload.type = evt.type;
     if (evt.meeting_link) payload.link = evt.meeting_link;
     if (evt.venue) payload.venue = evt.venue;
-    if (evt.groupIds) payload.groupIds = evt.groupIds;
-    if (evt.agentIds?.length) payload.agentIds = evt.agentIds;
+    if (evt.visibility) payload.visibility = evt.visibility;
+    // Agents: omit groupIds/agentIds — server auto-assigns self
+    if (!isAgent) {
+      if (evt.groupIds) payload.groupIds = evt.groupIds;
+      if (evt.agentIds?.length) payload.agentIds = evt.agentIds;
+    }
     await apiCall(`/events/${id}`, { method: 'PUT', data: payload });
     await fetchEvents();
   };

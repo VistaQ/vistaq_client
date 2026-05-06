@@ -5,7 +5,8 @@ import { UserRole, Event, Group, User } from '../types';
 import { apiCall } from '../services/apiClient';
 import {
     CalendarDays, Plus, MapPin, User as UserIcon, Users, X, Clock, Link as LinkIcon,
-    Edit2, ExternalLink, LayoutGrid, ChevronLeft, ChevronRight, Archive, Search, Check, Loader2, AlertCircle
+    Edit2, ExternalLink, LayoutGrid, ChevronLeft, ChevronRight, Archive, Search, Check, Loader2, AlertCircle,
+    Globe, Lock,
 } from 'lucide-react';
 
 /* ─── Helpers ─────────────────────────────────────────────── */
@@ -99,7 +100,13 @@ const EventDetailPopup: React.FC<EventDetailPopupProps> = ({ event, onClose, onE
                                 </div>
                             </div>
                             <div>
-                                <span className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1 block">Event</span>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">Event</span>
+                                    {event.visibility === 'private'
+                                        ? <span className="flex items-center gap-1 text-[10px] font-bold bg-white/20 text-white px-1.5 py-0.5 rounded-full"><Lock className="w-2.5 h-2.5" />Private</span>
+                                        : <span className="flex items-center gap-1 text-[10px] font-bold bg-white/20 text-white px-1.5 py-0.5 rounded-full"><Globe className="w-2.5 h-2.5" />Public</span>
+                                    }
+                                </div>
                                 <h2 className="text-lg font-bold leading-tight">{event.event_title}</h2>
                                 {event.status && event.status !== 'upcoming' && (
                                     <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${event.status === 'completed' ? 'bg-green-400/30 text-green-100' : 'bg-red-400/30 text-red-100'
@@ -526,7 +533,8 @@ const Events: React.FC = () => {
         targetAgentIds: [] as string[],
         allGroups: false,
         allAgents: false,
-        status: 'upcoming' as 'upcoming' | 'completed' | 'cancelled'
+        status: 'upcoming' as 'upcoming' | 'completed' | 'cancelled',
+        visibility: 'public' as 'public' | 'private',
     });
     const [agentSearch, setAgentSearch] = useState('');
 
@@ -609,12 +617,17 @@ const Events: React.FC = () => {
                 targetAgentIds: event.agentIds || [],
                 allGroups: false,
                 allAgents: false,
-                status: (event.status || 'upcoming') as 'upcoming' | 'completed' | 'cancelled'
+                status: (event.status || 'upcoming') as 'upcoming' | 'completed' | 'cancelled',
+                visibility: (event.visibility || 'public') as 'public' | 'private',
             });
         } else {
             setEditingEventId(null);
             const initialGroups = (currentUser.role === UserRole.GROUP_LEADER && currentUser.group_id) ? [currentUser.group_id] : [];
-            setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: initialGroups, targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming' });
+            // Default visibility: public for agent/group_leader, private for others
+            const defaultVisibility: 'public' | 'private' =
+                currentUser.role === UserRole.AGENT || currentUser.role === UserRole.GROUP_LEADER
+                    ? 'public' : 'private';
+            setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: initialGroups, targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming', visibility: defaultVisibility });
         }
         setIsModalOpen(true);
         setDetailEvent(null);
@@ -640,7 +653,7 @@ const Events: React.FC = () => {
             alert('Please select at least one group or agent to share this event with.');
             return;
         }
-        const eventData = {
+        const eventData: Record<string, unknown> = {
             event_title: formData.eventTitle,
             description: formData.description,
             date: formData.date,
@@ -649,11 +662,14 @@ const Events: React.FC = () => {
             type: (formData.eventType === 'online' ? 'Online' : 'Face to Face') as 'Online' | 'Face to Face',
             venue: formData.eventType === 'face-to-face' ? formData.venue : undefined,
             meeting_link: formData.eventType === 'online' ? formData.meetingLink : undefined,
-            groupIds: formData.groupIds,
-            agentIds: isAgentPersonal
-                ? [currentUser.id]
-                : formData.targetAgentIds.length > 0 ? formData.targetAgentIds : undefined,
+            visibility: formData.visibility,
+            isAgent: isAgentPersonal, // tells DataContext to omit groupIds/agentIds for agents
         };
+        // Non-agents: include audience targeting
+        if (!isAgentPersonal) {
+            eventData.groupIds = formData.groupIds;
+            if (formData.targetAgentIds.length > 0) eventData.agentIds = formData.targetAgentIds;
+        }
         if (editingEventId) {
             await updateEvent(editingEventId, eventData);
         } else {
@@ -661,7 +677,7 @@ const Events: React.FC = () => {
         }
         setIsModalOpen(false);
         setEditingEventId(null);
-        setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: [], targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming' });
+        setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: [], targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming', visibility: 'public' });
     };
 
     const toggleGroup = (id: string) => {
@@ -858,6 +874,10 @@ const Events: React.FC = () => {
                                             {evt.status.charAt(0).toUpperCase() + evt.status.slice(1)}
                                         </span>
                                     )}
+                                    {evt.visibility === 'private'
+                                        ? <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500"><Lock className="w-2.5 h-2.5" />Private</span>
+                                        : <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600"><Globe className="w-2.5 h-2.5" />Public</span>
+                                    }
                                 </div>
                             </div>
                         );
@@ -1010,7 +1030,45 @@ const Events: React.FC = () => {
 
                             <hr className="border-gray-200" />
 
-                            {/* ── Section 4: Audience ── */}
+                            {/* ── Section 4: Visibility ── */}
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                                    <Globe className="w-4 h-4 text-blue-500" />
+                                    Visibility
+                                </h3>
+                                <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, visibility: 'public' }))}
+                                        className={`flex-1 flex items-center gap-2.5 p-3 rounded-xl border-2 text-sm font-medium transition-all ${formData.visibility === 'public'
+                                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                            : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                                    >
+                                        <Globe className="w-4 h-4 flex-shrink-0" />
+                                        <div className="text-left">
+                                            <div className="font-semibold">Public</div>
+                                            <div className="text-xs font-normal opacity-75">Shareable link, visible to all</div>
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, visibility: 'private' }))}
+                                        className={`flex-1 flex items-center gap-2.5 p-3 rounded-xl border-2 text-sm font-medium transition-all ${formData.visibility === 'private'
+                                            ? 'border-gray-700 bg-gray-50 text-gray-800'
+                                            : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                                    >
+                                        <Lock className="w-4 h-4 flex-shrink-0" />
+                                        <div className="text-left">
+                                            <div className="font-semibold">Private</div>
+                                            <div className="text-xs font-normal opacity-75">Only visible to assigned audience</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <hr className="border-gray-200" />
+
+                            {/* ── Section 5: Audience ── */}
                             <div className="space-y-4">
                                 <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                                     <Users className="w-4 h-4 text-blue-500" />
