@@ -408,6 +408,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (evt.meeting_link) payload.link = evt.meeting_link;
     if (evt.venue) payload.venue = evt.venue;
     if (evt.visibility) payload.visibility = evt.visibility;
+    if (evt.status) payload.status = evt.status;
     // Agents: omit groupIds/agentIds — server auto-assigns self
     if (!isAgent) {
       if (evt.groupIds) payload.groupIds = evt.groupIds;

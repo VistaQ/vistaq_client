@@ -638,15 +638,16 @@ const Events: React.FC = () => {
             alert('Please fill in all required fields (Title, Date, Start Time, Description).');
             return;
         }
-        if (formData.eventType === 'face-to-face' && !formData.venue) {
+        const isAgentPersonal = currentUser.role === UserRole.AGENT;
+        // Venue/link are optional for agents (personal calendar events)
+        if (!isAgentPersonal && formData.eventType === 'face-to-face' && !formData.venue) {
             alert('Please enter a Venue / Location for a Face to Face event.');
             return;
         }
-        if (formData.eventType === 'online' && !formData.meetingLink) {
+        if (!isAgentPersonal && formData.eventType === 'online' && !formData.meetingLink) {
             alert('Please enter a Meeting URL for an Online event.');
             return;
         }
-        const isAgentPersonal = currentUser.role === UserRole.AGENT;
         const hasGroupTarget = formData.groupIds.length > 0;
         const hasAgentTarget = formData.targetAgentIds.length > 0;
         if (!isAgentPersonal && !hasGroupTarget && !hasAgentTarget && currentUser.role !== UserRole.GROUP_LEADER) {
@@ -663,6 +664,7 @@ const Events: React.FC = () => {
             venue: formData.eventType === 'face-to-face' ? formData.venue : undefined,
             meeting_link: formData.eventType === 'online' ? formData.meetingLink : undefined,
             visibility: formData.visibility,
+            status: formData.status,
             isAgent: isAgentPersonal, // tells DataContext to omit groupIds/agentIds for agents
         };
         // Non-agents: include audience targeting
