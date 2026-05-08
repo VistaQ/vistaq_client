@@ -68,6 +68,19 @@ const getSessionPoints = (session: CoachingSession): number => {
     return key ? DEFAULT_POINT_CONFIG[key] : 10;
 };
 
+/** Format the join window as "8 May · 9:00 AM – 1:00 PM" */
+const formatJoinWindow = (session: CoachingSession): string => {
+    const start = getJoinWindowStart(session);
+    const end   = getJoinWindowEnd(session);
+    const fmt   = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateLabel = start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    if (start.toDateString() === end.toDateString()) {
+        return `${dateLabel} · ${fmt(start)} – ${fmt(end)}`;
+    }
+    const endLabel = end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    return `${dateLabel} ${fmt(start)} – ${endLabel} ${fmt(end)}`;
+};
+
 /** Format a millisecond duration as a human-readable countdown string */
 const formatCountdown = (ms: number): string => {
     if (ms <= 0) return '0s';
@@ -541,6 +554,12 @@ const Coaching: React.FC = () => {
                                                 <Users className="w-3 h-3" /> {session.created_by_name}
                                             </span>
                                         </div>
+                                        {isParticipant && !isCancelled && !ended && (
+                                            <div className="flex items-center gap-1 mt-1 text-xs text-indigo-500">
+                                                <Info className="w-3 h-3 flex-shrink-0" />
+                                                Join link available: <span className="font-semibold ml-0.5">{formatJoinWindow(session)}</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Actions */}
@@ -653,6 +672,14 @@ const Coaching: React.FC = () => {
                                         <Users className="w-4 h-4 text-gray-400 flex-shrink-0" />
                                         <span>{COACHING_TYPE_LABELS[session.coaching_type]} · By {session.created_by_name}</span>
                                     </div>
+                                    {isParticipant && !isCancelled && !sessionEnded && (
+                                        <div className="flex items-center gap-2 pt-1 border-t border-gray-100 mt-1">
+                                            <Info className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+                                            <span className="text-xs text-indigo-500">
+                                                Join link available: <span className="font-semibold">{formatJoinWindow(session)}</span>
+                                            </span>
+                                        </div>
+                                    )}
                                     {session.description && (
                                         <div className="flex items-start gap-2 pt-2 border-t border-gray-100 mt-2">
                                             <AlignLeft className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
