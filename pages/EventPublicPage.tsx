@@ -140,11 +140,16 @@ const EventPublicPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col">
             {/* Minimal navbar */}
-            <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+            <header className="bg-blue-900 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
                 <Link to="/login">
                     <img src="/vistaq-logo.png" alt="VistaQ" className="h-8 w-auto" />
                 </Link>
-                <span className="text-xs text-gray-400 font-medium">Public Event</span>
+                <Link
+                    to="/login"
+                    className="px-4 py-1.5 text-sm font-semibold text-blue-900 bg-white rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                    Login
+                </Link>
             </header>
 
             <main className="flex-1 flex items-start justify-center p-4 pt-8 pb-16">
