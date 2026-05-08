@@ -10,7 +10,8 @@ import {
     LayoutList, LayoutGrid, ChevronDown, X,
 } from 'lucide-react';
 import CreateCoachingModal from '../components/CreateCoachingModal';
-import { CoachingSession } from '../types';
+import { CoachingSession, PointConfig } from '../types';
+import { DEFAULT_POINT_CONFIG } from '../services/points';
 
 // ─── Timing helpers (±2 hour window) ─────────────────────────────────────────
 
@@ -52,6 +53,31 @@ const COACHING_TYPE_BADGE: Record<string, string> = {
     group_coaching:      'bg-green-100 text-green-700',
     peer_circles:        'bg-purple-100 text-purple-700',
     seminar:             'bg-orange-100 text-orange-700',
+};
+
+// Maps coaching_type → PointConfig key so we can show earned points
+const COACHING_POINT_KEY: Record<string, keyof PointConfig> = {
+    individual_coaching: 'coachingIndividual',
+    group_coaching:      'coachingGroup',
+    peer_circles:        'coachingPeerCircles',
+    seminar:             'coachingSeminar',
+};
+
+const getSessionPoints = (session: CoachingSession): number => {
+    const key = COACHING_POINT_KEY[session.coaching_type];
+    return key ? DEFAULT_POINT_CONFIG[key] : 10;
+};
+
+/** Format a millisecond duration as a human-readable countdown string */
+const formatCountdown = (ms: number): string => {
+    if (ms <= 0) return '0s';
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+    if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
+    return `${s}s`;
 };
 
 // ─── Attendance Modal ─────────────────────────────────────────────────────────
@@ -168,6 +194,13 @@ const Coaching: React.FC = () => {
     const [editingSession, setEditingSession]       = useState<CoachingSession | null>(null);
     const [attendanceModal, setAttendanceModal]     = useState<CoachingSession | null>(null);
 
+    // Live clock — updates every second to drive countdown timers
+    const [now, setNow] = useState(() => new Date());
+    useEffect(() => {
+        const id = setInterval(() => setNow(new Date()), 1000);
+        return () => clearInterval(id);
+    }, []);
+
     // Filters & view
     const [filterStatus, setFilterStatus] = useState<'all' | 'upcoming' | 'past'>('all');
     const [filterMonth, setFilterMonth]   = useState<string>('');   // '' = all, '0'–'11'
@@ -250,39 +283,58 @@ const Coaching: React.FC = () => {
             return true;
         });
 
-    // ─── Shared: participant action row (Join / attendance status) ────────────
+    // ─── Shared: participant action row (Join / countdown / Joined / Expired) ─
     const ParticipantAction: React.FC<{ session: CoachingSession; compact?: boolean }> = ({ session, compact }) => {
         const isParticipant = currentUser.role === UserRole.AGENT || currentUser.role === UserRole.GROUP_LEADER;
         if (!isParticipant || session.status === 'cancelled') return null;
 
-        const myAttendance  = session.attendance.find(a => a.agent_id === currentUser.id);
-        const hasJoined     = myAttendance?.status === 'joined';
-        const didNotAttend  = myAttendance?.status === 'did_not_attend';
-        const joinOpen      = isJoinWindowOpen(session);
-        const ended         = isSessionEnded(session);
+        const myAttendance = session.attendance.find(a => a.agent_id === currentUser.id);
+        const hasJoined    = myAttendance?.status === 'joined';
 
+        const windowStart  = getJoinWindowStart(session);
+        const windowEnd    = getJoinWindowEnd(session);
+        const joinOpen     = now >= windowStart && now < windowEnd;
+        const ended        = now >= windowEnd;
+
+        const msToOpen     = windowStart.getTime() - now.getTime();   // positive = not yet open
+        const msToClose    = windowEnd.getTime()   - now.getTime();   // positive = still open
+        const pts          = getSessionPoints(session);
+
+        // ── Joined ──────────────────────────────────────────────────────────
         if (hasJoined) return (
             <span className={`flex items-center gap-1.5 text-xs font-bold text-emerald-700 ${compact ? '' : 'mt-3 pt-3 border-t border-emerald-200'}`}>
                 <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                Attended {myAttendance?.joined_at ? `· ${formatDateTime(myAttendance.joined_at)}` : ''}
+                Joined · +{pts} pts
             </span>
         );
-        if (didNotAttend || (ended && !hasJoined)) return (
-            <span className={`flex items-center gap-1.5 text-xs font-bold text-amber-700 ${compact ? '' : 'mt-3 pt-3 border-t border-amber-200'}`}>
-                <Info className="w-4 h-4 flex-shrink-0" /> Did Not Attend
+
+        // ── Expired (window closed, not joined) ──────────────────────────────
+        if (ended) return (
+            <span className={`flex items-center gap-1.5 text-xs font-bold text-rose-600 ${compact ? '' : 'mt-3 pt-3 border-t border-rose-100'}`}>
+                <XCircle className="w-3.5 h-3.5 flex-shrink-0" /> Expired
             </span>
         );
+
+        // ── Join window is open — button + live "Closes in" timer ───────────
         if (joinOpen) return (
-            <button
-                onClick={(e) => { e.stopPropagation(); handleJoinSession(session.id); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm flex-shrink-0"
-            >
-                <LogIn className="w-3.5 h-3.5" /> Join Session
-            </button>
+            <div className={`flex flex-col items-start gap-1 ${compact ? '' : 'mt-3 pt-3 border-t border-gray-100'}`}>
+                <button
+                    onClick={(e) => { e.stopPropagation(); handleJoinSession(session.id); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
+                >
+                    <LogIn className="w-3.5 h-3.5" /> Join Session
+                </button>
+                <span className="flex items-center gap-1 text-[10px] font-semibold text-rose-500">
+                    <Clock className="w-3 h-3" /> Closes in {formatCountdown(msToClose)}
+                </span>
+            </div>
         );
+
+        // ── Upcoming — countdown to when join window opens ───────────────────
         return (
             <span className={`flex items-center gap-1.5 text-xs font-medium text-gray-400 ${compact ? '' : 'mt-3 pt-3 border-t border-gray-100'}`}>
-                <Clock className="w-4 h-4 flex-shrink-0" /> Available at {formatJoinWindowStart(session)}
+                <Clock className="w-4 h-4 flex-shrink-0" />
+                Opens in {formatCountdown(msToOpen)}
             </span>
         );
     };
@@ -447,15 +499,20 @@ const Coaching: React.FC = () => {
                             const isParticipant = currentUser.role === UserRole.AGENT || currentUser.role === UserRole.GROUP_LEADER;
                             const myAttendance  = session.attendance.find(a => a.agent_id === currentUser.id);
                             const hasJoined     = isParticipant && myAttendance?.status === 'joined';
-                            const joinOpen      = isJoinWindowOpen(session);
-                            const ended         = isSessionEnded(session);
+                            const windowStart   = getJoinWindowStart(session);
+                            const windowEnd     = getJoinWindowEnd(session);
+                            const joinOpen      = now >= windowStart && now < windowEnd;
+                            const ended         = now >= windowEnd;
+                            const msToOpen      = windowStart.getTime() - now.getTime();
+                            const msToClose     = windowEnd.getTime()   - now.getTime();
+                            const pts           = getSessionPoints(session);
 
                             return (
                                 <div key={session.id} className={`flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 hover:bg-gray-50 transition-colors ${isCancelled ? 'opacity-60' : ''}`}>
                                     {/* Status dot */}
                                     <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 sm:mt-0 ${
                                         isCancelled ? 'bg-red-400' :
-                                        isJoinWindowOpen(session) ? 'bg-emerald-500' :
+                                        joinOpen ? 'bg-emerald-500' :
                                         ended ? 'bg-gray-300' : 'bg-blue-500'
                                     }`} />
 
@@ -517,22 +574,27 @@ const Coaching: React.FC = () => {
                                         {isParticipant && !isCancelled && (
                                             hasJoined ? (
                                                 <span className="flex items-center gap-1 text-xs font-bold text-emerald-700">
-                                                    <CheckCircle2 className="w-3.5 h-3.5" /> Attended
+                                                    <CheckCircle2 className="w-3.5 h-3.5" /> Joined · +{pts} pts
+                                                </span>
+                                            ) : ended ? (
+                                                <span className="flex items-center gap-1 text-xs font-bold text-rose-600">
+                                                    <XCircle className="w-3.5 h-3.5" /> Expired
                                                 </span>
                                             ) : joinOpen ? (
-                                                <button
-                                                    onClick={() => handleJoinSession(session.id)}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
-                                                >
-                                                    <LogIn className="w-3.5 h-3.5" /> Join Session
-                                                </button>
-                                            ) : ended ? (
-                                                <span className="flex items-center gap-1 text-xs font-bold text-amber-600">
-                                                    <Info className="w-3.5 h-3.5" /> Did Not Attend
-                                                </span>
+                                                <div className="flex flex-col items-end gap-0.5">
+                                                    <button
+                                                        onClick={() => handleJoinSession(session.id)}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
+                                                    >
+                                                        <LogIn className="w-3.5 h-3.5" /> Join Session
+                                                    </button>
+                                                    <span className="text-[10px] font-semibold text-rose-500 flex items-center gap-1">
+                                                        <Clock className="w-3 h-3" /> Closes in {formatCountdown(msToClose)}
+                                                    </span>
+                                                </div>
                                             ) : (
                                                 <span className="text-xs text-gray-400 flex items-center gap-1">
-                                                    <Clock className="w-3.5 h-3.5" /> {formatJoinWindowStart(session)}
+                                                    <Clock className="w-3.5 h-3.5" /> Opens in {formatCountdown(msToOpen)}
                                                 </span>
                                             )
                                         )}
@@ -552,7 +614,8 @@ const Coaching: React.FC = () => {
                         const isParticipant = currentUser.role === UserRole.AGENT || currentUser.role === UserRole.GROUP_LEADER;
                         const myAttendance  = session.attendance.find(a => a.agent_id === currentUser.id);
                         const hasJoined     = isParticipant && myAttendance?.status === 'joined';
-                        const didNotAttend  = isParticipant && (myAttendance?.status === 'did_not_attend' || (isSessionEnded(session) && !hasJoined));
+                        const sessionEnded  = now >= getJoinWindowEnd(session);
+                        const didNotAttend  = isParticipant && (myAttendance?.status === 'did_not_attend' || (sessionEnded && !hasJoined));
 
                         let cardBorder = 'border-gray-200 bg-white hover:border-indigo-200 hover:shadow-sm';
                         if (isCancelled)   cardBorder = 'border-red-200 bg-red-50 opacity-80';
