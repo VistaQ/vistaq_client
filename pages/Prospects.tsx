@@ -12,7 +12,19 @@ const Prospects: React.FC = () => {
   const { currentUser } = useAuth();
   const { getProspectsByScope } = useData();
   const [searchTerm, setSearchTerm] = useState('');
-  const [stageFilter, setStageFilter] = useState<ProspectStage | 'all'>('all');
+
+  type ProspectStatus =
+    | 'all'
+    | 'new_prospect'
+    | 'appt_not_scheduled'
+    | 'appt_scheduled'
+    | 'appt_completed'
+    | 'declined'
+    | 'kiv'
+    | 'successful'
+    | 'non_successful';
+
+  const [stageFilter, setStageFilter] = useState<ProspectStatus>('all');
   
   // State for managing the modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,8 +46,21 @@ const Prospects: React.FC = () => {
 
   const prospects = currentUser ? getProspectsByScope(currentUser) : [];
   
+  const getProspectStatus = (p: Prospect): Exclude<ProspectStatus, 'all'> => {
+    const { current_stage, appointment_status, sales_outcome } = p;
+    if (sales_outcome === 'successful')   return 'successful';
+    if (sales_outcome === 'unsuccessful') return 'non_successful';
+    if (sales_outcome === 'kiv')          return 'kiv';
+    if (appointment_status === 'done')    return 'appt_completed';
+    if (appointment_status === 'declined') return 'declined';
+    if (appointment_status === 'scheduled' || appointment_status === 'rescheduled') return 'appt_scheduled';
+    if (appointment_status === 'kiv')     return 'kiv';
+    if (appointment_status === 'not_done' || current_stage === ProspectStage.APPOINTMENT) return 'appt_not_scheduled';
+    return 'new_prospect';
+  };
+
   const filteredProspects = prospects.filter(p => {
-    if (stageFilter !== 'all' && p.current_stage !== stageFilter) return false;
+    if (stageFilter !== 'all' && getProspectStatus(p) !== stageFilter) return false;
     if (searchTerm) {
       return (
         (p.prospect_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -45,11 +70,16 @@ const Prospects: React.FC = () => {
     return true;
   });
 
-  const stageCounts = {
-    all: prospects.length,
-    [ProspectStage.PROSPECT]: prospects.filter(p => p.current_stage === ProspectStage.PROSPECT).length,
-    [ProspectStage.APPOINTMENT]: prospects.filter(p => p.current_stage === ProspectStage.APPOINTMENT).length,
-    [ProspectStage.SALES]: prospects.filter(p => p.current_stage === ProspectStage.SALES).length,
+  const stageCounts: Record<ProspectStatus, number> = {
+    all:               prospects.length,
+    new_prospect:      prospects.filter(p => getProspectStatus(p) === 'new_prospect').length,
+    appt_not_scheduled: prospects.filter(p => getProspectStatus(p) === 'appt_not_scheduled').length,
+    appt_scheduled:    prospects.filter(p => getProspectStatus(p) === 'appt_scheduled').length,
+    appt_completed:    prospects.filter(p => getProspectStatus(p) === 'appt_completed').length,
+    declined:          prospects.filter(p => getProspectStatus(p) === 'declined').length,
+    kiv:               prospects.filter(p => getProspectStatus(p) === 'kiv').length,
+    successful:        prospects.filter(p => getProspectStatus(p) === 'successful').length,
+    non_successful:    prospects.filter(p => getProspectStatus(p) === 'non_successful').length,
   };
 
   const handleCreateNew = () => {
@@ -209,37 +239,29 @@ const Prospects: React.FC = () => {
             />
           </div>
         </div>
-        {/* Stage Filter Tabs */}
+        {/* Status Filter Tabs */}
         <div className="flex flex-wrap gap-2">
           {([
-            { key: 'all',                          label: 'All',         color: 'gray'   },
-            { key: ProspectStage.PROSPECT,          label: 'Prospect',    color: 'blue'   },
-            { key: ProspectStage.APPOINTMENT,       label: 'Appointment', color: 'indigo' },
-            { key: ProspectStage.SALES,             label: 'Sales',       color: 'green'  },
-          ] as const).map(({ key, label, color }) => {
-            const active = stageFilter === key;
-            const count = stageCounts[key];
-            const colorMap: Record<string, string> = {
-              gray:   active ? 'bg-gray-700 text-white border-gray-700'   : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400 hover:bg-gray-50',
-              blue:   active ? 'bg-blue-600 text-white border-blue-600'   : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:bg-blue-50',
-              indigo: active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50',
-              green:  active ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:border-green-400 hover:bg-green-50',
-            };
-            const badgeMap: Record<string, string> = {
-              gray:   active ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-500',
-              blue:   active ? 'bg-white/25 text-white' : 'bg-blue-50 text-blue-500',
-              indigo: active ? 'bg-white/25 text-white' : 'bg-indigo-50 text-indigo-500',
-              green:  active ? 'bg-white/25 text-white' : 'bg-green-50 text-green-500',
-            };
+            { key: 'all',               label: 'All',                    active: 'bg-gray-700 text-white border-gray-700',     inactive: 'bg-white text-gray-600 border-gray-300 hover:border-gray-400 hover:bg-gray-50',     badge: 'bg-gray-100 text-gray-500',     badgeActive: 'bg-white/25 text-white' },
+            { key: 'new_prospect',      label: 'New Prospect',           active: 'bg-blue-600 text-white border-blue-600',     inactive: 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:bg-blue-50',     badge: 'bg-blue-50 text-blue-500',      badgeActive: 'bg-white/25 text-white' },
+            { key: 'appt_not_scheduled',label: 'Appt Not Scheduled',     active: 'bg-gray-500 text-white border-gray-500',     inactive: 'bg-white text-gray-600 border-gray-300 hover:border-gray-400 hover:bg-gray-50',     badge: 'bg-gray-100 text-gray-500',     badgeActive: 'bg-white/25 text-white' },
+            { key: 'appt_scheduled',    label: 'Appt Scheduled',         active: 'bg-indigo-600 text-white border-indigo-600', inactive: 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50', badge: 'bg-indigo-50 text-indigo-500',  badgeActive: 'bg-white/25 text-white' },
+            { key: 'appt_completed',    label: 'Appt Completed',         active: 'bg-cyan-600 text-white border-cyan-600',     inactive: 'bg-white text-gray-600 border-gray-300 hover:border-cyan-400 hover:bg-cyan-50',     badge: 'bg-cyan-50 text-cyan-500',      badgeActive: 'bg-white/25 text-white' },
+            { key: 'declined',          label: 'Declined',               active: 'bg-red-500 text-white border-red-500',       inactive: 'bg-white text-gray-600 border-gray-300 hover:border-red-400 hover:bg-red-50',       badge: 'bg-red-50 text-red-500',        badgeActive: 'bg-white/25 text-white' },
+            { key: 'kiv',              label: 'KIV',                    active: 'bg-orange-500 text-white border-orange-500', inactive: 'bg-white text-gray-600 border-gray-300 hover:border-orange-400 hover:bg-orange-50', badge: 'bg-orange-50 text-orange-500',  badgeActive: 'bg-white/25 text-white' },
+            { key: 'successful',        label: 'Successful',             active: 'bg-green-600 text-white border-green-600',   inactive: 'bg-white text-gray-600 border-gray-300 hover:border-green-400 hover:bg-green-50',   badge: 'bg-green-50 text-green-500',    badgeActive: 'bg-white/25 text-white' },
+            { key: 'non_successful',    label: 'Non-Successful',         active: 'bg-red-700 text-white border-red-700',       inactive: 'bg-white text-gray-600 border-gray-300 hover:border-red-500 hover:bg-red-50',       badge: 'bg-red-50 text-red-600',        badgeActive: 'bg-white/25 text-white' },
+          ] as { key: ProspectStatus; label: string; active: string; inactive: string; badge: string; badgeActive: string }[]).map(tab => {
+            const isActive = stageFilter === tab.key;
             return (
               <button
-                key={key}
-                onClick={() => setStageFilter(key)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium transition-all ${colorMap[color]}`}
+                key={tab.key}
+                onClick={() => setStageFilter(tab.key)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium transition-all ${isActive ? tab.active : tab.inactive}`}
               >
-                {label}
-                <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${badgeMap[color]}`}>
-                  {count}
+                {tab.label}
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${isActive ? tab.badgeActive : tab.badge}`}>
+                  {stageCounts[tab.key]}
                 </span>
               </button>
             );
