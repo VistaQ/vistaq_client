@@ -487,7 +487,7 @@ const SalesReportPage: React.FC = () => {
                     shortage={isMtd
                       ? Math.max(MDRT_TARGET / 12 - (myReport.month_fyc?.[n - 1] ?? 0), 0)
                       : myReport.mdrt_shortage_fyc}
-                    fixedColor="bg-blue-500"
+                    fixedColor="bg-green-500"
                   />
                   <MdrtBar
                     label="FYCt"
@@ -496,7 +496,7 @@ const SalesReportPage: React.FC = () => {
                     shortage={isMtd
                       ? Math.max(MDRT_TARGET / 12 - (myReport.month_fyct?.[n - 1] ?? 0), 0)
                       : myReport.mdrt_shortage_fyct}
-                    fixedColor="bg-indigo-500"
+                    fixedColor="bg-blue-500"
                   />
                 </div>
               )}

@@ -607,8 +607,8 @@ const Dashboard: React.FC = () => {
             const fycPct = myReport ? Math.min((myReport.fyc_ytd / MDRT_TARGET) * 100, 100) : 0;
             const fyctPct = myReport ? Math.min((myReport.fyct_ytd / MDRT_TARGET) * 100, 100) : 0;
             const barColors: Record<string, string> = {
-               FYC:  'from-blue-500 to-blue-400',
-               FYCt: 'from-indigo-500 to-indigo-400',
+               FYC:  'from-green-500 to-green-400',
+               FYCt: 'from-blue-500 to-blue-400',
             };
 
             return (
