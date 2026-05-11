@@ -3,15 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { User, UserRole, getRoleLabel, Group } from '../types';
 import { apiCall } from '../services/apiClient';
-import { 
-  Users, 
-  Search, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Shield, 
-  GraduationCap, 
-  UserCheck, 
+import {
+  Users,
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
+  Shield,
+  GraduationCap,
+  UserCheck,
+  UserX,
   X,
   IdCard,
   Key,
@@ -45,13 +46,15 @@ const generateTempPassword = (): string => {
 };
 
 const AdminUsers: React.FC = () => {
-  const { currentUser, addUser, updateUser, deleteUser } = useAuth();
+  const { currentUser, addUser, updateUser, deleteUser, deactivateUser, reactivateUser } = useAuth();
   if (!currentUser || currentUser.role !== UserRole.ADMIN) return null;
 
   const [users, setUsers] = useState<User[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('active');
+  const [confirmDeactivateId, setConfirmDeactivateId] = useState<string | null>(null);
 
   const fetchData = async () => {
     const [usersRes, groupsRes] = await Promise.all([
@@ -73,11 +76,23 @@ const AdminUsers: React.FC = () => {
   const [tempPassword, setTempPassword] = useState('');
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = filterRole === 'all' || user.role === filterRole;
-    return matchesSearch && matchesRole;
+    const matchesStatus = filterStatus === 'all' || (user as any).status === filterStatus || (filterStatus === 'active' && !(user as any).status);
+    return matchesSearch && matchesRole && matchesStatus;
   });
+
+  const handleDeactivateUser = async (id: string) => {
+    await deactivateUser(id);
+    setConfirmDeactivateId(null);
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, status: 'inactive' } as any : u));
+  };
+
+  const handleReactivateUser = async (id: string) => {
+    await reactivateUser(id);
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, status: 'active' } as any : u));
+  };
 
   const handleOpenModal = (user?: User) => {
     if (user) {
@@ -147,7 +162,7 @@ const AdminUsers: React.FC = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <select 
+        <select
            className="bg-gray-50 border border-gray-300 text-gray-900 rounded-md shadow-sm p-2"
            value={filterRole}
            onChange={(e) => setFilterRole(e.target.value)}
@@ -159,6 +174,19 @@ const AdminUsers: React.FC = () => {
             <option value={UserRole.GROUP_LEADER}>{getRoleLabel(UserRole.GROUP_LEADER)}</option>
             <option value={UserRole.AGENT}>{getRoleLabel(UserRole.AGENT)}</option>
         </select>
+        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+          {(['active', 'inactive', 'all'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setFilterStatus(s)}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${
+                filterStatus === s ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {s === 'all' ? 'All Status' : s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Users List */}
@@ -170,6 +198,7 @@ const AdminUsers: React.FC = () => {
                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Role</th>
                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Agent Code</th>
                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Group Assignment</th>
+                 <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Status</th>
                  <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Actions</th>
               </tr>
            </thead>
@@ -205,30 +234,54 @@ const AdminUsers: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                        {user.role === UserRole.TRAINER ? (
-                          user.managedGroupIds && user.managedGroupIds.length > 0 
+                          user.managedGroupIds && user.managedGroupIds.length > 0
                              ? <span className="text-purple-600">Manages {user.managedGroupIds.length} Groups</span>
                              : <span className="text-gray-400">No Groups Assigned</span>
                        ) : (
                           groups.find(g => g.id === user.group_id)?.name || '-'
                        )}
                     </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                       <button onClick={() => handleOpenModal(user)} className="text-blue-600 hover:text-blue-800">
-                          <Edit2 className="w-4 h-4" />
-                       </button>
-                       <button onClick={() => setConfirmDeleteId(user.id)} className="text-red-600 hover:text-red-800">
-                          <Trash2 className="w-4 h-4" />
-                       </button>
+                    <td className="px-6 py-4">
+                       {(user as any).status === 'inactive' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500">
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" /> Inactive
+                          </span>
+                       ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" /> Active
+                          </span>
+                       )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                       <div className="flex items-center justify-end gap-2">
+                         <button onClick={() => handleOpenModal(user)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                            <Edit2 className="w-4 h-4" />
+                         </button>
+                         {user.id !== currentUser.id && (
+                           (user as any).status === 'inactive' ? (
+                             <button onClick={() => handleReactivateUser(user.id)} className="text-green-600 hover:text-green-800" title="Reactivate">
+                               <UserCheck className="w-4 h-4" />
+                             </button>
+                           ) : (
+                             <button onClick={() => setConfirmDeactivateId(user.id)} className="text-amber-500 hover:text-amber-700" title="Deactivate">
+                               <UserX className="w-4 h-4" />
+                             </button>
+                           )
+                         )}
+                         <button onClick={() => setConfirmDeleteId(user.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                            <Trash2 className="w-4 h-4" />
+                         </button>
+                       </div>
                     </td>
                  </tr>
               ))}
               {filteredUsers.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                     <p className="font-medium">No users match your search.</p>
-                    {(searchTerm || filterRole !== 'all') && (
+                    {(searchTerm || filterRole !== 'all' || filterStatus !== 'active') && (
                       <button
-                        onClick={() => { setSearchTerm(''); setFilterRole('all'); }}
+                        onClick={() => { setSearchTerm(''); setFilterRole('all'); setFilterStatus('active'); }}
                         className="mt-2 text-sm text-blue-600 hover:underline"
                       >
                         Clear filters
@@ -240,6 +293,25 @@ const AdminUsers: React.FC = () => {
            </tbody>
         </table>
       </div>
+
+      {/* Deactivate Confirmation Modal */}
+      {confirmDeactivateId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="px-6 py-4 bg-amber-500 flex justify-between items-center">
+              <h3 className="font-semibold text-white">Deactivate User</h3>
+              <button onClick={() => setConfirmDeactivateId(null)} className="text-white/70 hover:text-white p-1 rounded-full hover:bg-white/20 transition-colors"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-gray-700">This will immediately end the user's session and prevent them from logging in. You can reactivate them at any time.</p>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setConfirmDeactivateId(null)} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium">Cancel</button>
+                <button onClick={() => handleDeactivateUser(confirmDeactivateId)} className="px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 font-bold">Yes, Deactivate</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {/* Delete Confirmation Modal */}

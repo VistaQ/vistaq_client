@@ -21,6 +21,8 @@ interface AuthContextType {
   addUser: (user: Partial<User>) => Promise<void>;
   updateUser: (id: string, updates: Partial<User>) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
+  deactivateUser: (id: string) => Promise<void>;
+  reactivateUser: (id: string) => Promise<void>;
   addGroup: (name: string, leaderId: string | undefined, trainerIds: string[], memberIds: string[]) => Promise<void>;
   updateGroup: (groupId: string, name: string, leaderId: string | undefined, trainerIds: string[], memberIds: string[]) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
@@ -307,6 +309,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     showNotification("User Deleted", "The user has been removed from the system.", "info");
   };
 
+  const deactivateUser = async (id: string) => {
+    await apiCall(`/users/${id}/deactivate`, { method: 'POST' });
+    showNotification("User Deactivated", "The user's account has been deactivated.", "info");
+  };
+
+  const reactivateUser = async (id: string) => {
+    await apiCall(`/users/${id}/reactivate`, { method: 'POST' });
+    showNotification("User Reactivated", "The user's account has been reactivated.", "success");
+  };
+
   // --- ADMIN: GROUPS ---
   const addGroup = async (name: string, leaderId: string | undefined, trainerIds: string[], memberIds: string[]) => {
     await apiCall('/groups', {
@@ -327,7 +339,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         name,
         leader_id: leaderId,
         trainer_ids: trainerIds.length > 0 ? trainerIds : undefined,
-        member_ids: memberIds.length > 0 ? memberIds : undefined,
+        member_ids: memberIds,
       }
     });
     showNotification("Group Updated", `Group configuration for "${name}" has been saved.`, "success");
@@ -342,7 +354,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <AuthContext.Provider value={{
       currentUser, login, register, logout, changePassword, isAuthenticated: !!currentUser,
       refreshCurrentUser, updateProfile,
-      addUser, updateUser, deleteUser,
+      addUser, updateUser, deleteUser, deactivateUser, reactivateUser,
       addGroup, updateGroup, deleteGroup,
       resetPassword,
       notification, showNotification, closeNotification,

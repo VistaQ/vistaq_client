@@ -1,10 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { Prospect, ProspectStage, UploadAuditEntry, UserRole } from '../types';
-import { Upload, FileText, CheckCircle, AlertCircle, FileSpreadsheet, Loader2, Clock, User, BarChart2, ChevronDown } from 'lucide-react';
+import { Prospect, ProspectStage, UploadAuditEntry, UserRole, AgentCode } from '../types';
+import { Upload, FileText, CheckCircle, AlertCircle, FileSpreadsheet, Loader2, Clock, User, BarChart2, ChevronDown, IdCard } from 'lucide-react';
 import { parseCSV } from '../utils/exportUtils';
 import { apiCall } from '../services/apiClient';
+import { createAgentCodes } from '../services/agentCodes';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,30 @@ const Import: React.FC = () => {
   const { importProspects, refetchSalesReports } = useData();
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
-  const [activeTab, setActiveTab] = useState<'prospects' | 'sales-report'>('prospects');
+  const [activeTab, setActiveTab] = useState<'prospects' | 'sales-report' | 'agent-codes'>('prospects');
+
+  // ─── Agent Codes tab state ─────────────────────────────────────────────────
+  const [agentCodesInput, setAgentCodesInput] = useState('');
+  const [agentCodesLoading, setAgentCodesLoading] = useState(false);
+  const [agentCodesResult, setAgentCodesResult] = useState<AgentCode[] | null>(null);
+  const [agentCodesError, setAgentCodesError] = useState<string | null>(null);
+
+  const handleUploadAgentCodes = async () => {
+    const raw = agentCodesInput.split(/[\n,]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+    const distinct = Array.from(new Set(raw));
+    if (distinct.length === 0) { setAgentCodesError('Please enter at least one agent code.'); return; }
+    setAgentCodesLoading(true);
+    setAgentCodesError(null);
+    setAgentCodesResult(null);
+    try {
+      const result = await createAgentCodes(distinct);
+      setAgentCodesResult(result);
+    } catch (e: any) {
+      setAgentCodesError(e?.message || 'Upload failed. Please try again.');
+    } finally {
+      setAgentCodesLoading(false);
+    }
+  };
 
   // ─── Prospects tab state ───────────────────────────────────────────────────
 
@@ -192,6 +216,15 @@ const Import: React.FC = () => {
           >
             <BarChart2 className="w-4 h-4" />
             Sales Report
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTab('agent-codes')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'agent-codes' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            <IdCard className="w-4 h-4" />
+            Agent Codes
           </button>
         )}
       </div>
@@ -409,6 +442,72 @@ const Import: React.FC = () => {
             )}
           </div>
         </>
+      )}
+
+      {/* ─── Agent Codes tab ─── */}
+      {activeTab === 'agent-codes' && isAdmin && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <div>
+              <h2 className="font-bold text-gray-900 mb-1">Bulk Upload Agent Codes</h2>
+              <p className="text-sm text-gray-500">Paste agent codes below — one per line or comma-separated. Codes are automatically trimmed and uppercased. Re-submitting an existing code is safe.</p>
+            </div>
+            <textarea
+              className="w-full h-36 bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-3 font-mono text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 resize-none"
+              placeholder={"T66701C\nT66702C\nT66703C"}
+              value={agentCodesInput}
+              onChange={e => { setAgentCodesInput(e.target.value); setAgentCodesError(null); setAgentCodesResult(null); }}
+            />
+            {agentCodesError && (
+              <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 px-4 py-3 rounded-lg">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" /> {agentCodesError}
+              </div>
+            )}
+            <button
+              onClick={handleUploadAgentCodes}
+              disabled={agentCodesLoading || !agentCodesInput.trim()}
+              className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {agentCodesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <IdCard className="w-4 h-4" />}
+              {agentCodesLoading ? 'Uploading…' : 'Upload Codes'}
+            </button>
+          </div>
+
+          {agentCodesResult && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-6 py-4 bg-green-50 border-b border-green-100 flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <span className="font-semibold text-green-800">{agentCodesResult.length} code{agentCodesResult.length !== 1 ? 's' : ''} uploaded successfully</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                      <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase">Agent Code</th>
+                      <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase">Status</th>
+                      <th className="text-left px-6 py-3 text-xs font-bold text-gray-500 uppercase">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {agentCodesResult.map(row => (
+                      <tr key={row.agentCode} className="hover:bg-gray-50">
+                        <td className="px-6 py-3 font-mono font-semibold text-gray-900">{row.agentCode}</td>
+                        <td className="px-6 py-3">
+                          {row.isUsed ? (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600">Used</span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Available</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-3 text-gray-500">{new Date(row.createdAt).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
     </div>
