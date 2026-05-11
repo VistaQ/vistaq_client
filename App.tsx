@@ -23,6 +23,7 @@ const Sales = React.lazy(() => import('./pages/Sales'));
 const AdminUsers = React.lazy(() => import('./pages/AdminUsers'));
 const AdminGroups = React.lazy(() => import('./pages/AdminGroups'));
 const AdminRewards = React.lazy(() => import('./pages/AdminRewards'));
+const AdminAgentCodes = React.lazy(() => import('./pages/AdminAgentCodes'));
 const Import = React.lazy(() => import('./pages/Import'));
 const MyCalendar = React.lazy(() => import('./pages/MyCalendar'));
 const Profile = React.lazy(() => import('./pages/Profile'));
@@ -100,6 +101,7 @@ const App: React.FC = () => {
                       <Route path="users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
                       <Route path="admin-groups" element={<AdminRoute><AdminGroups /></AdminRoute>} />
                       <Route path="admin-rewards" element={<AdminRoute><AdminRewards /></AdminRoute>} />
+                      <Route path="admin-agent-codes" element={<AdminRoute><AdminAgentCodes /></AdminRoute>} />
                       {/* Catch-all: unknown protected paths redirect to dashboard */}
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>

@@ -29,6 +29,7 @@ import {
   Trophy,
   BarChart2,
   Bell,
+  IdCard,
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import WelcomeModal from './WelcomeModal';
@@ -148,6 +149,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <NavItem id="users" label="User Management" icon={Settings} />
               <NavItem id="admin-groups" label="Group Management" icon={Layers} />
               <NavItem id="admin-rewards" label="Rewards Config" icon={Gift} />
+              <NavItem id="admin-agent-codes" label="Agent Codes" icon={IdCard} />
             </>
           )}
 
