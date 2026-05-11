@@ -39,6 +39,8 @@ const Dashboard: React.FC = () => {
    const { prospects, coachingSessions, getEventsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats, isLoadingProspects, salesReports, isLoadingSalesReports, refetchSalesReports } = useData();
 
    const [users, setUsers] = useState<User[]>([]);
+   const [chartPeriod, setChartPeriod] = useState<'mtd' | 'ytd'>('mtd');
+   const [mgmtChartPeriod, setMgmtChartPeriod] = useState<'mtd' | 'ytd'>('mtd');
 
    // Fetch stats, events and coaching sessions on mount (deferred — not loaded on app start)
    useEffect(() => {
@@ -69,10 +71,14 @@ const Dashboard: React.FC = () => {
 
       const ytdAppointments_Mgmt = ytd?.appointments_set ?? 0;
       const ytdSalesMeetings_Mgmt = ytd?.sales_meetings ?? 0;
-      const totalSalesNOC_YTD_Mgmt = ytd?.sales_noc ?? 0;
-      const totalSalesACE_YTD_Mgmt = ytd?.sales_ace ?? 0;
       const noOfAgentsYTD = ytd?.agents_count ?? 0;
-      const acsYTD_Mgmt = totalSalesNOC_YTD_Mgmt > 0 ? (totalSalesACE_YTD_Mgmt / totalSalesNOC_YTD_Mgmt) : 0;
+
+      // --- ETL-sourced NOC / ACE / ACS (aggregated across all reports in scope) ---
+      const mgmtETL_NOC = salesReports.reduce((s, r) => s + (r.noc_ytd ?? 0), 0);
+      const mgmtETL_ACE = salesReports.reduce((s, r) => s + (r.ace_ytd ?? 0), 0);
+      const mgmtETL_ACS = mgmtETL_NOC > 0 ? mgmtETL_ACE / mgmtETL_NOC : 0;
+      // Keep for top-card "Total Revenue" fallback
+      const totalSalesACE_YTD_Mgmt = mgmtETL_ACE;
 
       // --- Group Rankings from /groups/stats (already sorted by ytd_sales_ace desc) ---
       const groupRankings = groupStats.map(g => ({
@@ -82,13 +88,20 @@ const Dashboard: React.FC = () => {
          sales: g.ytd_sales_noc,
       }));
 
-      // --- MTD Chart Data from API ---
+      // --- Chart Data ---
       const mgmtChartDataMTD = [
          { name: 'Prospects',        value: mtd?.prospects ?? 0,        barType: 'count' },
          { name: 'Appointments', value: mtd?.appointments_set ?? 0, barType: 'count' },
          { name: 'Sales Meetings',   value: mtd?.sales_meetings ?? 0,   barType: 'count' },
          { name: 'Sales',            value: mtd?.sales_noc ?? 0,        barType: 'sales', ace: mtd?.sales_ace ?? 0 },
       ];
+      const mgmtChartDataYTD = [
+         { name: 'Prospects',        value: ytd?.prospects ?? 0,        barType: 'count' },
+         { name: 'Appointments', value: ytd?.appointments_set ?? 0, barType: 'count' },
+         { name: 'Sales Meetings',   value: ytd?.sales_meetings ?? 0,   barType: 'count' },
+         { name: 'Sales',            value: mgmtETL_NOC,                barType: 'sales', ace: mgmtETL_ACE },
+      ];
+      const mgmtActiveChartData = mgmtChartPeriod === 'mtd' ? mgmtChartDataMTD : mgmtChartDataYTD;
 
       const MgmtCustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { payload: { barType: string; value: number; ace?: number } }[]; label?: string }) => {
          if (active && payload && payload.length) {
@@ -220,7 +233,7 @@ const Dashboard: React.FC = () => {
                <BarChart2 className="w-5 h-5 mr-2 text-gray-500" />
                Performance Metrics (YTD)
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects</p>
@@ -243,17 +256,17 @@ const Dashboard: React.FC = () => {
                </div>
 
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
+                  <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">NOC (YTD)</p>
+                  <h3 className="text-3xl font-bold text-gray-900">{mgmtETL_NOC}</h3>
+                  <p className="text-xs text-gray-400 mt-1">Sales Report</p>
+               </div>
+
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
-                  <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (NOC & ACE)</p>
-                  <div className="flex items-baseline gap-2">
-                     <h3 className="text-3xl font-bold text-gray-900">{totalSalesNOC_YTD_Mgmt}</h3>
-                     <span className="text-xs text-gray-400">NOC</span>
-                  </div>
-                  <div className="flex items-baseline gap-1 mt-1">
-                     <p className="text-2xl font-bold text-green-600">RM {totalSalesACE_YTD_Mgmt.toLocaleString()}</p>
-                     <span className="text-xs text-gray-400">ACE</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">Year to Date</p>
+                  <p className="text-sm font-medium text-gray-500 mb-1">ACE (YTD)</p>
+                  <h3 className="text-2xl font-bold text-green-600">RM {mgmtETL_ACE.toLocaleString()}</h3>
+                  <p className="text-xs text-gray-400 mt-1">Sales Report</p>
                </div>
 
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
@@ -266,21 +279,30 @@ const Dashboard: React.FC = () => {
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg mb-3"><BarChart2 className="w-5 h-5" /></div>
                   <p className="text-sm font-medium text-gray-500 mb-1">ACS (ACE/NOC)</p>
-                  <h3 className="text-3xl font-bold text-yellow-600 mt-1">RM {acsYTD_Mgmt.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
+                  <h3 className="text-2xl font-bold text-yellow-600 mt-1">RM {mgmtETL_ACS.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
                   <p className="text-xs text-gray-400 mt-1">Year to Date</p>
                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-               {/* MTD Pipeline */}
+               {/* MTD / YTD Pipeline */}
                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                   <div className="flex justify-between items-center mb-6">
-                     <h3 className="text-lg font-bold text-gray-800">Month-To-Date Pipeline</h3>
-                     <span className="text-xs font-medium px-2 py-1 bg-gray-100 text-gray-600 rounded">{now.toLocaleString('default', { month: 'long', year: 'numeric' })} MTD</span>
+                     <h3 className="text-lg font-bold text-gray-800">Pipeline</h3>
+                     <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+                           {(['mtd', 'ytd'] as const).map(p => (
+                              <button key={p} onClick={() => setMgmtChartPeriod(p)}
+                                 className={`px-4 py-1 rounded-lg text-xs font-semibold transition-colors ${mgmtChartPeriod === p ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                                 {p.toUpperCase()}
+                              </button>
+                           ))}
+                        </div>
+                     </div>
                   </div>
                   <div className="h-64">
                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={mgmtChartDataMTD} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <BarChart data={mgmtActiveChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
                            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                            <YAxis allowDecimals={false} tickFormatter={(v) => v.toLocaleString()}>
@@ -288,7 +310,7 @@ const Dashboard: React.FC = () => {
                            </YAxis>
                            <Tooltip content={<MgmtCustomTooltip />} />
                            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                              {mgmtChartDataMTD.map((entry, index) => (
+                              {mgmtActiveChartData.map((entry, index) => (
                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                               ))}
                            </Bar>
@@ -416,9 +438,12 @@ const Dashboard: React.FC = () => {
    const totalProspectsYTD = personalYtd?.prospects ?? 0;
    const totalAppointmentsYTD = personalYtd?.appointments_set ?? 0;
    const totalSalesMeetingsYTD = personalYtd?.sales_meetings ?? 0;
-   const totalSalesNOC_YTD = personalYtd?.sales_noc ?? 0;
-   const totalSalesACE_YTD = personalYtd?.sales_ace ?? 0;
-   const acsYTD = totalSalesNOC_YTD > 0 ? (totalSalesACE_YTD / totalSalesNOC_YTD) : 0;
+
+   // --- ETL-sourced NOC / ACE / ACS (from Sales Report data, not prospect pipeline) ---
+   const myReport = salesReports.find(r => r.agent_id === currentUser?.id) ?? salesReports[0];
+   const etlNOC = myReport?.noc_ytd ?? 0;
+   const etlACE = myReport?.ace_ytd ?? 0;
+   const etlACS = etlNOC > 0 ? etlACE / etlNOC : 0;
 
    const mtdSalesNOC = personalMtd?.sales_noc ?? 0;
    const mtdSalesACE = personalMtd?.sales_ace ?? 0;
@@ -478,13 +503,22 @@ const Dashboard: React.FC = () => {
      [upcomingAppointments, upcomingEvents, upcomingCoachingSessions]
    );
 
-   // Chart Data (Month-To-Date Funnel)
+   // Chart Data — MTD and YTD
    const chartDataMTD = useMemo(() => [
       { name: 'Prospects',        value: personalMtd?.prospects ?? 0,        barType: 'count' },
       { name: 'Appointments', value: personalMtd?.appointments_set ?? 0, barType: 'count' },
       { name: 'Sales Meetings',   value: personalMtd?.sales_meetings ?? 0,   barType: 'count' },
       { name: 'Sales',           value: mtdSalesNOC,           barType: 'sales', ace: mtdSalesACE },
    ], [personalMtd, mtdSalesNOC, mtdSalesACE]);
+
+   const chartDataYTD = useMemo(() => [
+      { name: 'Prospects',        value: personalYtd?.prospects ?? 0,        barType: 'count' },
+      { name: 'Appointments', value: personalYtd?.appointments_set ?? 0, barType: 'count' },
+      { name: 'Sales Meetings',   value: personalYtd?.sales_meetings ?? 0,   barType: 'count' },
+      { name: 'Sales',           value: etlNOC,                             barType: 'sales', ace: etlACE },
+   ], [personalYtd, etlNOC, etlACE]);
+
+   const activeChartData = chartPeriod === 'mtd' ? chartDataMTD : chartDataYTD;
 
    // Custom Tooltip for the MTD Bar Chart
    const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { payload: { barType: string; value: number; ace?: number } }[]; label?: string }) => {
@@ -525,7 +559,7 @@ const Dashboard: React.FC = () => {
          </div>
 
          {/* YTD WIDGETS */}
-         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
                <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects (YTD)</p>
@@ -545,32 +579,36 @@ const Dashboard: React.FC = () => {
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
+               <div className="p-2 bg-purple-50 text-purple-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
+               <p className="text-sm font-medium text-gray-500 mb-1">NOC (YTD)</p>
+               <h3 className="text-3xl font-bold text-gray-900">{etlNOC}</h3>
+               <p className="text-xs text-gray-400 mt-1">Sales Report</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-green-50 text-green-600 rounded-lg mb-3"><DollarSign className="w-5 h-5" /></div>
-               <p className="text-sm font-medium text-gray-500 mb-1">Total Sales (YTD)</p>
-               <div className="flex items-baseline gap-2">
-                  <h3 className="text-3xl font-bold text-gray-900">{totalSalesNOC_YTD}</h3>
-                  <span className="text-xs text-gray-400">NOC</span>
-               </div>
-               <div className="flex items-baseline gap-1 mt-1">
-                  <p className="text-2xl font-bold text-green-600">RM {totalSalesACE_YTD.toLocaleString()}</p>
-                  <span className="text-xs text-gray-400">ACE</span>
-               </div>
+               <p className="text-sm font-medium text-gray-500 mb-1">ACE (YTD)</p>
+               <h3 className="text-2xl font-bold text-green-600">RM {etlACE.toLocaleString()}</h3>
+               <p className="text-xs text-gray-400 mt-1">Sales Report</p>
             </div>
 
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg mb-3"><BarChart2 className="w-5 h-5" /></div>
                <p className="text-sm font-medium text-gray-500 mb-1">ACS (ACE/NOC) (YTD)</p>
-               <h3 className="text-3xl font-bold text-yellow-600 mt-1">RM {acsYTD.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
+               <h3 className="text-2xl font-bold text-yellow-600 mt-1">RM {etlACS.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h3>
+               <p className="text-xs text-gray-400 mt-1">Sales Report</p>
             </div>
          </div>
 
          {/* MDRT Progress Widget */}
          {(() => {
-            const myReport = salesReports.find(r => r.agent_id === currentUser?.id) ?? salesReports[0];
             const monthsLeft = Math.max(12 - (new Date().getMonth() + 1), 0);
             const fycPct = myReport ? Math.min((myReport.fyc_ytd / MDRT_TARGET) * 100, 100) : 0;
             const fyctPct = myReport ? Math.min((myReport.fyct_ytd / MDRT_TARGET) * 100, 100) : 0;
-            const barColor = (p: number) => p < 25 ? 'from-red-500 to-red-400' : p < 75 ? 'from-amber-500 to-amber-400' : 'from-green-500 to-green-400';
+            const barColors: Record<string, string> = {
+               FYC:  'from-blue-500 to-blue-400',
+               FYCt: 'from-indigo-500 to-indigo-400',
+            };
 
             return (
                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -600,7 +638,7 @@ const Dashboard: React.FC = () => {
                                  <span className="font-bold text-gray-900">{item.pct.toFixed(1)}%</span>
                               </div>
                               <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                                 <div className={`h-full rounded-full bg-gradient-to-r ${barColor(item.pct)}`} style={{ width: `${item.pct}%` }} />
+                                 <div className={`h-full rounded-full bg-gradient-to-r ${barColors[item.label] ?? 'from-blue-500 to-blue-400'}`} style={{ width: `${item.pct}%` }} />
                               </div>
                               <div className="flex justify-between text-xs text-gray-400 mt-1">
                                  <span>RM {Math.round(item.ytd).toLocaleString()}</span>
@@ -615,15 +653,22 @@ const Dashboard: React.FC = () => {
          })()}
 
          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* MTD Bar Chart */}
+            {/* Pipeline Bar Chart — MTD / YTD toggle */}
             <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold text-gray-800">Month-To-Date Pipeline</h3>
-                  <span className="text-xs font-medium px-2 py-1 bg-gray-100 text-gray-600 rounded">{now.toLocaleString('default', { month: 'long', year: 'numeric' })} MTD</span>
+                  <h3 className="text-lg font-bold text-gray-800">Pipeline</h3>
+                  <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+                     {(['mtd', 'ytd'] as const).map(p => (
+                        <button key={p} onClick={() => setChartPeriod(p)}
+                           className={`px-4 py-1 rounded-lg text-xs font-semibold transition-colors ${chartPeriod === p ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                           {p.toUpperCase()}
+                        </button>
+                     ))}
+                  </div>
                </div>
                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                     <BarChart data={chartDataMTD} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                     <BarChart data={activeChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                         <YAxis allowDecimals={false} tickFormatter={(v) => v.toLocaleString()}>
@@ -631,7 +676,7 @@ const Dashboard: React.FC = () => {
                         </YAxis>
                         <Tooltip content={<CustomTooltip />} />
                         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                           {chartDataMTD.map((entry, index) => (
+                           {activeChartData.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                            ))}
                         </Bar>

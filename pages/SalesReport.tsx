@@ -102,11 +102,11 @@ const MiniTable: React.FC<{ headers: string[]; rows: (string | number | React.Re
   </div>
 );
 
-const MdrtBar: React.FC<{ label: string; value: number; target: number; shortage: number }> = ({
-  label, value, target, shortage
+const MdrtBar: React.FC<{ label: string; value: number; target: number; shortage: number; fixedColor?: string }> = ({
+  label, value, target, shortage, fixedColor
 }) => {
   const pctVal = Math.min((value / target) * 100, 100);
-  const color = pctVal < 25 ? 'bg-red-500' : pctVal < 75 ? 'bg-amber-500' : 'bg-green-500';
+  const color = fixedColor ?? (pctVal < 25 ? 'bg-red-500' : pctVal < 75 ? 'bg-amber-500' : 'bg-green-500');
   return (
     <div className="mb-5">
       <div className="flex items-center justify-between mb-2">
@@ -487,6 +487,7 @@ const SalesReportPage: React.FC = () => {
                     shortage={isMtd
                       ? Math.max(MDRT_TARGET / 12 - (myReport.month_fyc?.[n - 1] ?? 0), 0)
                       : myReport.mdrt_shortage_fyc}
+                    fixedColor="bg-blue-500"
                   />
                   <MdrtBar
                     label="FYCt"
@@ -495,6 +496,7 @@ const SalesReportPage: React.FC = () => {
                     shortage={isMtd
                       ? Math.max(MDRT_TARGET / 12 - (myReport.month_fyct?.[n - 1] ?? 0), 0)
                       : myReport.mdrt_shortage_fyct}
+                    fixedColor="bg-indigo-500"
                   />
                 </div>
               )}
