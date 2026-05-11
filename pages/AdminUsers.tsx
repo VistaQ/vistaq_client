@@ -11,13 +11,37 @@ import {
   Trash2,
   Shield,
   GraduationCap,
-  UserCheck,
-  UserX,
   X,
   IdCard,
   Key,
   Globe
 } from 'lucide-react';
+
+/** iOS-style animated toggle */
+const ToggleSwitch: React.FC<{
+  checked: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+  title?: string;
+}> = ({ checked, onChange, disabled, title }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    onClick={onChange}
+    disabled={disabled}
+    title={title}
+    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed ${
+      checked ? 'bg-green-500' : 'bg-gray-300'
+    }`}
+  >
+    <span
+      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition-transform duration-200 ease-in-out ${
+        checked ? 'translate-x-5' : 'translate-x-0'
+      }`}
+    />
+  </button>
+);
 
 /** Generate a secure temporary password with guaranteed mixed-character entropy. */
 const generateTempPassword = (): string => {
@@ -253,21 +277,23 @@ const AdminUsers: React.FC = () => {
                        )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                       <div className="flex items-center justify-end gap-2">
+                       <div className="flex items-center justify-end gap-3">
+                         <ToggleSwitch
+                           checked={(user as any).status !== 'inactive'}
+                           onChange={() => {
+                             if (user.id === currentUser.id) return;
+                             if ((user as any).status === 'inactive') {
+                               handleReactivateUser(user.id);
+                             } else {
+                               setConfirmDeactivateId(user.id);
+                             }
+                           }}
+                           disabled={user.id === currentUser.id}
+                           title={user.id === currentUser.id ? 'Cannot deactivate yourself' : (user as any).status === 'inactive' ? 'Reactivate user' : 'Deactivate user'}
+                         />
                          <button onClick={() => handleOpenModal(user)} className="text-blue-600 hover:text-blue-800" title="Edit">
                             <Edit2 className="w-4 h-4" />
                          </button>
-                         {user.id !== currentUser.id && (
-                           (user as any).status === 'inactive' ? (
-                             <button onClick={() => handleReactivateUser(user.id)} className="text-green-600 hover:text-green-800" title="Reactivate">
-                               <UserCheck className="w-4 h-4" />
-                             </button>
-                           ) : (
-                             <button onClick={() => setConfirmDeactivateId(user.id)} className="text-amber-500 hover:text-amber-700" title="Deactivate">
-                               <UserX className="w-4 h-4" />
-                             </button>
-                           )
-                         )}
                          <button onClick={() => setConfirmDeleteId(user.id)} className="text-red-600 hover:text-red-800" title="Delete">
                             <Trash2 className="w-4 h-4" />
                          </button>
