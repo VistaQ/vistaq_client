@@ -36,7 +36,7 @@ const COLORS = CHART_COLORS;
 const Dashboard: React.FC = () => {
    const navigate = useNavigate();
    const { currentUser } = useAuth();
-   const { prospects, coachingSessions, getEventsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats, isLoadingProspects, salesReports, isLoadingSalesReports, refetchSalesReports } = useData();
+   const { prospects, coachingSessions, getEventsForUser, refetchEvents, refetchCoachingSessions, dashboardStats, groupStats, isLoadingDashboardStats, refetchDashboardStats, refetchGroupStats, isLoadingProspects, salesReports, isLoadingSalesReports, refetchSalesReports, mySalesReport, isLoadingMySalesReport, refetchMySalesReport } = useData();
 
    const [users, setUsers] = useState<User[]>([]);
    const [chartPeriod, setChartPeriod] = useState<'mtd' | 'ytd'>('mtd');
@@ -49,6 +49,7 @@ const Dashboard: React.FC = () => {
       refetchEvents();
       refetchCoachingSessions();
       refetchSalesReports();
+      refetchMySalesReport();
       apiCall('/users').then(res => setUsers(Array.isArray(res.data) ? res.data : [])).catch(() => {});
    }, []);
 
@@ -439,8 +440,8 @@ const Dashboard: React.FC = () => {
    const totalAppointmentsYTD = personalYtd?.appointments_set ?? 0;
    const totalSalesMeetingsYTD = personalYtd?.sales_meetings ?? 0;
 
-   // --- ETL-sourced NOC / ACE / ACS (from Sales Report data, not prospect pipeline) ---
-   const myReport = salesReports.find(r => r.agent_id === currentUser?.id) ?? salesReports[0];
+   // --- ETL-sourced NOC / ACE / ACS — use mySalesReport (same source as Sales Report page) ---
+   const myReport = mySalesReport ?? undefined;
    const etlNOC = myReport?.noc_ytd ?? 0;
    const etlACE = myReport?.ace_ytd ?? 0;
    const etlACS = etlNOC > 0 ? etlACE / etlNOC : 0;
@@ -624,7 +625,7 @@ const Dashboard: React.FC = () => {
                         Full Report →
                      </button>
                   </div>
-                  {isLoadingSalesReports ? (
+                  {isLoadingMySalesReport ? (
                      <p className="text-sm text-gray-400 animate-pulse">Loading sales data…</p>
                   ) : !myReport ? (
                      <p className="text-sm text-gray-400 italic">No ETL data for this year yet. Contact your admin.</p>
