@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { SalesReport as SalesReportType, MDRT_TARGET, MONTH_LABELS } from '../types';
+import { SalesReport as SalesReportType, MONTH_LABELS } from '../types';
 import { CHART_COLORS } from '../constants/tokens';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -134,6 +134,9 @@ const SalesReportPage: React.FC = () => {
   const currentMonth = new Date().getMonth() + 1; // 1-based
   const n = currentMonth; // month number for productivity formula
 
+  // Personal annual target — set in Profile page, stored in localStorage
+  const salesTarget = parseFloat(localStorage.getItem(`salesTarget_${currentUser?.id}`) ?? '0') || 400_000;
+
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [kpiTab, setKpiTab] = useState<'fyct' | 'fyc' | 'ace' | 'noc'>('fyct');
   const [periodTab, setPeriodTab] = useState<'mtd' | 'ytd'>('ytd');
@@ -239,25 +242,25 @@ const SalesReportPage: React.FC = () => {
     fyct: {
       label: 'FYCt',
       ytd: myReport?.fyct_ytd ?? 0,
-      ytdTarget: MDRT_TARGET,
+      ytdTarget: salesTarget,
       mtd: myReport?.month_fyct?.[n - 1] ?? 0,
-      mtdTarget: MDRT_TARGET / 12,
+      mtdTarget: salesTarget / 12,
       isMonetary: true,
     },
     fyc: {
       label: 'FYC',
       ytd: myReport?.fyc_ytd ?? 0,
-      ytdTarget: MDRT_TARGET,
+      ytdTarget: salesTarget,
       mtd: myReport?.month_fyc?.[n - 1] ?? 0,
-      mtdTarget: MDRT_TARGET / 12,
+      mtdTarget: salesTarget / 12,
       isMonetary: true,
     },
     ace: {
       label: 'ACE',
       ytd: myReport?.ace_ytd ?? 0,
-      ytdTarget: MDRT_TARGET,
+      ytdTarget: salesTarget,
       mtd: myReport?.month_ace?.[n - 1] ?? 0,
-      mtdTarget: MDRT_TARGET / 12,
+      mtdTarget: salesTarget / 12,
       isMonetary: true,
     },
     noc: {
@@ -377,12 +380,12 @@ const SalesReportPage: React.FC = () => {
       </div>
 
       {/* ── Section nav ── */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border border-gray-100 rounded-xl shadow-sm px-4 py-3 flex gap-1 overflow-x-auto">
+      <div className="sticky top-0 z-20 bg-slate-800 rounded-xl shadow-md px-4 py-3 flex gap-1 overflow-x-auto">
         {SECTIONS.map(s => (
           <button
             key={s.id}
             onClick={() => scrollTo(s.id)}
-            className="flex-shrink-0 text-sm font-semibold px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            className="flex-shrink-0 text-sm font-semibold px-4 py-2 rounded-lg text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
           >
             {s.label}
           </button>
@@ -402,7 +405,7 @@ const SalesReportPage: React.FC = () => {
         <SectionCard
           id="milestone"
           title="Sales Performance Milestone"
-          subtitle="MDRT target: RM 400,000"
+          subtitle={`Annual target: RM ${salesTarget.toLocaleString()}`}
         >
           {noEtlData ? (
             <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-xl text-amber-700 text-sm">
@@ -435,7 +438,7 @@ const SalesReportPage: React.FC = () => {
                       label: `FYCt ${periodTab.toUpperCase()}`,
                       value: isMtd ? rm(myReport.month_fyct?.[n - 1] ?? 0) : rm(myReport.fyct_ytd),
                       sub: isMtd
-                        ? `${((( myReport.month_fyct?.[n - 1] ?? 0) / (MDRT_TARGET / 12)) * 100).toFixed(1)}% of monthly target`
+                        ? `${((( myReport.month_fyct?.[n - 1] ?? 0) / (salesTarget / 12)) * 100).toFixed(1)}% of monthly target`
                         : `${myReport.fyct_pct.toFixed(1)}% of annual target`,
                       bg: 'bg-blue-50', icon: <TrendingUp className="w-5 h-5 text-blue-600" />,
                     },
@@ -443,7 +446,7 @@ const SalesReportPage: React.FC = () => {
                       label: `FYC ${periodTab.toUpperCase()}`,
                       value: isMtd ? rm(myReport.month_fyc?.[n - 1] ?? 0) : rm(myReport.fyc_ytd),
                       sub: isMtd
-                        ? `${(((myReport.month_fyc?.[n - 1] ?? 0) / (MDRT_TARGET / 12)) * 100).toFixed(1)}% of monthly target`
+                        ? `${(((myReport.month_fyc?.[n - 1] ?? 0) / (salesTarget / 12)) * 100).toFixed(1)}% of monthly target`
                         : `${myReport.fyc_pct.toFixed(1)}% of annual target`,
                       bg: 'bg-indigo-50', icon: <Award className="w-5 h-5 text-indigo-600" />,
                     },
@@ -477,25 +480,25 @@ const SalesReportPage: React.FC = () => {
                 <div className="mb-6 p-6 bg-gray-50 rounded-xl border border-gray-100">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                      MDRT Progress · {isMtd ? `Monthly target ${rm(MDRT_TARGET / 12)}` : `Annual target ${rm(MDRT_TARGET)}`}
+                      Sales Target Progress · {isMtd ? `Monthly target ${rm(salesTarget / 12)}` : `Annual target ${rm(salesTarget)}`}
                     </span>
                   </div>
                   <MdrtBar
                     label="FYC"
                     value={isMtd ? (myReport.month_fyc?.[n - 1] ?? 0) : myReport.fyc_ytd}
-                    target={isMtd ? MDRT_TARGET / 12 : MDRT_TARGET}
+                    target={isMtd ? salesTarget / 12 : salesTarget}
                     shortage={isMtd
-                      ? Math.max(MDRT_TARGET / 12 - (myReport.month_fyc?.[n - 1] ?? 0), 0)
-                      : myReport.mdrt_shortage_fyc}
+                      ? Math.max(salesTarget / 12 - (myReport.month_fyc?.[n - 1] ?? 0), 0)
+                      : Math.max(salesTarget - myReport.fyc_ytd, 0)}
                     fixedColor="bg-green-500"
                   />
                   <MdrtBar
                     label="FYCt"
                     value={isMtd ? (myReport.month_fyct?.[n - 1] ?? 0) : myReport.fyct_ytd}
-                    target={isMtd ? MDRT_TARGET / 12 : MDRT_TARGET}
+                    target={isMtd ? salesTarget / 12 : salesTarget}
                     shortage={isMtd
-                      ? Math.max(MDRT_TARGET / 12 - (myReport.month_fyct?.[n - 1] ?? 0), 0)
-                      : myReport.mdrt_shortage_fyct}
+                      ? Math.max(salesTarget / 12 - (myReport.month_fyct?.[n - 1] ?? 0), 0)
+                      : Math.max(salesTarget - myReport.fyct_ytd, 0)}
                     fixedColor="bg-blue-500"
                   />
                 </div>

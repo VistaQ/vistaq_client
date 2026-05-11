@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole, Prospect, ProspectStage, CoachingSession, User, TRAINING_MODE_LABELS, MDRT_TARGET } from '../types';
+import { UserRole, Prospect, ProspectStage, CoachingSession, User, TRAINING_MODE_LABELS } from '../types';
 import { apiCall } from '../services/apiClient';
 import {
    Calendar,
@@ -25,7 +25,6 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, Label } from 'recharts';
 
-const MDRT_TARGET_FYC = MDRT_TARGET; // RM 400,000 — sourced from types.ts
 const MDRT_TARGET_PROSPECTS = 100;
 
 import { CHART_COLORS, CHART_LABEL_FILL } from '../constants/tokens';
@@ -440,6 +439,9 @@ const Dashboard: React.FC = () => {
    const totalAppointmentsYTD = personalYtd?.appointments_set ?? 0;
    const totalSalesMeetingsYTD = personalYtd?.sales_meetings ?? 0;
 
+   // Personal annual sales target — set in Profile, stored in localStorage
+   const salesTarget = parseFloat(localStorage.getItem(`salesTarget_${currentUser?.id}`) ?? '0') || 400_000;
+
    // --- ETL-sourced NOC / ACE / ACS — use mySalesReport (same source as Sales Report page) ---
    const myReport = mySalesReport ?? undefined;
    const etlNOC = myReport?.noc_ytd ?? 0;
@@ -604,8 +606,8 @@ const Dashboard: React.FC = () => {
          {/* MDRT Progress Widget */}
          {(() => {
             const monthsLeft = Math.max(12 - (new Date().getMonth() + 1), 0);
-            const fycPct = myReport ? Math.min((myReport.fyc_ytd / MDRT_TARGET) * 100, 100) : 0;
-            const fyctPct = myReport ? Math.min((myReport.fyct_ytd / MDRT_TARGET) * 100, 100) : 0;
+            const fycPct = myReport ? Math.min((myReport.fyc_ytd / salesTarget) * 100, 100) : 0;
+            const fyctPct = myReport ? Math.min((myReport.fyct_ytd / salesTarget) * 100, 100) : 0;
             const barColors: Record<string, string> = {
                FYC:  'from-green-500 to-green-400',
                FYCt: 'from-blue-500 to-blue-400',
@@ -615,8 +617,8 @@ const Dashboard: React.FC = () => {
                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                   <div className="flex items-center justify-between mb-4">
                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">MDRT Progress</p>
-                        <p className="text-sm text-gray-500 mt-0.5">Target: RM {MDRT_TARGET.toLocaleString()} · {monthsLeft} months remaining</p>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Sales Target Progress</p>
+                        <p className="text-sm text-gray-500 mt-0.5">Target: RM {salesTarget.toLocaleString()} · {monthsLeft} months remaining</p>
                      </div>
                      <button
                         onClick={() => navigate('/sales-report')}
@@ -631,8 +633,8 @@ const Dashboard: React.FC = () => {
                      <p className="text-sm text-gray-400 italic">No ETL data for this year yet. Contact your admin.</p>
                   ) : (
                      <div className="space-y-3">
-                        {[{ label: 'FYC', ytd: myReport.fyc_ytd, shortage: myReport.mdrt_shortage_fyc, pct: fycPct },
-                          { label: 'FYCt', ytd: myReport.fyct_ytd, shortage: myReport.mdrt_shortage_fyct, pct: fyctPct }].map(item => (
+                        {[{ label: 'FYC', ytd: myReport.fyc_ytd, shortage: Math.max(salesTarget - myReport.fyc_ytd, 0), pct: fycPct },
+                          { label: 'FYCt', ytd: myReport.fyct_ytd, shortage: Math.max(salesTarget - myReport.fyct_ytd, 0), pct: fyctPct }].map(item => (
                            <div key={item.label}>
                               <div className="flex justify-between text-sm mb-1">
                                  <span className="font-semibold text-gray-700">{item.label}</span>
