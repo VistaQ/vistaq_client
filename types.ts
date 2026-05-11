@@ -147,6 +147,15 @@ export type UploadAuditEntry = components['schemas']['UploadAuditEntry'];
 export const MDRT_TARGET = 400_000; // RM — fixed for all agents
 export const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// ─── Agent Codes ─────────────────────────────────────────────────────────────
+
+export type AgentCode = {
+  agentCode: string;
+  isUsed: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 // ─── In-app Notifications ────────────────────────────────────────────────────
 
 export type NotificationType =

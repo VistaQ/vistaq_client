@@ -11,7 +11,11 @@ const getLoginErrorMessage = (err: any): { message: string; isNetwork: boolean }
   }
   switch (err?.status) {
     case 401:
+      return { message: 'Incorrect email or password. Please try again.', isNetwork: false };
     case 403:
+      if (err?.message === 'Account is inactive') {
+        return { message: 'This account has been deactivated. Please contact your admin.', isNetwork: false };
+      }
       return { message: 'Incorrect email or password. Please try again.', isNetwork: false };
     case 404:
       return { message: 'No account found with that email address.', isNetwork: false };
