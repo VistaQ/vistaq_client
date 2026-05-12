@@ -203,60 +203,55 @@ const SalesReportPage: React.FC = () => {
   const monthsLeft = Math.max(12 - n, 0);
   const periodLabel = `Jan–${MONTH_LABELS[n - 1]} ${selectedYear}`;
 
+  // ─── Shared report row — matches company ETL format ──────────────────────
+  // Columns: Agent Code | Agent Name | FYCt (YTD) | % FYCt | FYC (YTD) | % FYC |
+  //          Shortage (FYC) | ACE (YTD) | NOC (YTD) | Jan FYCt | Jan FYC | Jan ACE | Jan NOC | … | Dec …
+  const buildReportRow = (): Record<string, string | number> | null => {
+    if (!myReport) return null;
+    const fycPct  = salesTarget > 0 ? (ytdFyc  / salesTarget) * 100 : 0;
+    const fyctPct = salesTarget > 0 ? (ytdFyct / salesTarget) * 100 : 0;
+    const row: Record<string, string | number> = {
+      'Agent Code':      myReport.agent_code,
+      'Agent Name':      myReport.agent_name,
+      'FYCt (YTD)':     ytdFyct,
+      '% FYCt':          `${fyctPct.toFixed(2)}%`,
+      'FYC (YTD)':      ytdFyc,
+      '% FYC':           `${fycPct.toFixed(2)}%`,
+      'Shortage (FYC)':  Math.max(salesTarget - ytdFyc, 0),
+      'ACE (YTD)':      ytdAce,
+      'NOC (YTD)':      ytdNoc,
+    };
+    MONTH_LABELS.forEach((m, idx) => {
+      row[`${m} FYCt`] = myReport.month_fyct?.[idx] ?? 0;
+      row[`${m} FYC`]  = myReport.month_fyc?.[idx]  ?? 0;
+      row[`${m} ACE`]  = myReport.month_ace?.[idx]  ?? 0;
+      row[`${m} NOC`]  = myReport.month_noc?.[idx]  ?? 0;
+    });
+    return row;
+  };
+
   // ─── Download: Excel ─────────────────────────────────────────────────────
   const downloadExcel = () => {
-    if (!myReport) return;
-
-    // Summary sheet
-    const summaryRows = [
-      { Section: 'Sales Milestone', Metric: 'FYCt YTD', Value: rm(ytdFyct), '%': ((ytdFyct / salesTarget) * 100).toFixed(1) + '%' },
-      { Section: '',               Metric: 'FYC YTD',  Value: rm(ytdFyc),  '%': ((ytdFyc  / salesTarget) * 100).toFixed(1) + '%' },
-      { Section: '',               Metric: 'ACE YTD',  Value: rm(ytdAce),  '%': '' },
-      { Section: '',               Metric: 'NOC YTD',  Value: String(ytdNoc), '%': '' },
-      { Section: '',               Metric: 'Annual Target', Value: rm(salesTarget), '%': '' },
-      { Section: '',               Metric: 'FYC Shortage',  Value: rm(Math.max(salesTarget - ytdFyc, 0)),  '%': '' },
-      { Section: '',               Metric: 'FYCt Shortage', Value: rm(Math.max(salesTarget - ytdFyct, 0)), '%': '' },
-      { Section: 'Pipeline (YTD)', Metric: 'Prospects',      Value: String(G), '%': '' },
-      { Section: '',               Metric: 'Appointments',   Value: String(H), '%': divOrDash(H, G) },
-      { Section: '',               Metric: 'Sales Meetings', Value: String(I), '%': divOrDash(I, H) },
-      { Section: '',               Metric: 'Sales',          Value: String(J), '%': divOrDash(J, I) },
-    ];
-
-    // Monthly breakdown sheet
-    const monthlyRows = MONTH_LABELS.map((m, idx) => ({
-      Month:  m,
-      FYCt:   myReport.month_fyct?.[idx]  ?? 0,
-      FYC:    myReport.month_fyc?.[idx]   ?? 0,
-      ACE:    myReport.month_ace?.[idx]   ?? 0,
-      NOC:    myReport.month_noc?.[idx]   ?? 0,
-    }));
-
-    // Products sheet
-    const productSheet = [
-      ...productRows.map(r => ({ Product: r.name, Cases: r.count, 'Total ACE': rm(r.ace) })),
-      { Product: 'TOTAL', Cases: totalProdCount, 'Total ACE': rm(totalProdACE) },
-    ];
-
+    const row = buildReportRow();
+    if (!row) return;
+    const ws = XLSX.utils.json_to_sheet([row]);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows),  'Summary');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthlyRows),  'Monthly Breakdown');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(productSheet), 'Products');
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales Report');
     XLSX.writeFile(wb, `VistaQ_SalesReport_${MONTH_LABELS[n - 1]}_${selectedYear}.xlsx`);
   };
 
+  // ─── Download: CSV ────────────────────────────────────────────────────────
   const downloadCSV = () => {
-    if (!myReport) return;
-    const row = {
-      'Agent Code':  myReport.agent_code,
-      'Agent Name':  myReport.agent_name,
-      'Period':      periodLabel,
-      'FYCt (YTD)':  rm(ytdFyct),
-      'FYC (YTD)':   rm(ytdFyc),
-      'ACE (YTD)':   rm(ytdAce),
-      'NOC (YTD)':   String(ytdNoc),
-    };
+    const row = buildReportRow();
+    if (!row) return;
     const headers = Object.keys(row);
-    const csv = [headers.join(','), headers.map(h => row[h as keyof typeof row]).join(',')].join('\n');
+    const csv = [
+      headers.join(','),
+      headers.map(h => {
+        const v = String(row[h]);
+        return v.includes(',') ? `"${v}"` : v;
+      }).join(','),
+    ].join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     a.download = `VistaQ_SalesReport_${MONTH_LABELS[n - 1]}_${selectedYear}.csv`;
@@ -297,6 +292,20 @@ const SalesReportPage: React.FC = () => {
 
     let y = 46;
 
+    // ── Data source note ──
+    doc.setFillColor(239, 246, 255); // blue-50
+    doc.setDrawColor(191, 219, 254); // blue-200
+    doc.roundedRect(14, y, W - 28, 12, 2, 2, 'FD');
+    doc.setFontSize(7.5);
+    doc.setTextColor(30, 64, 175); // blue-800
+    doc.setFont('helvetica', 'bold');
+    doc.text('Data sources:', 18, y + 5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Sales figures (FYCt, FYC, ACE, NOC) — Company ETL records   ·   Annual target (${rm(salesTarget)}) — Agent profile setting`, 42, y + 5);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Target can be updated anytime in the Profile page.', 18, y + 10);
+    y += 17;
+
     // ── Section helper ──
     const sectionHeader = (title: string, color: [number, number, number]) => {
       doc.setFillColor(...color);
@@ -313,17 +322,20 @@ const SalesReportPage: React.FC = () => {
 
     autoTable(doc, {
       startY: y,
-      head: [['Metric', 'Month to Date', 'Year to Date', 'Annual Target', '% of Target (YTD)']],
+      head: [['Metric', 'MTD', 'YTD', 'Profile Target', '% of Target', 'Shortage']],
       body: [
-        ['FYCt', rm(mtdFyct), rm(ytdFyct), rm(salesTarget), ((ytdFyct / salesTarget) * 100).toFixed(1) + '%'],
-        ['FYC',  rm(mtdFyc),  rm(ytdFyc),  rm(salesTarget), ((ytdFyc  / salesTarget) * 100).toFixed(1) + '%'],
-        ['ACE',  rm(mtdAce),  rm(ytdAce),  '—', '—'],
-        ['NOC',  String(mtdNoc), String(ytdNoc), '—', '—'],
+        ['FYCt', rm(mtdFyct), rm(ytdFyct), rm(salesTarget), `${((ytdFyct / salesTarget) * 100).toFixed(2)}%`, rm(Math.max(salesTarget - ytdFyct, 0))],
+        ['FYC',  rm(mtdFyc),  rm(ytdFyc),  rm(salesTarget), `${((ytdFyc  / salesTarget) * 100).toFixed(2)}%`, rm(Math.max(salesTarget - ytdFyc,  0))],
+        ['ACE',  rm(mtdAce),  rm(ytdAce),  '—', '—', '—'],
+        ['NOC',  String(mtdNoc), String(ytdNoc), '—', '—', '—'],
       ],
       headStyles: { fillColor: slate800, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       bodyStyles: { fontSize: 8 },
       alternateRowStyles: { fillColor: gray100 },
-      columnStyles: { 4: { fontStyle: 'bold', textColor: blue600 } },
+      columnStyles: {
+        4: { fontStyle: 'bold', textColor: blue600 },
+        5: { textColor: [220, 38, 38] },
+      },
       margin: { left: 14, right: 14 },
     });
     y = (doc as any).lastAutoTable.finalY + 6;
@@ -395,15 +407,20 @@ const SalesReportPage: React.FC = () => {
     }
 
     // ── MONTHLY BREAKDOWN ──
-    if (trendData.length > 0 && myReport) {
-      if (y > 200) { doc.addPage(); y = 20; }
+    if (myReport) {
+      doc.addPage();
+      y = 20;
       sectionHeader('Monthly Breakdown', [168, 85, 247]);
 
       autoTable(doc, {
         startY: y,
         head: [['Month', 'FYCt', 'FYC', 'ACE', 'NOC']],
-        body: trendData.map(row => [
-          row.month, rm(row.FYCt), rm(row.FYC), rm(row.ACE), String(row.NOC),
+        body: MONTH_LABELS.map((month, idx) => [
+          month,
+          rm(myReport!.month_fyct?.[idx] ?? 0),
+          rm(myReport!.month_fyc?.[idx]  ?? 0),
+          rm(myReport!.month_ace?.[idx]  ?? 0),
+          String(myReport!.month_noc?.[idx] ?? 0),
         ]),
         headStyles: { fillColor: slate800, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
         bodyStyles: { fontSize: 8 },
@@ -444,7 +461,7 @@ const SalesReportPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sales Report</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Your personal production & pipeline analytics</p>
+          <p className="text-sm text-gray-500 mt-0.5">Sales data from company records · Progress calculated against your profile target</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Month / Year selectors */}
@@ -477,15 +494,15 @@ const SalesReportPage: React.FC = () => {
             <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-30">
               <button onClick={downloadPDF} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 font-medium flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-blue-500" />
-                Beautiful Report (PDF)
+                PDF Report
               </button>
               <button onClick={downloadExcel} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium flex items-center gap-2 border-t border-gray-100">
                 <span className="w-2 h-2 rounded-full bg-green-500" />
-                Full Report (Excel)
+                Excel Report
               </button>
               <button onClick={downloadCSV} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium flex items-center gap-2 border-t border-gray-100">
                 <span className="w-2 h-2 rounded-full bg-gray-400" />
-                Export CSV
+                CSV Report
               </button>
             </div>
           </div>
@@ -520,7 +537,7 @@ const SalesReportPage: React.FC = () => {
         <SectionCard
           id="milestone"
           title="Sales Milestone"
-          subtitle={`Annual target: ${rm(salesTarget)} · Period: ${periodLabel} · ${monthsLeft} month${monthsLeft !== 1 ? 's' : ''} to year end`}
+          subtitle={`Your profile target: ${rm(salesTarget)} · Period: ${periodLabel} · ${monthsLeft} month${monthsLeft !== 1 ? 's' : ''} to year end`}
         >
           {noEtlData ? (
             <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-xl text-amber-700 text-sm">
@@ -529,6 +546,17 @@ const SalesReportPage: React.FC = () => {
             </div>
           ) : (
             <>
+              {/* Data source note */}
+              <div className="flex items-start gap-3 p-4 mb-6 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
+                <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
+                <span>
+                  Sales figures (FYCt, FYC, ACE, NOC) are sourced from your <strong>company's ETL records</strong>.
+                  All progress bars and percentage calculations compare these figures against the{' '}
+                  <strong>annual target you have set in your Profile</strong> ({rm(salesTarget)}).
+                  You can update your target anytime from the Profile page.
+                </span>
+              </div>
+
               {/* Period toggle — YTD first */}
               <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
                 <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
@@ -552,16 +580,16 @@ const SalesReportPage: React.FC = () => {
                       label: `FYCt ${milestoneTab.toUpperCase()}`,
                       value: isMilYtd ? rm(ytdFyct) : rm(mtdFyct),
                       sub:   isMilYtd
-                        ? `${((ytdFyct / salesTarget) * 100).toFixed(1)}% of annual target`
-                        : `${((mtdFyct / monthlyTarget) * 100).toFixed(1)}% of monthly target`,
+                        ? `${((ytdFyct / salesTarget) * 100).toFixed(1)}% of your profile target`
+                        : `${((mtdFyct / monthlyTarget) * 100).toFixed(1)}% of monthly profile target`,
                       bg: 'bg-blue-50', icon: <TrendingUp className="w-5 h-5 text-blue-600" />,
                     },
                     {
                       label: `FYC ${milestoneTab.toUpperCase()}`,
                       value: isMilYtd ? rm(ytdFyc) : rm(mtdFyc),
                       sub:   isMilYtd
-                        ? `${((ytdFyc / salesTarget) * 100).toFixed(1)}% of annual target`
-                        : `${((mtdFyc / monthlyTarget) * 100).toFixed(1)}% of monthly target`,
+                        ? `${((ytdFyc / salesTarget) * 100).toFixed(1)}% of your profile target`
+                        : `${((mtdFyc / monthlyTarget) * 100).toFixed(1)}% of monthly profile target`,
                       bg: 'bg-green-50', icon: <Award className="w-5 h-5 text-green-600" />,
                     },
                     {
@@ -593,7 +621,7 @@ const SalesReportPage: React.FC = () => {
               {myReport && (
                 <div className="p-5 md:p-6 bg-gray-50 rounded-xl border border-gray-100">
                   <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-5">
-                    Sales Target Progress · Annual target {rm(salesTarget)}
+                    Sales Progress vs Your Profile Target · {rm(salesTarget)}
                   </p>
                   <TargetBar
                     label="FYC"

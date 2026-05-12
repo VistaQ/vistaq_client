@@ -16,6 +16,8 @@
     "@emailjs/browser": "^4.4.1",
     "@lottiefiles/react-lottie-player": "^3.6.0",
     "@vercel/config": "^0.0.33",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.563.0",
     "react": "^19.2.3",
