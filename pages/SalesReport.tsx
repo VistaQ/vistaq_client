@@ -24,10 +24,20 @@ const pct = (v: number) => (v * 100).toFixed(1) + '%';
 // ─── section nav ────────────────────────────────────────────────────────────
 
 const SECTIONS = [
-  { id: 'milestone', label: 'Milestone' },
-  { id: 'pipeline',  label: 'Prospect'  },
-  { id: 'products',  label: 'Products'  },
-  { id: 'trends',    label: 'Trends'    },
+  { id: 'milestone',  label: 'Milestone'  },
+  { id: 'pipeline',   label: 'Prospect'   },
+  { id: 'efficiency', label: 'Efficiency' },
+  { id: 'products',   label: 'Products'   },
+  { id: 'trends',     label: 'Trends'     },
+];
+
+// ─── Aging config ─────────────────────────────────────────────────────────────
+
+const AGING_BUCKETS = [
+  { label: '0–30 days',  min: 0,  max: 30,        bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-100',  dot: '#22c55e' },
+  { label: '31–60 days', min: 31, max: 60,        bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-100', dot: '#eab308' },
+  { label: '61–90 days', min: 61, max: 90,        bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-100', dot: '#f97316' },
+  { label: '90+ days',   min: 91, max: Infinity,  bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-100',    dot: '#ef4444' },
 ];
 
 // ─── Trend line config ───────────────────────────────────────────────────────
@@ -158,6 +168,25 @@ const SalesReportPage: React.FC = () => {
 
   const divOrDash = (num: number, den: number) => den === 0 ? '—' : pct(num / den);
   const isPipYtd = pipelineTab === 'ytd';
+
+  // ─── Aging (all active — not filtered by period, shows current pipeline state)
+  const today = new Date();
+  const daysSince = (d: string | null | undefined): number => {
+    if (!d) return 0;
+    return Math.floor((today.getTime() - new Date(d).getTime()) / (1000 * 60 * 60 * 24));
+  };
+  // Prospect aging: entered but no appointment yet
+  const prospectAgingDays = allProspects
+    .filter(p => p.prospect_entered_at && !p.appointment_completed_at && p.sales_outcome !== 'successful')
+    .map(p => daysSince(p.prospect_entered_at));
+  // Meeting aging: had a sales meeting but no successful outcome yet
+  const meetingAgingDays = allProspects
+    .filter(p => p.sales_parts_completed?.length && p.sales_outcome !== 'successful')
+    .map(p => daysSince(p.sales_completed_at));
+  const bucketCounts = (days: number[]) =>
+    AGING_BUCKETS.map(b => ({ ...b, count: days.filter(d => d >= b.min && d <= b.max).length }));
+  const prospectBuckets = bucketCounts(prospectAgingDays);
+  const meetingBuckets  = bucketCounts(meetingAgingDays);
 
   // ─── Product summary ──────────────────────────────────────────────────────
   const successfulSales = allProspects.filter(p => p.sales_outcome === 'successful');
@@ -693,11 +722,21 @@ const SalesReportPage: React.FC = () => {
             ))}
           </div>
 
-          <div className="border-t border-gray-100 my-6" />
+        </SectionCard>
+      </div>
 
-          {/* Conversion rates */}
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Conversion Rates</p>
-          <div className="grid grid-cols-3 gap-3">
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECTION 3 — SALES EFFICIENCY & AGING
+      ══════════════════════════════════════════════════════════════════════ */}
+      <div ref={el => { sectionRefs.current['efficiency'] = el; }}>
+        <SectionCard
+          id="efficiency"
+          title="Sales Efficiency & Aging"
+          subtitle="Conversion rates and how long prospects have been waiting at each stage"
+        >
+          {/* Conversion rates — 3 coloured cards */}
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Conversion Rates</p>
+          <div className="grid grid-cols-3 gap-3 mb-8">
             {[
               { label: 'Appointment Rate', mtd: divOrDash(h, g), ytd: divOrDash(H, G), bg: 'bg-violet-50', border: 'border-violet-100', numColor: 'text-violet-700', tagBg: 'bg-violet-100 text-violet-600' },
               { label: 'Show-up Rate',     mtd: divOrDash(i, h), ytd: divOrDash(I, H), bg: 'bg-sky-50',    border: 'border-sky-100',    numColor: 'text-sky-700',    tagBg: 'bg-sky-100 text-sky-600'    },
@@ -710,11 +749,53 @@ const SalesReportPage: React.FC = () => {
               </div>
             ))}
           </div>
+
+          <div className="border-t border-gray-100 my-6" />
+
+          {/* Aging — shows all active prospects regardless of period filter */}
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Prospect & Meeting Aging</p>
+          <p className="text-xs text-gray-400 mb-5">Active prospects only · not filtered by selected period</p>
+
+          <div className="space-y-6">
+            {/* Prospect Aging */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 rounded-full bg-blue-400" />
+                <p className="text-sm font-semibold text-gray-700">Prospect Aging</p>
+                <span className="text-xs text-gray-400">· awaiting first appointment ({prospectAgingDays.length} active)</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {prospectBuckets.map(b => (
+                  <div key={b.label} className={`${b.bg} ${b.border} border rounded-xl p-3 md:p-4 text-center`}>
+                    <p className={`text-2xl font-bold ${b.text}`}>{b.count}</p>
+                    <p className={`text-xs font-semibold mt-1 ${b.text}`}>{b.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Meeting Aging */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <p className="text-sm font-semibold text-gray-700">Meeting Aging</p>
+                <span className="text-xs text-gray-400">· sales meeting done, outcome pending ({meetingAgingDays.length} active)</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {meetingBuckets.map(b => (
+                  <div key={b.label} className={`${b.bg} ${b.border} border rounded-xl p-3 md:p-4 text-center`}>
+                    <p className={`text-2xl font-bold ${b.text}`}>{b.count}</p>
+                    <p className={`text-xs font-semibold mt-1 ${b.text}`}>{b.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </SectionCard>
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          SECTION 3 — PRODUCTS
+          SECTION 4 — PRODUCTS
       ══════════════════════════════════════════════════════════════════════ */}
       <div ref={el => { sectionRefs.current['products'] = el; }}>
         <SectionCard
