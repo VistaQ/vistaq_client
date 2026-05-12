@@ -203,60 +203,55 @@ const SalesReportPage: React.FC = () => {
   const monthsLeft = Math.max(12 - n, 0);
   const periodLabel = `Jan–${MONTH_LABELS[n - 1]} ${selectedYear}`;
 
+  // ─── Shared report row — matches company ETL format ──────────────────────
+  // Columns: Agent Code | Agent Name | FYCt (YTD) | % FYCt | FYC (YTD) | % FYC |
+  //          Shortage (FYC) | ACE (YTD) | NOC (YTD) | Jan FYCt | Jan FYC | Jan ACE | Jan NOC | … | Dec …
+  const buildReportRow = (): Record<string, string | number> | null => {
+    if (!myReport) return null;
+    const fycPct  = salesTarget > 0 ? (ytdFyc  / salesTarget) * 100 : 0;
+    const fyctPct = salesTarget > 0 ? (ytdFyct / salesTarget) * 100 : 0;
+    const row: Record<string, string | number> = {
+      'Agent Code':      myReport.agent_code,
+      'Agent Name':      myReport.agent_name,
+      'FYCt (YTD)':     ytdFyct,
+      '% FYCt':          `${fyctPct.toFixed(2)}%`,
+      'FYC (YTD)':      ytdFyc,
+      '% FYC':           `${fycPct.toFixed(2)}%`,
+      'Shortage (FYC)':  Math.max(salesTarget - ytdFyc, 0),
+      'ACE (YTD)':      ytdAce,
+      'NOC (YTD)':      ytdNoc,
+    };
+    MONTH_LABELS.forEach((m, idx) => {
+      row[`${m} FYCt`] = myReport.month_fyct?.[idx] ?? 0;
+      row[`${m} FYC`]  = myReport.month_fyc?.[idx]  ?? 0;
+      row[`${m} ACE`]  = myReport.month_ace?.[idx]  ?? 0;
+      row[`${m} NOC`]  = myReport.month_noc?.[idx]  ?? 0;
+    });
+    return row;
+  };
+
   // ─── Download: Excel ─────────────────────────────────────────────────────
   const downloadExcel = () => {
-    if (!myReport) return;
-
-    // Summary sheet
-    const summaryRows = [
-      { Section: 'Sales Milestone', Metric: 'FYCt YTD', Value: rm(ytdFyct), '%': ((ytdFyct / salesTarget) * 100).toFixed(1) + '%' },
-      { Section: '',               Metric: 'FYC YTD',  Value: rm(ytdFyc),  '%': ((ytdFyc  / salesTarget) * 100).toFixed(1) + '%' },
-      { Section: '',               Metric: 'ACE YTD',  Value: rm(ytdAce),  '%': '' },
-      { Section: '',               Metric: 'NOC YTD',  Value: String(ytdNoc), '%': '' },
-      { Section: '',               Metric: 'Annual Target', Value: rm(salesTarget), '%': '' },
-      { Section: '',               Metric: 'FYC Shortage',  Value: rm(Math.max(salesTarget - ytdFyc, 0)),  '%': '' },
-      { Section: '',               Metric: 'FYCt Shortage', Value: rm(Math.max(salesTarget - ytdFyct, 0)), '%': '' },
-      { Section: 'Pipeline (YTD)', Metric: 'Prospects',      Value: String(G), '%': '' },
-      { Section: '',               Metric: 'Appointments',   Value: String(H), '%': divOrDash(H, G) },
-      { Section: '',               Metric: 'Sales Meetings', Value: String(I), '%': divOrDash(I, H) },
-      { Section: '',               Metric: 'Sales',          Value: String(J), '%': divOrDash(J, I) },
-    ];
-
-    // Monthly breakdown sheet
-    const monthlyRows = MONTH_LABELS.map((m, idx) => ({
-      Month:  m,
-      FYCt:   myReport.month_fyct?.[idx]  ?? 0,
-      FYC:    myReport.month_fyc?.[idx]   ?? 0,
-      ACE:    myReport.month_ace?.[idx]   ?? 0,
-      NOC:    myReport.month_noc?.[idx]   ?? 0,
-    }));
-
-    // Products sheet
-    const productSheet = [
-      ...productRows.map(r => ({ Product: r.name, Cases: r.count, 'Total ACE': rm(r.ace) })),
-      { Product: 'TOTAL', Cases: totalProdCount, 'Total ACE': rm(totalProdACE) },
-    ];
-
+    const row = buildReportRow();
+    if (!row) return;
+    const ws = XLSX.utils.json_to_sheet([row]);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows),  'Summary');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthlyRows),  'Monthly Breakdown');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(productSheet), 'Products');
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales Report');
     XLSX.writeFile(wb, `VistaQ_SalesReport_${MONTH_LABELS[n - 1]}_${selectedYear}.xlsx`);
   };
 
+  // ─── Download: CSV ────────────────────────────────────────────────────────
   const downloadCSV = () => {
-    if (!myReport) return;
-    const row = {
-      'Agent Code':  myReport.agent_code,
-      'Agent Name':  myReport.agent_name,
-      'Period':      periodLabel,
-      'FYCt (YTD)':  rm(ytdFyct),
-      'FYC (YTD)':   rm(ytdFyc),
-      'ACE (YTD)':   rm(ytdAce),
-      'NOC (YTD)':   String(ytdNoc),
-    };
+    const row = buildReportRow();
+    if (!row) return;
     const headers = Object.keys(row);
-    const csv = [headers.join(','), headers.map(h => row[h as keyof typeof row]).join(',')].join('\n');
+    const csv = [
+      headers.join(','),
+      headers.map(h => {
+        const v = String(row[h]);
+        return v.includes(',') ? `"${v}"` : v;
+      }).join(','),
+    ].join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     a.download = `VistaQ_SalesReport_${MONTH_LABELS[n - 1]}_${selectedYear}.csv`;
@@ -327,17 +322,20 @@ const SalesReportPage: React.FC = () => {
 
     autoTable(doc, {
       startY: y,
-      head: [['Metric', 'Month to Date', 'Year to Date', 'Profile Target', '% of Profile Target (YTD)']],
+      head: [['Metric', 'MTD', 'YTD', 'Profile Target', '% of Target', 'Shortage']],
       body: [
-        ['FYCt', rm(mtdFyct), rm(ytdFyct), rm(salesTarget), ((ytdFyct / salesTarget) * 100).toFixed(1) + '%'],
-        ['FYC',  rm(mtdFyc),  rm(ytdFyc),  rm(salesTarget), ((ytdFyc  / salesTarget) * 100).toFixed(1) + '%'],
-        ['ACE',  rm(mtdAce),  rm(ytdAce),  '—', '—'],
-        ['NOC',  String(mtdNoc), String(ytdNoc), '—', '—'],
+        ['FYCt', rm(mtdFyct), rm(ytdFyct), rm(salesTarget), `${((ytdFyct / salesTarget) * 100).toFixed(2)}%`, rm(Math.max(salesTarget - ytdFyct, 0))],
+        ['FYC',  rm(mtdFyc),  rm(ytdFyc),  rm(salesTarget), `${((ytdFyc  / salesTarget) * 100).toFixed(2)}%`, rm(Math.max(salesTarget - ytdFyc,  0))],
+        ['ACE',  rm(mtdAce),  rm(ytdAce),  '—', '—', '—'],
+        ['NOC',  String(mtdNoc), String(ytdNoc), '—', '—', '—'],
       ],
       headStyles: { fillColor: slate800, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       bodyStyles: { fontSize: 8 },
       alternateRowStyles: { fillColor: gray100 },
-      columnStyles: { 4: { fontStyle: 'bold', textColor: blue600 } },
+      columnStyles: {
+        4: { fontStyle: 'bold', textColor: blue600 },
+        5: { textColor: [220, 38, 38] },
+      },
       margin: { left: 14, right: 14 },
     });
     y = (doc as any).lastAutoTable.finalY + 6;
@@ -409,15 +407,20 @@ const SalesReportPage: React.FC = () => {
     }
 
     // ── MONTHLY BREAKDOWN ──
-    if (trendData.length > 0 && myReport) {
-      if (y > 200) { doc.addPage(); y = 20; }
+    if (myReport) {
+      doc.addPage();
+      y = 20;
       sectionHeader('Monthly Breakdown', [168, 85, 247]);
 
       autoTable(doc, {
         startY: y,
         head: [['Month', 'FYCt', 'FYC', 'ACE', 'NOC']],
-        body: trendData.map(row => [
-          row.month, rm(row.FYCt), rm(row.FYC), rm(row.ACE), String(row.NOC),
+        body: MONTH_LABELS.map((month, idx) => [
+          month,
+          rm(myReport!.month_fyct?.[idx] ?? 0),
+          rm(myReport!.month_fyc?.[idx]  ?? 0),
+          rm(myReport!.month_ace?.[idx]  ?? 0),
+          String(myReport!.month_noc?.[idx] ?? 0),
         ]),
         headStyles: { fillColor: slate800, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
         bodyStyles: { fontSize: 8 },
