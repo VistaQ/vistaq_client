@@ -60,7 +60,10 @@ const GroupBar: React.FC<{
   <div className="mt-3">
     <div className="flex justify-between text-xs text-gray-500 mb-1">
       <span className="font-semibold">{label}</span>
-      <span>{rm(value)} of {rm(total)} · {pct.toFixed(1)}%</span>
+      <span>
+        <span className="hidden sm:inline">{rm(value)} of {rm(total)} · </span>
+        {pct.toFixed(1)}%
+      </span>
     </div>
     <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
       <div className={`h-2.5 rounded-full transition-all duration-700 ${fillClass}`} style={{ width: `${Math.min(pct, 100)}%` }} />
@@ -103,8 +106,8 @@ const AgentPanel: React.FC<{
       {/* Backdrop */}
       <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Panel */}
-      <div className="w-full max-w-lg bg-white shadow-2xl flex flex-col overflow-hidden">
+      {/* Panel — full-width on mobile, capped at lg on desktop */}
+      <div className="w-full sm:max-w-lg bg-white shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-5 bg-slate-800 text-white flex items-start justify-between gap-4">
           <div>
@@ -510,13 +513,13 @@ const GroupSalesReport: React.FC = () => {
                 <tr className="border-b border-gray-100">
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left w-8">#</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Agent</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">FYCt YTD</th>
+                  <th className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">FYCt YTD</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">FYC YTD</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Progress</th>
+                  <th className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Progress</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Target %</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">ACE</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">NOC</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Shortage</th>
+                  <th className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">ACE</th>
+                  <th className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">NOC</th>
+                  <th className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Shortage</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">View</th>
                 </tr>
               </thead>
@@ -540,15 +543,15 @@ const GroupSalesReport: React.FC = () => {
                           <span className="ml-2 text-xs text-gray-400 font-normal">{r.agent_code}</span>
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-blue-700 font-medium">{rm(agentFyct)}</td>
+                      <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-blue-700 font-medium">{rm(agentFyct)}</td>
                       <td className="px-4 py-3 text-sm text-right text-green-700 font-medium">{rm(agentFyc)}</td>
-                      <td className="px-4 py-3">
+                      <td className="hidden md:table-cell px-4 py-3">
                         <MiniBar pct={tPct} />
                       </td>
                       <td className={`px-4 py-3 text-sm text-right font-bold ${tColor}`}>{tPct.toFixed(1)}%</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-700">{rm(agentAce)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-700">{agentNoc}</td>
-                      <td className="px-4 py-3 text-sm text-right text-red-500">{rm(Math.max(DEFAULT_TARGET - agentFyc, 0))}</td>
+                      <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-gray-700">{rm(agentAce)}</td>
+                      <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-gray-700">{agentNoc}</td>
+                      <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-red-500">{rm(Math.max(DEFAULT_TARGET - agentFyc, 0))}</td>
                       <td className="px-4 py-3 text-center">
                         <button
                           onClick={() => setSelectedAgent(r)}
@@ -565,13 +568,13 @@ const GroupSalesReport: React.FC = () => {
                 <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold">
                   <td className="px-4 py-3" />
                   <td className="px-4 py-3 text-sm text-gray-900">Group Total</td>
-                  <td className="px-4 py-3 text-sm text-right text-blue-700">{rm(totalFyct)}</td>
+                  <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-blue-700">{rm(totalFyct)}</td>
                   <td className="px-4 py-3 text-sm text-right text-green-700">{rm(totalFyc)}</td>
-                  <td className="px-4 py-3" />
+                  <td className="hidden md:table-cell px-4 py-3" />
                   <td className="px-4 py-3 text-sm text-right text-gray-500">{groupFycPct.toFixed(1)}% avg</td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-900">{rm(totalAce)}</td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-900">{totalNoc}</td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-500">—</td>
+                  <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-gray-900">{rm(totalAce)}</td>
+                  <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-gray-900">{totalNoc}</td>
+                  <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-gray-500">—</td>
                   <td className="px-4 py-3" />
                 </tr>
               </tbody>
@@ -589,7 +592,7 @@ const GroupSalesReport: React.FC = () => {
           </div>
           <div className="p-6 md:p-8">
             {/* Individual metric toggles */}
-            <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-xl border border-gray-100 mb-5 w-fit">
+            <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-xl border border-gray-100 mb-5">
               <span className="self-center text-xs font-bold text-gray-400 uppercase pr-1">Metrics</span>
               {TREND_LINES.map(cfg => (
                 <button
