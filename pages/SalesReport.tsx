@@ -5,116 +5,53 @@ import { SalesReport as SalesReportType, MONTH_LABELS } from '../types';
 import { CHART_COLORS } from '../constants/tokens';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import {
-  Download, TrendingUp, BarChart2, Users, Target,
-  ChevronDown, Award, AlertCircle, Loader2
+  Download, TrendingUp, Users, Target, Award,
+  ChevronDown, AlertCircle, Loader2,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-const rm = (v: number) =>
-  'RM ' + Math.round(v).toLocaleString('en-MY');
+const rm = (v: number) => 'RM ' + Math.round(v).toLocaleString('en-MY');
+const pct = (v: number) => (v * 100).toFixed(1) + '%';
 
-const pct = (v: number) =>
-  (v * 100).toFixed(1) + '%';
-
-const daysBetween = (a: string | null | undefined, b: string | null | undefined): number | null => {
-  if (!a || !b) return null;
-  const da = new Date(a).getTime();
-  const db = new Date(b).getTime();
-  if (isNaN(da) || isNaN(db)) return null;
-  return Math.round(Math.abs(db - da) / 86400000);
-};
-
-const agingBucket = (days: number): string => {
-  if (days <= 7) return '≤ 7d';
-  if (days <= 14) return '≤ 14d';
-  if (days <= 21) return '≤ 21d';
-  if (days <= 28) return '≤ 28d';
-  return '> 28d';
-};
-const AGING_BUCKETS = ['≤ 7d', '≤ 14d', '≤ 21d', '≤ 28d', '> 28d'];
-
-const isThisMonth = (dateStr: string | null | undefined): boolean => {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
+const isThisMonth = (d: string | null | undefined) => {
+  if (!d) return false;
+  const dt = new Date(d);
   const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth();
 };
-
-const isThisYear = (dateStr: string | null | undefined): boolean => {
-  if (!dateStr) return false;
-  return new Date(dateStr).getFullYear() === new Date().getFullYear();
+const isThisYear = (d: string | null | undefined) => {
+  if (!d) return false;
+  return new Date(d).getFullYear() === new Date().getFullYear();
 };
 
 // ─── section nav ────────────────────────────────────────────────────────────
 
 const SECTIONS = [
   { id: 'milestone', label: 'Milestone' },
-  { id: 'productivity', label: 'Productivity' },
-  { id: 'effectiveness', label: 'Effectiveness' },
-  { id: 'efficiency', label: 'Efficiency' },
-  { id: 'products', label: 'Products' },
-  { id: 'trends', label: 'Trends' },
+  { id: 'pipeline',  label: 'Pipeline'  },
+  { id: 'products',  label: 'Products'  },
+  { id: 'trends',    label: 'Trends'    },
 ];
 
-// ─── sub-components ─────────────────────────────────────────────────────────
+// ─── TargetBar ───────────────────────────────────────────────────────────────
 
-const SectionCard: React.FC<{ id: string; title: string; subtitle?: string; children: React.ReactNode }> = ({
-  id, title, subtitle, children
-}) => (
-  <div id={id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-    <div className="px-8 py-5 border-b border-gray-100 bg-gray-50/50 flex items-start justify-between">
-      <div>
-        <h2 className="text-lg font-bold text-gray-900">{title}</h2>
-        {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
-      </div>
-    </div>
-    <div className="p-8">{children}</div>
-  </div>
-);
-
-const MiniTable: React.FC<{ headers: string[]; rows: (string | number | React.ReactNode)[][] }> = ({ headers, rows }) => (
-  <div className="overflow-x-auto">
-    <table className="w-full">
-      <thead>
-        <tr className="border-b border-gray-100">
-          {headers.map((h, i) => (
-            <th key={i} className={`px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-50">
-        {rows.map((row, ri) => (
-          <tr key={ri} className="hover:bg-gray-50/50">
-            {row.map((cell, ci) => (
-              <td key={ci} className={`px-6 py-3 text-sm ${ci === 0 ? 'font-medium text-gray-800' : 'text-right text-gray-700'}`}>
-                {cell}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
-
-const MdrtBar: React.FC<{ label: string; value: number; target: number; shortage: number; fixedColor?: string }> = ({
-  label, value, target, shortage, fixedColor
-}) => {
-  const pctVal = Math.min((value / target) * 100, 100);
-  const color = fixedColor ?? (pctVal < 25 ? 'bg-red-500' : pctVal < 75 ? 'bg-amber-500' : 'bg-green-500');
+const TargetBar: React.FC<{
+  label: string; value: number; target: number; shortage: number; fixedColor: string;
+}> = ({ label, value, target, shortage, fixedColor }) => {
+  const p = Math.min((value / target) * 100, 100);
   return (
     <div className="mb-5">
       <div className="flex items-center justify-between mb-2">
         <span className="text-base font-semibold text-gray-700">{label}</span>
-        <span className="text-base font-bold text-gray-900">{pctVal.toFixed(1)}%</span>
+        <span className="text-base font-bold text-gray-900">{p.toFixed(1)}%</span>
       </div>
       <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
-        <div className={`h-4 rounded-full ${color} transition-all duration-700 shadow-sm`} style={{ width: `${pctVal}%` }} />
+        <div className={`h-4 rounded-full ${fixedColor} transition-all duration-700 shadow-sm`} style={{ width: `${p}%` }} />
       </div>
       <div className="flex justify-between mt-1.5 text-sm text-gray-500">
         <span>{rm(value)} of {rm(target)}</span>
@@ -124,66 +61,66 @@ const MdrtBar: React.FC<{ label: string; value: number; target: number; shortage
   );
 };
 
+// ─── SectionCard ─────────────────────────────────────────────────────────────
+
+const SectionCard: React.FC<{ id: string; title: string; subtitle?: string; children: React.ReactNode }> = ({
+  id, title, subtitle, children,
+}) => (
+  <div id={id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="px-6 md:px-8 py-5 border-b border-gray-100 bg-gray-50/50">
+      <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+      {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
+    </div>
+    <div className="p-6 md:p-8">{children}</div>
+  </div>
+);
+
 // ─── main page ───────────────────────────────────────────────────────────────
 
 const SalesReportPage: React.FC = () => {
   const { currentUser } = useAuth();
   const { mySalesReport, isLoadingMySalesReport, refetchMySalesReport, getProspectsByScope } = useData();
 
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1; // 1-based
-  const n = currentMonth; // month number for productivity formula
+  const currentYear  = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+  const n = currentMonth;
 
-  // Personal annual target — set in Profile page, stored in localStorage
-  const salesTarget = parseFloat(localStorage.getItem(`salesTarget_${currentUser?.id}`) ?? '0') || 400_000;
-
-  const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [kpiTab, setKpiTab] = useState<'fyct' | 'fyc' | 'ace' | 'noc'>('fyct');
-  const [periodTab, setPeriodTab] = useState<'mtd' | 'ytd'>('ytd');
-  const [trendLines, setTrendLines] = useState<Record<string, boolean>>({
-    Prospects: true, Appointments: false, 'Sales Meetings': false, Sales: true,
-    FYCt: true, FYC: false, ACE: false, NOC: false,
-  });
+  const [selectedYear,  setSelectedYear]  = useState(currentYear);
+  const [milestoneTab,  setMilestoneTab]  = useState<'mtd' | 'ytd'>('ytd');
+  const [pipelineTab,   setPipelineTab]   = useState<'mtd' | 'ytd'>('ytd');
+  const [trendPreset,   setTrendPreset]   = useState<'etl' | 'pipeline' | 'all'>('etl');
 
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // Fetch on mount / year change
   useEffect(() => { refetchMySalesReport(selectedYear); }, [selectedYear]);
 
   if (!currentUser) return null;
 
-  // ─── ETL data ─────────────────────────────────────────────────────────────
+  // ─── Personal sales target (from localStorage until backend ships) ──────
+  const salesTarget = parseFloat(localStorage.getItem(`salesTarget_${currentUser.id}`) ?? '0') || 400_000;
+  const monthlyTarget = salesTarget / 12;
 
+  // ─── ETL data ─────────────────────────────────────────────────────────────
   const myReport: SalesReportType | undefined = mySalesReport ?? undefined;
   const hasEtlData = myReport !== undefined;
+  const isMilMtd = milestoneTab === 'mtd';
 
   // ─── Prospect data ────────────────────────────────────────────────────────
-
   const allProspects = getProspectsByScope(currentUser);
 
-  // Effectiveness counts — using YTD (current year) and MTD filters
-  const prospectsMTD = allProspects.filter(p => isThisMonth(p.prospect_entered_at));
-  const prospectsYTD = allProspects.filter(p => isThisYear(p.prospect_entered_at));
+  const g = allProspects.filter(p => isThisMonth(p.prospect_entered_at)).length;
+  const G = allProspects.filter(p => isThisYear(p.prospect_entered_at)).length;
+  const h = allProspects.filter(p => isThisMonth(p.appointment_completed_at)).length;
+  const H = allProspects.filter(p => isThisYear(p.appointment_completed_at)).length;
+  const i = allProspects.filter(p => p.sales_parts_completed?.length && isThisMonth(p.sales_completed_at)).length;
+  const I = allProspects.filter(p => p.sales_parts_completed?.length && isThisYear(p.sales_completed_at)).length;
+  const j = allProspects.filter(p => p.sales_outcome === 'successful' && isThisMonth(p.sales_completed_at)).length;
+  const J = allProspects.filter(p => p.sales_outcome === 'successful' && isThisYear(p.sales_completed_at)).length;
 
-  const apptMTD = allProspects.filter(p => isThisMonth(p.appointment_completed_at));
-  const apptYTD = allProspects.filter(p => isThisYear(p.appointment_completed_at));
-
-  const meetingMTD = allProspects.filter(p => p.sales_parts_completed?.length && isThisMonth(p.sales_completed_at));
-  const meetingYTD = allProspects.filter(p => p.sales_parts_completed?.length && isThisYear(p.sales_completed_at));
-
-  const salesMTD = allProspects.filter(p => p.sales_outcome === 'successful' && isThisMonth(p.sales_completed_at));
-  const salesYTD = allProspects.filter(p => p.sales_outcome === 'successful' && isThisYear(p.sales_completed_at));
-
-  const g = prospectsMTD.length, G = prospectsYTD.length;
-  const h = apptMTD.length, H = apptYTD.length;
-  const i = meetingMTD.length, I = meetingYTD.length;
-  const j = salesMTD.length, J = salesYTD.length;
-
-  const divOrDash = (num: number, den: number) =>
-    den === 0 ? '—' : pct(num / den);
+  const divOrDash = (num: number, den: number) => den === 0 ? '—' : pct(num / den);
+  const isPipMtd = pipelineTab === 'mtd';
 
   // ─── Product summary ──────────────────────────────────────────────────────
-
   const successfulSales = allProspects.filter(p => p.sales_outcome === 'successful');
   const productMap: Record<string, { count: number; ace: number }> = {};
   for (const s of successfulSales) {
@@ -198,107 +135,54 @@ const SalesReportPage: React.FC = () => {
     .map(([name, d]) => ({ name, ...d }))
     .sort((a, b) => b.ace - a.ace);
   const totalProdCount = productRows.reduce((s, r) => s + r.count, 0);
-  const totalProdACE = productRows.reduce((s, r) => s + r.ace, 0);
-
-  // ─── Aging ────────────────────────────────────────────────────────────────
-
-  const prospectAgingCounts = Object.fromEntries(AGING_BUCKETS.map(b => [b, 0]));
-  for (const p of allProspects) {
-    const d = daysBetween(p.prospect_entered_at, p.appointment_date);
-    if (d !== null) prospectAgingCounts[agingBucket(d)]++;
-  }
-
-  const meetingAgingCounts = Object.fromEntries(AGING_BUCKETS.map(b => [b, 0]));
-  for (const p of allProspects) {
-    const d = daysBetween(p.appointment_date, p.sales_completed_at);
-    if (d !== null) meetingAgingCounts[agingBucket(d)]++;
-  }
+  const totalProdACE   = productRows.reduce((s, r) => s + r.ace,   0);
 
   // ─── Monthly trend data ───────────────────────────────────────────────────
-
   const trendData = MONTH_LABELS.slice(0, n).map((label, idx) => {
-    const month1 = idx + 1; // 1-based
-    const inMonth = (dateStr: string | null | undefined) => {
-      if (!dateStr) return false;
-      const d = new Date(dateStr);
-      return d.getFullYear() === selectedYear && d.getMonth() === idx;
+    const inMonth = (d: string | null | undefined) => {
+      if (!d) return false;
+      const dt = new Date(d);
+      return dt.getFullYear() === selectedYear && dt.getMonth() === idx;
     };
     return {
       month: label,
-      Prospects: allProspects.filter(p => inMonth(p.prospect_entered_at)).length,
-      Appointments: allProspects.filter(p => inMonth(p.appointment_completed_at)).length,
+      Prospects:      allProspects.filter(p => inMonth(p.prospect_entered_at)).length,
+      Appointments:   allProspects.filter(p => inMonth(p.appointment_completed_at)).length,
       'Sales Meetings': allProspects.filter(p => p.sales_parts_completed?.length && inMonth(p.sales_completed_at)).length,
-      Sales: allProspects.filter(p => p.sales_outcome === 'successful' && inMonth(p.sales_completed_at)).length,
+      Sales:          allProspects.filter(p => p.sales_outcome === 'successful' && inMonth(p.sales_completed_at)).length,
       FYCt: myReport?.month_fyct?.[idx] ?? 0,
-      FYC: myReport?.month_fyc?.[idx] ?? 0,
-      ACE: myReport?.month_ace?.[idx] ?? 0,
-      NOC: myReport?.month_noc?.[idx] ?? 0,
+      FYC:  myReport?.month_fyc?.[idx]  ?? 0,
+      ACE:  myReport?.month_ace?.[idx]  ?? 0,
+      NOC:  myReport?.month_noc?.[idx]  ?? 0,
     };
   });
 
-  // ─── Widget 1 KPI data ────────────────────────────────────────────────────
-
-  const kpiConfig = {
-    fyct: {
-      label: 'FYCt',
-      ytd: myReport?.fyct_ytd ?? 0,
-      ytdTarget: salesTarget,
-      mtd: myReport?.month_fyct?.[n - 1] ?? 0,
-      mtdTarget: salesTarget / 12,
-      isMonetary: true,
-    },
-    fyc: {
-      label: 'FYC',
-      ytd: myReport?.fyc_ytd ?? 0,
-      ytdTarget: salesTarget,
-      mtd: myReport?.month_fyc?.[n - 1] ?? 0,
-      mtdTarget: salesTarget / 12,
-      isMonetary: true,
-    },
-    ace: {
-      label: 'ACE',
-      ytd: myReport?.ace_ytd ?? 0,
-      ytdTarget: salesTarget,
-      mtd: myReport?.month_ace?.[n - 1] ?? 0,
-      mtdTarget: salesTarget / 12,
-      isMonetary: true,
-    },
-    noc: {
-      label: 'NOC',
-      ytd: myReport?.noc_ytd ?? 0,
-      ytdTarget: 0, // configurable — shown as N/A until set
-      mtd: myReport?.month_noc?.[n - 1] ?? 0,
-      mtdTarget: 0,
-      isMonetary: false,
-    },
-  };
-  const kpi = kpiConfig[kpiTab];
-  const isMtd = periodTab === 'mtd';
-  const kpiValue  = isMtd ? kpi.mtd : kpi.ytd;
-  const kpiTarget = isMtd ? kpi.mtdTarget : kpi.ytdTarget;
-  const kpiDiff   = kpiValue - kpiTarget;
-  const kpiPct    = kpiTarget > 0 ? (kpiValue / kpiTarget) * 100 : 0;
-  const monthsLeft = Math.max(12 - n, 0);
+  // ─── Monthly averages (for Trends header) ─────────────────────────────────
+  const avgFyct = n > 0 ? (myReport?.fyct_ytd ?? 0) / n : 0;
+  const avgFyc  = n > 0 ? (myReport?.fyc_ytd  ?? 0) / n : 0;
+  const avgAce  = n > 0 ? (myReport?.ace_ytd  ?? 0) / n : 0;
+  const avgNoc  = n > 0 ? (myReport?.noc_ytd  ?? 0) / n : 0;
 
   // ─── Download ─────────────────────────────────────────────────────────────
-
   const downloadExcel = () => {
     if (!myReport) return;
     const row: Record<string, unknown> = {
       'Agent Code': myReport.agent_code,
       'Agent Name': myReport.agent_name,
-      'ACE (YTD)': myReport.ace_ytd,
-      'NOC (YTD)': myReport.noc_ytd,
+      'ACE (YTD)':  myReport.ace_ytd,
+      'NOC (YTD)':  myReport.noc_ytd,
       'FYCt (YTD)': myReport.fyct_ytd,
-      '% FYCt': myReport.fyct_pct,
-      'MDRT Shortage (FYCt)': myReport.mdrt_shortage_fyct,
-      'FYC (YTD)': myReport.fyc_ytd,
-      '% FYC': myReport.fyc_pct,
-      'MDRT Shortage (FYC)': myReport.mdrt_shortage_fyc,
+      '% of Target (FYCt)': ((myReport.fyct_ytd / salesTarget) * 100).toFixed(1) + '%',
+      'FYC (YTD)':  myReport.fyc_ytd,
+      '% of Target (FYC)':  ((myReport.fyc_ytd  / salesTarget) * 100).toFixed(1) + '%',
+      'Shortage (FYCt)':    Math.max(salesTarget - myReport.fyct_ytd, 0),
+      'Shortage (FYC)':     Math.max(salesTarget - myReport.fyc_ytd,  0),
     };
     MONTH_LABELS.forEach((m, idx) => {
-      row[`${m} ACE`] = myReport.month_ace?.[idx] ?? 0;
-      row[`${m} NOC`] = myReport.month_noc?.[idx] ?? 0;
+      row[`${m} ACE`]  = myReport.month_ace?.[idx]  ?? 0;
+      row[`${m} NOC`]  = myReport.month_noc?.[idx]  ?? 0;
+      row[`${m} FYCt`] = myReport.month_fyct?.[idx] ?? 0;
+      row[`${m} FYC`]  = myReport.month_fyc?.[idx]  ?? 0;
     });
     const ws = XLSX.utils.json_to_sheet([row]);
     const wb = XLSX.utils.book_new();
@@ -309,12 +193,12 @@ const SalesReportPage: React.FC = () => {
   const downloadCSV = () => {
     if (!myReport) return;
     const row = {
-      'Agent Code': myReport.agent_code,
-      'Agent Name': myReport.agent_name,
-      'ACE (YTD)': myReport.ace_ytd,
-      'NOC (YTD)': myReport.noc_ytd,
-      'FYCt (YTD)': myReport.fyct_ytd,
-      'FYC (YTD)': myReport.fyc_ytd,
+      'Agent Code':  myReport.agent_code,
+      'Agent Name':  myReport.agent_name,
+      'ACE (YTD)':   myReport.ace_ytd,
+      'NOC (YTD)':   myReport.noc_ytd,
+      'FYCt (YTD)':  myReport.fyct_ytd,
+      'FYC (YTD)':   myReport.fyc_ytd,
     };
     const headers = Object.keys(row);
     const csv = [headers.join(','), headers.map(h => row[h as keyof typeof row]).join(',')].join('\n');
@@ -325,18 +209,13 @@ const SalesReportPage: React.FC = () => {
     URL.revokeObjectURL(a.href);
   };
 
-  // ─── scroll to section ────────────────────────────────────────────────────
-
-  const scrollTo = (id: string) => {
+  const scrollTo = (id: string) =>
     sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
 
-  // ─── empty ETL state ──────────────────────────────────────────────────────
-
-  const noEtlData = !hasEtlData;
+  const monthsLeft = Math.max(12 - n, 0);
+  const noEtlData  = !hasEtlData;
 
   // ─── render ───────────────────────────────────────────────────────────────
-
   return (
     <div className="space-y-8 pb-12">
 
@@ -344,12 +223,9 @@ const SalesReportPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sales Report</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Your personal production & pipeline analytics
-          </p>
+          <p className="text-sm text-gray-500 mt-0.5">Your personal production & pipeline analytics</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Year selector */}
           <select
             value={selectedYear}
             onChange={e => setSelectedYear(Number(e.target.value))}
@@ -359,8 +235,6 @@ const SalesReportPage: React.FC = () => {
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
-
-          {/* Download */}
           <div className="relative group">
             <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm">
               <Download className="w-4 h-4" />
@@ -368,18 +242,14 @@ const SalesReportPage: React.FC = () => {
               <ChevronDown className="w-3 h-3" />
             </button>
             <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-30">
-              <button onClick={downloadExcel} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium">
-                Full Report (Excel)
-              </button>
-              <button onClick={downloadCSV} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium border-t border-gray-100">
-                Export CSV
-              </button>
+              <button onClick={downloadExcel} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium">Full Report (Excel)</button>
+              <button onClick={downloadCSV}   className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium border-t border-gray-100">Export CSV</button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Section nav ── */}
+      {/* ── Section nav — dark blue ── */}
       <div className="sticky top-0 z-20 bg-slate-800 rounded-xl shadow-md px-4 py-3 flex gap-1 overflow-x-auto">
         {SECTIONS.map(s => (
           <button
@@ -400,12 +270,14 @@ const SalesReportPage: React.FC = () => {
         </div>
       )}
 
-      {/* ── Widget 1 — Sales Performance Milestone ── */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECTION 1 — SALES MILESTONE
+      ══════════════════════════════════════════════════════════════════════ */}
       <div ref={el => { sectionRefs.current['milestone'] = el; }}>
         <SectionCard
           id="milestone"
-          title="Sales Performance Milestone"
-          subtitle={`Annual target: RM ${salesTarget.toLocaleString()}`}
+          title="Sales Milestone"
+          subtitle={`Annual target: RM ${salesTarget.toLocaleString()} · ${monthsLeft} month${monthsLeft !== 1 ? 's' : ''} remaining`}
         >
           {noEtlData ? (
             <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-xl text-amber-700 text-sm">
@@ -414,314 +286,200 @@ const SalesReportPage: React.FC = () => {
             </div>
           ) : (
             <>
-              {/* ── Period toggle (MTD / YTD) — drives entire widget ── */}
-              <div className="flex items-center justify-between mb-6">
+              {/* Period toggle */}
+              <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
                 <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
                   {(['mtd', 'ytd'] as const).map(p => (
                     <button
                       key={p}
-                      onClick={() => setPeriodTab(p)}
-                      className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${periodTab === p ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                      onClick={() => setMilestoneTab(p)}
+                      className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${milestoneTab === p ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
                       {p === 'mtd' ? 'Month to Date' : 'Year to Date'}
                     </button>
                   ))}
                 </div>
-                <span className="text-sm text-blue-600 font-medium">{monthsLeft} months remaining</span>
               </div>
 
-              {/* ── Stat cards — values swap with period toggle ── */}
+              {/* Stat cards — 2×2 on mobile, 4 cols on md+ */}
               {myReport && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  {([
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                  {[
                     {
-                      label: `FYCt ${periodTab.toUpperCase()}`,
-                      value: isMtd ? rm(myReport.month_fyct?.[n - 1] ?? 0) : rm(myReport.fyct_ytd),
-                      sub: isMtd
-                        ? `${((( myReport.month_fyct?.[n - 1] ?? 0) / (salesTarget / 12)) * 100).toFixed(1)}% of monthly target`
-                        : `${myReport.fyct_pct.toFixed(1)}% of annual target`,
+                      label: `FYCt ${milestoneTab.toUpperCase()}`,
+                      value: isMilMtd ? rm(myReport.month_fyct?.[n - 1] ?? 0) : rm(myReport.fyct_ytd),
+                      sub:   isMilMtd
+                        ? `${(((myReport.month_fyct?.[n - 1] ?? 0) / monthlyTarget) * 100).toFixed(1)}% of monthly target`
+                        : `${((myReport.fyct_ytd / salesTarget) * 100).toFixed(1)}% of annual target`,
                       bg: 'bg-blue-50', icon: <TrendingUp className="w-5 h-5 text-blue-600" />,
                     },
                     {
-                      label: `FYC ${periodTab.toUpperCase()}`,
-                      value: isMtd ? rm(myReport.month_fyc?.[n - 1] ?? 0) : rm(myReport.fyc_ytd),
-                      sub: isMtd
-                        ? `${(((myReport.month_fyc?.[n - 1] ?? 0) / (salesTarget / 12)) * 100).toFixed(1)}% of monthly target`
-                        : `${myReport.fyc_pct.toFixed(1)}% of annual target`,
-                      bg: 'bg-indigo-50', icon: <Award className="w-5 h-5 text-indigo-600" />,
+                      label: `FYC ${milestoneTab.toUpperCase()}`,
+                      value: isMilMtd ? rm(myReport.month_fyc?.[n - 1] ?? 0) : rm(myReport.fyc_ytd),
+                      sub:   isMilMtd
+                        ? `${(((myReport.month_fyc?.[n - 1] ?? 0) / monthlyTarget) * 100).toFixed(1)}% of monthly target`
+                        : `${((myReport.fyc_ytd / salesTarget) * 100).toFixed(1)}% of annual target`,
+                      bg: 'bg-green-50', icon: <Award className="w-5 h-5 text-green-600" />,
                     },
                     {
-                      label: `ACE ${periodTab.toUpperCase()}`,
-                      value: isMtd ? rm(myReport.month_ace?.[n - 1] ?? 0) : rm(myReport.ace_ytd),
-                      sub: 'Annualised contribution',
+                      label: `ACE ${milestoneTab.toUpperCase()}`,
+                      value: isMilMtd ? rm(myReport.month_ace?.[n - 1] ?? 0) : rm(myReport.ace_ytd),
+                      sub:   'Annualised contribution',
                       bg: 'bg-emerald-50', icon: <Target className="w-5 h-5 text-emerald-600" />,
                     },
                     {
-                      label: `NOC ${periodTab.toUpperCase()}`,
-                      value: isMtd ? String(myReport.month_noc?.[n - 1] ?? 0) : String(myReport.noc_ytd),
-                      sub: 'Number of cases',
+                      label: `NOC ${milestoneTab.toUpperCase()}`,
+                      value: isMilMtd ? String(myReport.month_noc?.[n - 1] ?? 0) : String(myReport.noc_ytd),
+                      sub:   'Number of cases',
                       bg: 'bg-purple-50', icon: <Users className="w-5 h-5 text-purple-600" />,
                     },
-                  ] as { label: string; value: string; sub: string; bg: string; icon: React.ReactNode }[]).map(card => (
-                    <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
+                  ].map(card => (
+                    <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-5 flex flex-col">
                       <div className="flex items-center mb-3">
                         <div className={`p-2 ${card.bg} rounded-lg mr-3`}>{card.icon}</div>
-                        <p className="text-xs font-semibold text-gray-500 uppercase">{card.label}</p>
+                        <p className="text-xs font-semibold text-gray-500 uppercase leading-tight">{card.label}</p>
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+                      <p className="text-xl md:text-2xl font-bold text-gray-900">{card.value}</p>
                       <p className="text-xs text-gray-400 mt-1">{card.sub}</p>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* ── MDRT progress bars — values swap with period toggle ── */}
+              {/* Sales Target Progress bars — always YTD vs annual target */}
               {myReport && (
-                <div className="mb-6 p-6 bg-gray-50 rounded-xl border border-gray-100">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                      Sales Target Progress · {isMtd ? `Monthly target ${rm(salesTarget / 12)}` : `Annual target ${rm(salesTarget)}`}
-                    </span>
-                  </div>
-                  <MdrtBar
+                <div className="p-5 md:p-6 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-5">
+                    Sales Target Progress · Annual target {rm(salesTarget)}
+                  </p>
+                  <TargetBar
                     label="FYC"
-                    value={isMtd ? (myReport.month_fyc?.[n - 1] ?? 0) : myReport.fyc_ytd}
-                    target={isMtd ? salesTarget / 12 : salesTarget}
-                    shortage={isMtd
-                      ? Math.max(salesTarget / 12 - (myReport.month_fyc?.[n - 1] ?? 0), 0)
-                      : Math.max(salesTarget - myReport.fyc_ytd, 0)}
+                    value={myReport.fyc_ytd}
+                    target={salesTarget}
+                    shortage={Math.max(salesTarget - myReport.fyc_ytd, 0)}
                     fixedColor="bg-green-500"
                   />
-                  <MdrtBar
+                  <TargetBar
                     label="FYCt"
-                    value={isMtd ? (myReport.month_fyct?.[n - 1] ?? 0) : myReport.fyct_ytd}
-                    target={isMtd ? salesTarget / 12 : salesTarget}
-                    shortage={isMtd
-                      ? Math.max(salesTarget / 12 - (myReport.month_fyct?.[n - 1] ?? 0), 0)
-                      : Math.max(salesTarget - myReport.fyct_ytd, 0)}
+                    value={myReport.fyct_ytd}
+                    target={salesTarget}
+                    shortage={Math.max(salesTarget - myReport.fyct_ytd, 0)}
                     fixedColor="bg-blue-500"
                   />
                 </div>
               )}
-
-              {/* ── KPI metric toggle ── */}
-              <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1 w-fit">
-                {(['fyct', 'fyc', 'ace', 'noc'] as const).map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setKpiTab(tab)}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${kpiTab === tab ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                  >
-                    {kpiConfig[tab].label}
-                  </button>
-                ))}
-              </div>
-
-              {/* ── KPI table — columns reflect selected period ── */}
-              <MiniTable
-                headers={['', `${isMtd ? 'MTD' : 'YTD'} %`, isMtd ? 'MTD Value' : 'YTD Value', 'Target', 'Difference']}
-                rows={[
-                  [
-                    'Achieved',
-                    kpiTarget > 0 ? `${kpiPct.toFixed(1)}%` : '—',
-                    kpi.isMonetary ? rm(kpiValue) : String(kpiValue),
-                    kpi.isMonetary && kpiTarget > 0 ? rm(kpiTarget) : kpiTarget > 0 ? String(Math.round(kpiTarget)) : '—',
-                    kpiTarget > 0
-                      ? <span className={kpiDiff >= 0 ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'}>
-                          {kpiDiff >= 0 ? '+' : ''}{kpi.isMonetary ? rm(kpiDiff) : String(Math.round(kpiDiff))}
-                        </span>
-                      : '—',
-                  ],
-                  [
-                    'Target',
-                    kpiTarget > 0 ? '100%' : '—',
-                    kpi.isMonetary && kpiTarget > 0 ? rm(kpiTarget) : kpiTarget > 0 ? String(Math.round(kpiTarget)) : '—',
-                    '—',
-                    '—',
-                  ],
-                  [
-                    'Difference',
-                    kpiTarget > 0 ? `${(kpiPct - 100).toFixed(1)}%` : '—',
-                    kpiTarget > 0
-                      ? <span className={kpiDiff >= 0 ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'}>
-                          {kpiDiff >= 0 ? '+' : ''}{kpi.isMonetary ? rm(kpiDiff) : String(Math.round(kpiDiff))}
-                        </span>
-                      : '—',
-                    '—',
-                    '—',
-                  ],
-                ]}
-              />
             </>
           )}
         </SectionCard>
       </div>
 
-      {/* ── Widget 2 — Productivity Per Month ── */}
-      <div ref={el => { sectionRefs.current['productivity'] = el; }}>
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECTION 2 — PIPELINE
+      ══════════════════════════════════════════════════════════════════════ */}
+      <div ref={el => { sectionRefs.current['pipeline'] = el; }}>
         <SectionCard
-          id="productivity"
-          title="Productivity Per Month"
-          subtitle={`Calculated as YTD ÷ ${n} (months elapsed)`}
+          id="pipeline"
+          title="Pipeline"
+          subtitle="Stage progression and conversion rates — from prospect data"
         >
-          {noEtlData ? (
-            <p className="text-sm text-gray-400 italic">Awaiting ETL data upload.</p>
-          ) : (
-            <>
-              <MiniTable
-                headers={['Metric', 'Monthly Productivity', 'YTD Total']}
-                rows={[
-                  ['FYCt', rm((myReport?.fyct_ytd ?? 0) / n), rm(myReport?.fyct_ytd ?? 0)],
-                  ['FYC', rm((myReport?.fyc_ytd ?? 0) / n), rm(myReport?.fyc_ytd ?? 0)],
-                  ['ACE', rm((myReport?.ace_ytd ?? 0) / n), rm(myReport?.ace_ytd ?? 0)],
-                  ['NOC', ((myReport?.noc_ytd ?? 0) / n).toFixed(1), String(myReport?.noc_ytd ?? 0)],
-                  ['ACS (ACE/NOC)', myReport && myReport.noc_ytd > 0 ? rm(myReport.ace_ytd / myReport.noc_ytd) : '—', '—'],
-                ]}
-              />
+          {/* MTD / YTD toggle */}
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-6">
+            {(['mtd', 'ytd'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => setPipelineTab(p)}
+                className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${pipelineTab === p ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                {p === 'mtd' ? 'Month to Date' : 'Year to Date'}
+              </button>
+            ))}
+          </div>
 
-              {/* Monthly trend chart */}
-              <div className="mt-8">
-                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Monthly Trend</p>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={trendData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
-                    <Tooltip formatter={(v: number) => rm(v)} />
-                    <Legend />
-                    <Bar dataKey="ACE" fill={CHART_COLORS[0]} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="FYCt" fill={CHART_COLORS[1]} radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+          {/* Stage funnel — 2×2 on mobile, 4 cols on md+ */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            {[
+              { label: 'Prospects',     value: isPipMtd ? g : G, color: 'text-blue-600',   bg: 'bg-blue-50'   },
+              { label: 'Appointments',  value: isPipMtd ? h : H, color: 'text-purple-600', bg: 'bg-purple-50' },
+              { label: 'Sales Meetings',value: isPipMtd ? i : I, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+              { label: 'Sales',         value: isPipMtd ? j : J, color: 'text-green-600',  bg: 'bg-green-50'  },
+            ].map(chip => (
+              <div key={chip.label} className={`${chip.bg} rounded-xl p-4 text-center`}>
+                <p className="text-2xl md:text-3xl font-bold text-gray-900">{chip.value}</p>
+                <p className={`text-xs font-semibold mt-1 ${chip.color}`}>{chip.label}</p>
               </div>
-            </>
-          )}
-        </SectionCard>
-      </div>
+            ))}
+          </div>
 
-      {/* ── Widget 3 — Sales Effectiveness ── */}
-      <div ref={el => { sectionRefs.current['effectiveness'] = el; }}>
-        <SectionCard
-          id="effectiveness"
-          title="Sales Effectiveness"
-          subtitle="Pipeline stage progression — from prospect data"
-        >
-          <MiniTable
-            headers={['Stage', 'MTD', 'YTD', 'Per Month (YTD/n)']}
-            rows={[
-              ['Prospect', g, G, (G / n).toFixed(1)],
-              ['Appointment', h, H, (H / n).toFixed(1)],
-              ['Sales Meeting', i, I, (I / n).toFixed(1)],
-              ['Sales', j, J, (J / n).toFixed(1)],
-            ]}
-          />
-        </SectionCard>
-      </div>
+          {/* Divider */}
+          <div className="border-t border-gray-100 my-6" />
 
-      {/* ── Widget 4 — Sales Efficiency + Aging ── */}
-      <div ref={el => { sectionRefs.current['efficiency'] = el; }}>
-        <SectionCard
-          id="efficiency"
-          title="Sales Efficiency & Aging"
-          subtitle="Conversion rates and pipeline timing"
-        >
-          {/* Efficiency table */}
-          <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Conversion Rates</p>
-          <MiniTable
-            headers={['Metric', 'MTD', 'YTD', 'Per Month']}
-            rows={[
-              ['Appointment Rate', divOrDash(h, g), divOrDash(H, G), divOrDash(H, G)],
-              ['Show-up Rate', divOrDash(i, h), divOrDash(I, H), divOrDash(I, H)],
-              ['Closing Rate', divOrDash(j, i), divOrDash(J, I), divOrDash(J, I)],
-            ]}
-          />
-
-          {/* Prospect aging */}
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Prospect Aging</p>
-              <p className="text-sm text-gray-400 mb-4">Days from prospect creation → appointment date</p>
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={AGING_BUCKETS.map(b => ({ name: b, count: prospectAgingCounts[b] }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill={CHART_COLORS[2]} radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Meeting Aging</p>
-              <p className="text-sm text-gray-400 mb-4">Days from appointment → sales completion</p>
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={AGING_BUCKETS.map(b => ({ name: b, count: meetingAgingCounts[b] }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill={CHART_COLORS[3]} radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          {/* Conversion rates — 3 numbers */}
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Conversion Rates</p>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Appointment Rate', mtd: divOrDash(h, g), ytd: divOrDash(H, G) },
+              { label: 'Show-up Rate',     mtd: divOrDash(i, h), ytd: divOrDash(I, H) },
+              { label: 'Closing Rate',     mtd: divOrDash(j, i), ytd: divOrDash(J, I) },
+            ].map(rate => (
+              <div key={rate.label} className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
+                <p className="text-xl md:text-2xl font-bold text-gray-900">{isPipMtd ? rate.mtd : rate.ytd}</p>
+                <p className="text-xs font-semibold text-gray-500 mt-1 leading-tight">{rate.label}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{isPipMtd ? 'MTD' : 'YTD'}</p>
+              </div>
+            ))}
           </div>
         </SectionCard>
       </div>
 
-      {/* ── Widget 5 — Product Summary ── */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECTION 3 — PRODUCTS
+      ══════════════════════════════════════════════════════════════════════ */}
       <div ref={el => { sectionRefs.current['products'] = el; }}>
         <SectionCard
           id="products"
           title="Product Summary"
-          subtitle="Cumulative — all successful sales across all months"
+          subtitle="Cumulative — all successful sales"
         >
           {productRows.length === 0 ? (
             <p className="text-sm text-gray-400 italic">No successful sales recorded yet.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              {/* Table */}
+              {/* Simplified 3-column table */}
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-100">
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Product</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Cases</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">% (No.)</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Total ACE</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">% (ACE)</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Product</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Cases</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Total ACE</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {productRows.map((r, idx) => (
                       <tr key={idx} className="hover:bg-gray-50/50">
-                        <td className="px-6 py-3 text-sm font-medium text-gray-800">{r.name}</td>
-                        <td className="px-6 py-3 text-sm text-right text-gray-700">{r.count}</td>
-                        <td className="px-6 py-3 text-sm text-right text-gray-700">{totalProdCount > 0 ? pct(r.count / totalProdCount) : '—'}</td>
-                        <td className="px-6 py-3 text-sm text-right text-gray-700">{rm(r.ace)}</td>
-                        <td className="px-6 py-3 text-sm text-right text-gray-700">{totalProdACE > 0 ? pct(r.ace / totalProdACE) : '—'}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-800">{r.name}</td>
+                        <td className="px-4 py-3 text-sm text-right text-gray-700">{r.count}</td>
+                        <td className="px-4 py-3 text-sm text-right text-gray-700">{rm(r.ace)}</td>
                       </tr>
                     ))}
-                    <tr className="border-t-2 border-gray-200 font-bold bg-gray-50">
-                      <td className="px-6 py-3 text-sm font-bold text-gray-900">Total</td>
-                      <td className="px-6 py-3 text-sm font-bold text-right text-gray-900">{totalProdCount}</td>
-                      <td className="px-6 py-3 text-sm font-bold text-right text-gray-900">100%</td>
-                      <td className="px-6 py-3 text-sm font-bold text-right text-gray-900">{rm(totalProdACE)}</td>
-                      <td className="px-6 py-3 text-sm font-bold text-right text-gray-900">100%</td>
+                    <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold">
+                      <td className="px-4 py-3 text-sm text-gray-900">Total</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-900">{totalProdCount}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-900">{rm(totalProdACE)}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
 
-              {/* Pie chart */}
-              <div>
+              {/* Pie chart — desktop only */}
+              <div className="hidden md:block">
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
                     <Pie
                       data={productRows}
                       dataKey="ace"
                       nameKey="name"
-                      cx="50%"
-                      cy="50%"
+                      cx="50%" cy="50%"
                       outerRadius={90}
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                       labelLine={false}
@@ -739,26 +497,45 @@ const SalesReportPage: React.FC = () => {
         </SectionCard>
       </div>
 
-      {/* ── Widget 6 — Monthly Progress Chart ── */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECTION 4 — TRENDS
+      ══════════════════════════════════════════════════════════════════════ */}
       <div ref={el => { sectionRefs.current['trends'] = el; }}>
         <SectionCard
           id="trends"
-          title="Monthly Progress"
-          subtitle="Select metrics to display on the chart"
+          title="Monthly Trends"
+          subtitle="Month-by-month production breakdown"
         >
-          {/* Toggle strip */}
-          <div className="flex flex-wrap gap-2 mb-5">
-            {Object.keys(trendLines).map(key => (
+          {/* Monthly averages row */}
+          {myReport && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              {[
+                { label: 'Avg FYCt / Month', value: rm(avgFyct), color: 'text-blue-600'   },
+                { label: 'Avg FYC / Month',  value: rm(avgFyc),  color: 'text-green-600'  },
+                { label: 'Avg ACE / Month',  value: rm(avgAce),  color: 'text-emerald-600'},
+                { label: 'Avg NOC / Month',  value: avgNoc.toFixed(1), color: 'text-purple-600' },
+              ].map(s => (
+                <div key={s.label} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                  <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Preset toggle */}
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-5">
+            {([
+              { key: 'etl',      label: 'ETL (FYCt / FYC / ACE / NOC)' },
+              { key: 'pipeline', label: 'Pipeline'                       },
+              { key: 'all',      label: 'All'                            },
+            ] as const).map(preset => (
               <button
-                key={key}
-                onClick={() => setTrendLines(prev => ({ ...prev, [key]: !prev[key] }))}
-                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                  trendLines[key]
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-                }`}
+                key={preset.key}
+                onClick={() => setTrendPreset(preset.key)}
+                className={`px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${trendPreset === preset.key ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
-                {key}
+                {preset.label}
               </button>
             ))}
           </div>
@@ -767,27 +544,27 @@ const SalesReportPage: React.FC = () => {
             <LineChart data={trendData} margin={{ top: 5, right: 20, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+              <YAxis yAxisId="left"  tick={{ fontSize: 11 }} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
               <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
               <Tooltip />
               <Legend />
-              {/* Count lines — right axis */}
-              {(['Prospects', 'Appointments', 'Sales Meetings', 'Sales'] as const).map((key, idx) =>
-                trendLines[key] && (
-                  <Line key={key} yAxisId="right" type="monotone" dataKey={key}
-                    stroke={CHART_COLORS[idx]} strokeWidth={2} dot={{ r: 3 }} />
-                )
+              {/* ETL lines */}
+              {(trendPreset === 'etl' || trendPreset === 'all') && myReport && (
+                <>
+                  <Line yAxisId="left" type="monotone" dataKey="FYCt" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 2" />
+                  <Line yAxisId="left" type="monotone" dataKey="FYC"  stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 2" />
+                  <Line yAxisId="left" type="monotone" dataKey="ACE"  stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 2" />
+                  <Line yAxisId="right" type="monotone" dataKey="NOC" stroke="#a855f7" strokeWidth={2} dot={{ r: 3 }} />
+                </>
               )}
-              {/* Monetary lines — left axis */}
-              {(['FYCt', 'FYC', 'ACE'] as const).map((key, idx) =>
-                trendLines[key] && (
-                  <Line key={key} yAxisId="left" type="monotone" dataKey={key}
-                    stroke={CHART_COLORS[idx + 4]} strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 2" />
-                )
-              )}
-              {trendLines['NOC'] && (
-                <Line yAxisId="right" type="monotone" dataKey="NOC"
-                  stroke={CHART_COLORS[7]} strokeWidth={2} dot={{ r: 3 }} />
+              {/* Pipeline lines */}
+              {(trendPreset === 'pipeline' || trendPreset === 'all') && (
+                <>
+                  <Line yAxisId="right" type="monotone" dataKey="Prospects"      stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 3 }} />
+                  <Line yAxisId="right" type="monotone" dataKey="Appointments"   stroke={CHART_COLORS[1]} strokeWidth={2} dot={{ r: 3 }} />
+                  <Line yAxisId="right" type="monotone" dataKey="Sales Meetings" stroke={CHART_COLORS[2]} strokeWidth={2} dot={{ r: 3 }} />
+                  <Line yAxisId="right" type="monotone" dataKey="Sales"          stroke={CHART_COLORS[3]} strokeWidth={2} dot={{ r: 3 }} />
+                </>
               )}
             </LineChart>
           </ResponsiveContainer>
