@@ -24,11 +24,10 @@ const pct = (v: number) => (v * 100).toFixed(1) + '%';
 // ─── section nav ────────────────────────────────────────────────────────────
 
 const SECTIONS = [
-  { id: 'milestone',  label: 'Milestone'  },
-  { id: 'pipeline',   label: 'Prospect'   },
-  { id: 'efficiency', label: 'Efficiency' },
-  { id: 'products',   label: 'Products'   },
-  { id: 'trends',     label: 'Trends'     },
+  { id: 'milestone', label: 'Milestone' },
+  { id: 'pipeline',  label: 'Prospect'  },
+  { id: 'products',  label: 'Products'  },
+  { id: 'trends',    label: 'Trends'    },
 ];
 
 // ─── Aging config ─────────────────────────────────────────────────────────────
@@ -686,15 +685,15 @@ const SalesReportPage: React.FC = () => {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          SECTION 2 — PIPELINE
+          SECTION 2 — PROSPECT PIPELINE & EFFICIENCY
       ══════════════════════════════════════════════════════════════════════ */}
       <div ref={el => { sectionRefs.current['pipeline'] = el; }}>
         <SectionCard
           id="pipeline"
           title="Prospect"
-          subtitle="Stage progression and conversion rates — from prospect data"
+          subtitle="Stage funnel, conversion rates and pipeline aging"
         >
-          {/* YTD / MTD toggle — YTD first */}
+          {/* YTD / MTD toggle — controls funnel + conversion rates */}
           <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-full sm:w-fit mb-6">
             {(['ytd', 'mtd'] as const).map(p => (
               <button
@@ -708,7 +707,8 @@ const SalesReportPage: React.FC = () => {
           </div>
 
           {/* Stage funnel — 2×2 on mobile, 4 cols on md+ */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Stage Funnel</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
             {[
               { label: 'Prospects',      value: isPipYtd ? G : g, color: 'text-blue-600',   bg: 'bg-blue-50'   },
               { label: 'Appointments',   value: isPipYtd ? H : h, color: 'text-purple-600', bg: 'bg-purple-50' },
@@ -722,19 +722,9 @@ const SalesReportPage: React.FC = () => {
             ))}
           </div>
 
-        </SectionCard>
-      </div>
+          <div className="border-t border-gray-100 my-6" />
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          SECTION 3 — SALES EFFICIENCY & AGING
-      ══════════════════════════════════════════════════════════════════════ */}
-      <div ref={el => { sectionRefs.current['efficiency'] = el; }}>
-        <SectionCard
-          id="efficiency"
-          title="Sales Efficiency & Aging"
-          subtitle="Conversion rates and how long prospects have been waiting at each stage"
-        >
-          {/* Conversion rates — 3 coloured cards */}
+          {/* Conversion rates — 3 coloured cards, same YTD/MTD toggle */}
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Conversion Rates</p>
           <div className="grid grid-cols-3 gap-3 mb-8">
             {[
@@ -752,8 +742,8 @@ const SalesReportPage: React.FC = () => {
 
           <div className="border-t border-gray-100 my-6" />
 
-          {/* Aging — shows all active prospects regardless of period filter */}
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Prospect & Meeting Aging</p>
+          {/* Aging — shows all active prospects, not filtered by period */}
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Pipeline Aging</p>
           <p className="text-xs text-gray-400 mb-5">Active prospects only · not filtered by selected period</p>
 
           <div className="space-y-6">
