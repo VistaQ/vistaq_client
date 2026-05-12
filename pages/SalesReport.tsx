@@ -498,7 +498,7 @@ const SalesReportPage: React.FC = () => {
           <select
             value={selectedMonth}
             onChange={e => setSelectedMonth(Number(e.target.value))}
-            className="flex-1 min-w-[90px] text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-sm border border-gray-200 rounded-lg pl-3 pr-8 py-2 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {monthOptions.map(m => (
               <option key={m.value} value={m.value}>{m.label}</option>
@@ -507,7 +507,7 @@ const SalesReportPage: React.FC = () => {
           <select
             value={selectedYear}
             onChange={e => setSelectedYear(Number(e.target.value))}
-            className="flex-1 min-w-[80px] text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-sm border border-gray-200 rounded-lg pl-3 pr-8 py-2 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {[currentYear - 1, currentYear, currentYear + 1].map(y => (
               <option key={y} value={y}>{y}</option>

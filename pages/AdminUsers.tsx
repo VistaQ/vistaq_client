@@ -187,7 +187,7 @@ const AdminUsers: React.FC = () => {
           />
         </div>
         <select
-           className="bg-gray-50 border border-gray-300 text-gray-900 rounded-md shadow-sm p-2"
+           className="bg-gray-50 border border-gray-300 text-gray-900 rounded-md shadow-sm pl-2 pr-8 py-2"
            value={filterRole}
            onChange={(e) => setFilterRole(e.target.value)}
         >
@@ -372,7 +372,7 @@ const AdminUsers: React.FC = () => {
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Name</label>
                         <input
                            type="text"
-                           className="w-full bg-gray-50 border border-gray-300 text-gray-900 p-2 rounded"
+                           className="w-full bg-gray-50 border border-gray-300 text-gray-900 pl-2 pr-8 py-2 rounded"
                            value={editingUser.name}
                            onChange={e => setEditingUser({...editingUser, name: e.target.value})}
                            required
@@ -382,7 +382,7 @@ const AdminUsers: React.FC = () => {
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Email</label>
                         <input
                            type="email"
-                           className="w-full bg-gray-50 border border-gray-300 text-gray-900 p-2 rounded"
+                           className="w-full bg-gray-50 border border-gray-300 text-gray-900 pl-2 pr-8 py-2 rounded"
                            value={editingUser.email}
                            onChange={e => setEditingUser({...editingUser, email: e.target.value})}
                            required
@@ -410,7 +410,7 @@ const AdminUsers: React.FC = () => {
                   <div>
                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role</label>
                      <select 
-                        className="w-full bg-gray-50 border border-gray-300 text-gray-900 p-2 rounded"
+                        className="w-full bg-gray-50 border border-gray-300 text-gray-900 pl-2 pr-8 py-2 rounded"
                         value={editingUser.role}
                         onChange={e => setEditingUser({...editingUser, role: e.target.value as UserRole})}
                      >
