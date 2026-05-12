@@ -12,22 +12,13 @@ import {
   ChevronDown, AlertCircle, Loader2,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const rm = (v: number) => 'RM ' + Math.round(v).toLocaleString('en-MY');
 const pct = (v: number) => (v * 100).toFixed(1) + '%';
-
-const isThisMonth = (d: string | null | undefined) => {
-  if (!d) return false;
-  const dt = new Date(d);
-  const now = new Date();
-  return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth();
-};
-const isThisYear = (d: string | null | undefined) => {
-  if (!d) return false;
-  return new Date(d).getFullYear() === new Date().getFullYear();
-};
 
 // ─── section nav ────────────────────────────────────────────────────────────
 
@@ -38,12 +29,27 @@ const SECTIONS = [
   { id: 'trends',    label: 'Trends'    },
 ];
 
+// ─── Trend line config ───────────────────────────────────────────────────────
+
+const ETL_LINE_CFG = [
+  { key: 'FYCt', color: '#3b82f6', yAxis: 'left'  as const },
+  { key: 'FYC',  color: '#22c55e', yAxis: 'left'  as const },
+  { key: 'ACE',  color: '#10b981', yAxis: 'left'  as const },
+  { key: 'NOC',  color: '#a855f7', yAxis: 'right' as const },
+];
+const PIPELINE_LINE_CFG = [
+  { key: 'Prospects',      color: CHART_COLORS[0], yAxis: 'right' as const },
+  { key: 'Appointments',   color: CHART_COLORS[1], yAxis: 'right' as const },
+  { key: 'Sales Meetings', color: CHART_COLORS[2], yAxis: 'right' as const },
+  { key: 'Sales',          color: CHART_COLORS[3], yAxis: 'right' as const },
+];
+
 // ─── TargetBar ───────────────────────────────────────────────────────────────
 
 const TargetBar: React.FC<{
   label: string; value: number; target: number; shortage: number; fixedColor: string;
 }> = ({ label, value, target, shortage, fixedColor }) => {
-  const p = Math.min((value / target) * 100, 100);
+  const p = target > 0 ? Math.min((value / target) * 100, 100) : 0;
   return (
     <div className="mb-5">
       <div className="flex items-center justify-between mb-2">
@@ -81,44 +87,75 @@ const SalesReportPage: React.FC = () => {
   const { currentUser } = useAuth();
   const { mySalesReport, isLoadingMySalesReport, refetchMySalesReport, getProspectsByScope } = useData();
 
-  const currentYear  = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
-  const n = currentMonth;
+  const now          = new Date();
+  const currentYear  = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
 
   const [selectedYear,  setSelectedYear]  = useState(currentYear);
-  const [milestoneTab,  setMilestoneTab]  = useState<'mtd' | 'ytd'>('ytd');
-  const [pipelineTab,   setPipelineTab]   = useState<'mtd' | 'ytd'>('ytd');
-  const [trendPreset,   setTrendPreset]   = useState<'etl' | 'pipeline' | 'all'>('etl');
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [milestoneTab,  setMilestoneTab]  = useState<'ytd' | 'mtd'>('ytd');
+  const [pipelineTab,   setPipelineTab]   = useState<'ytd' | 'mtd'>('ytd');
+  const [trendLines,    setTrendLines]    = useState<Set<string>>(() => new Set(['FYCt', 'FYC']));
 
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => { refetchMySalesReport(selectedYear); }, [selectedYear]);
 
+  const toggleTrendLine = (key: string) =>
+    setTrendLines(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+
   if (!currentUser) return null;
 
-  // ─── Personal sales target (from localStorage until backend ships) ──────
-  const salesTarget = parseFloat(localStorage.getItem(`salesTarget_${currentUser.id}`) ?? '0') || 400_000;
+  // ─── Sales target ─────────────────────────────────────────────────────────
+  const salesTarget   = parseFloat(localStorage.getItem(`salesTarget_${currentUser.id}`) ?? '0') || 400_000;
   const monthlyTarget = salesTarget / 12;
 
   // ─── ETL data ─────────────────────────────────────────────────────────────
   const myReport: SalesReportType | undefined = mySalesReport ?? undefined;
   const hasEtlData = myReport !== undefined;
-  const isMilMtd = milestoneTab === 'mtd';
+  const n = selectedMonth; // effective period index (1-based)
+
+  // Computed-from-arrays period values
+  const ytdFyct = (myReport?.month_fyct ?? []).slice(0, n).reduce((s, v) => s + v, 0);
+  const ytdFyc  = (myReport?.month_fyc  ?? []).slice(0, n).reduce((s, v) => s + v, 0);
+  const ytdAce  = (myReport?.month_ace  ?? []).slice(0, n).reduce((s, v) => s + v, 0);
+  const ytdNoc  = (myReport?.month_noc  ?? []).slice(0, n).reduce((s, v) => s + v, 0);
+  const mtdFyct = myReport?.month_fyct?.[n - 1] ?? 0;
+  const mtdFyc  = myReport?.month_fyc?.[n - 1]  ?? 0;
+  const mtdAce  = myReport?.month_ace?.[n - 1]  ?? 0;
+  const mtdNoc  = myReport?.month_noc?.[n - 1]  ?? 0;
+
+  const isMilYtd = milestoneTab === 'ytd';
 
   // ─── Prospect data ────────────────────────────────────────────────────────
   const allProspects = getProspectsByScope(currentUser);
 
-  const g = allProspects.filter(p => isThisMonth(p.prospect_entered_at)).length;
-  const G = allProspects.filter(p => isThisYear(p.prospect_entered_at)).length;
-  const h = allProspects.filter(p => isThisMonth(p.appointment_completed_at)).length;
-  const H = allProspects.filter(p => isThisYear(p.appointment_completed_at)).length;
-  const i = allProspects.filter(p => p.sales_parts_completed?.length && isThisMonth(p.sales_completed_at)).length;
-  const I = allProspects.filter(p => p.sales_parts_completed?.length && isThisYear(p.sales_completed_at)).length;
-  const j = allProspects.filter(p => p.sales_outcome === 'successful' && isThisMonth(p.sales_completed_at)).length;
-  const J = allProspects.filter(p => p.sales_outcome === 'successful' && isThisYear(p.sales_completed_at)).length;
+  const inMtd = (d: string | null | undefined): boolean => {
+    if (!d) return false;
+    const dt = new Date(d);
+    return dt.getFullYear() === selectedYear && dt.getMonth() + 1 === selectedMonth;
+  };
+  const inYtd = (d: string | null | undefined): boolean => {
+    if (!d) return false;
+    const dt = new Date(d);
+    return dt.getFullYear() === selectedYear && dt.getMonth() + 1 <= selectedMonth;
+  };
+
+  const g = allProspects.filter(p => inMtd(p.prospect_entered_at)).length;
+  const G = allProspects.filter(p => inYtd(p.prospect_entered_at)).length;
+  const h = allProspects.filter(p => inMtd(p.appointment_completed_at)).length;
+  const H = allProspects.filter(p => inYtd(p.appointment_completed_at)).length;
+  const i = allProspects.filter(p => p.sales_parts_completed?.length && inMtd(p.sales_completed_at)).length;
+  const I = allProspects.filter(p => p.sales_parts_completed?.length && inYtd(p.sales_completed_at)).length;
+  const j = allProspects.filter(p => p.sales_outcome === 'successful' && inMtd(p.sales_completed_at)).length;
+  const J = allProspects.filter(p => p.sales_outcome === 'successful' && inYtd(p.sales_completed_at)).length;
 
   const divOrDash = (num: number, den: number) => den === 0 ? '—' : pct(num / den);
-  const isPipMtd = pipelineTab === 'mtd';
+  const isPipYtd = pipelineTab === 'ytd';
 
   // ─── Product summary ──────────────────────────────────────────────────────
   const successfulSales = allProspects.filter(p => p.sales_outcome === 'successful');
@@ -145,7 +182,7 @@ const SalesReportPage: React.FC = () => {
       return dt.getFullYear() === selectedYear && dt.getMonth() === idx;
     };
     return {
-      month: label,
+      month:          label,
       Prospects:      allProspects.filter(p => inMonth(p.prospect_entered_at)).length,
       Appointments:   allProspects.filter(p => inMonth(p.appointment_completed_at)).length,
       'Sales Meetings': allProspects.filter(p => p.sales_parts_completed?.length && inMonth(p.sales_completed_at)).length,
@@ -157,37 +194,54 @@ const SalesReportPage: React.FC = () => {
     };
   });
 
-  // ─── Monthly averages (for Trends header) ─────────────────────────────────
-  const avgFyct = n > 0 ? (myReport?.fyct_ytd ?? 0) / n : 0;
-  const avgFyc  = n > 0 ? (myReport?.fyc_ytd  ?? 0) / n : 0;
-  const avgAce  = n > 0 ? (myReport?.ace_ytd  ?? 0) / n : 0;
-  const avgNoc  = n > 0 ? (myReport?.noc_ytd  ?? 0) / n : 0;
+  // ─── Monthly averages ─────────────────────────────────────────────────────
+  const avgFyct = n > 0 ? ytdFyct / n : 0;
+  const avgFyc  = n > 0 ? ytdFyc  / n : 0;
+  const avgAce  = n > 0 ? ytdAce  / n : 0;
+  const avgNoc  = n > 0 ? ytdNoc  / n : 0;
 
-  // ─── Download ─────────────────────────────────────────────────────────────
+  const monthsLeft = Math.max(12 - n, 0);
+  const periodLabel = `Jan–${MONTH_LABELS[n - 1]} ${selectedYear}`;
+
+  // ─── Download: Excel ─────────────────────────────────────────────────────
   const downloadExcel = () => {
     if (!myReport) return;
-    const row: Record<string, unknown> = {
-      'Agent Code': myReport.agent_code,
-      'Agent Name': myReport.agent_name,
-      'ACE (YTD)':  myReport.ace_ytd,
-      'NOC (YTD)':  myReport.noc_ytd,
-      'FYCt (YTD)': myReport.fyct_ytd,
-      '% of Target (FYCt)': ((myReport.fyct_ytd / salesTarget) * 100).toFixed(1) + '%',
-      'FYC (YTD)':  myReport.fyc_ytd,
-      '% of Target (FYC)':  ((myReport.fyc_ytd  / salesTarget) * 100).toFixed(1) + '%',
-      'Shortage (FYCt)':    Math.max(salesTarget - myReport.fyct_ytd, 0),
-      'Shortage (FYC)':     Math.max(salesTarget - myReport.fyc_ytd,  0),
-    };
-    MONTH_LABELS.forEach((m, idx) => {
-      row[`${m} ACE`]  = myReport.month_ace?.[idx]  ?? 0;
-      row[`${m} NOC`]  = myReport.month_noc?.[idx]  ?? 0;
-      row[`${m} FYCt`] = myReport.month_fyct?.[idx] ?? 0;
-      row[`${m} FYC`]  = myReport.month_fyc?.[idx]  ?? 0;
-    });
-    const ws = XLSX.utils.json_to_sheet([row]);
+
+    // Summary sheet
+    const summaryRows = [
+      { Section: 'Sales Milestone', Metric: 'FYCt YTD', Value: rm(ytdFyct), '%': ((ytdFyct / salesTarget) * 100).toFixed(1) + '%' },
+      { Section: '',               Metric: 'FYC YTD',  Value: rm(ytdFyc),  '%': ((ytdFyc  / salesTarget) * 100).toFixed(1) + '%' },
+      { Section: '',               Metric: 'ACE YTD',  Value: rm(ytdAce),  '%': '' },
+      { Section: '',               Metric: 'NOC YTD',  Value: String(ytdNoc), '%': '' },
+      { Section: '',               Metric: 'Annual Target', Value: rm(salesTarget), '%': '' },
+      { Section: '',               Metric: 'FYC Shortage',  Value: rm(Math.max(salesTarget - ytdFyc, 0)),  '%': '' },
+      { Section: '',               Metric: 'FYCt Shortage', Value: rm(Math.max(salesTarget - ytdFyct, 0)), '%': '' },
+      { Section: 'Pipeline (YTD)', Metric: 'Prospects',      Value: String(G), '%': '' },
+      { Section: '',               Metric: 'Appointments',   Value: String(H), '%': divOrDash(H, G) },
+      { Section: '',               Metric: 'Sales Meetings', Value: String(I), '%': divOrDash(I, H) },
+      { Section: '',               Metric: 'Sales',          Value: String(J), '%': divOrDash(J, I) },
+    ];
+
+    // Monthly breakdown sheet
+    const monthlyRows = MONTH_LABELS.map((m, idx) => ({
+      Month:  m,
+      FYCt:   myReport.month_fyct?.[idx]  ?? 0,
+      FYC:    myReport.month_fyc?.[idx]   ?? 0,
+      ACE:    myReport.month_ace?.[idx]   ?? 0,
+      NOC:    myReport.month_noc?.[idx]   ?? 0,
+    }));
+
+    // Products sheet
+    const productSheet = [
+      ...productRows.map(r => ({ Product: r.name, Cases: r.count, 'Total ACE': rm(r.ace) })),
+      { Product: 'TOTAL', Cases: totalProdCount, 'Total ACE': rm(totalProdACE) },
+    ];
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Sales Report');
-    XLSX.writeFile(wb, `VistaQ_SalesReport_${selectedYear}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows),  'Summary');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthlyRows),  'Monthly Breakdown');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(productSheet), 'Products');
+    XLSX.writeFile(wb, `VistaQ_SalesReport_${MONTH_LABELS[n - 1]}_${selectedYear}.xlsx`);
   };
 
   const downloadCSV = () => {
@@ -195,25 +249,192 @@ const SalesReportPage: React.FC = () => {
     const row = {
       'Agent Code':  myReport.agent_code,
       'Agent Name':  myReport.agent_name,
-      'ACE (YTD)':   myReport.ace_ytd,
-      'NOC (YTD)':   myReport.noc_ytd,
-      'FYCt (YTD)':  myReport.fyct_ytd,
-      'FYC (YTD)':   myReport.fyc_ytd,
+      'Period':      periodLabel,
+      'FYCt (YTD)':  rm(ytdFyct),
+      'FYC (YTD)':   rm(ytdFyc),
+      'ACE (YTD)':   rm(ytdAce),
+      'NOC (YTD)':   String(ytdNoc),
     };
     const headers = Object.keys(row);
     const csv = [headers.join(','), headers.map(h => row[h as keyof typeof row]).join(',')].join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `VistaQ_SalesReport_${selectedYear}.csv`;
+    a.download = `VistaQ_SalesReport_${MONTH_LABELS[n - 1]}_${selectedYear}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
+  };
+
+  // ─── Download: PDF ────────────────────────────────────────────────────────
+  const downloadPDF = () => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    const slate800   = [30, 41, 59]   as [number, number, number];
+    const green600   = [22, 163, 74]  as [number, number, number];
+    const blue600    = [37, 99, 235]  as [number, number, number];
+    const gray100    = [243, 244, 246] as [number, number, number];
+    const gray600    = [75, 85, 99]   as [number, number, number];
+
+    // ── Header bar ──
+    doc.setFillColor(...slate800);
+    doc.rect(0, 0, W, 38, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('VistaQ', 14, 13);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Sales Report', 14, 21);
+    doc.setFontSize(9);
+    doc.setTextColor(180, 190, 210);
+    const agentLine = myReport
+      ? `${myReport.agent_name}  ·  ${myReport.agent_code}`
+      : currentUser?.name ?? '';
+    doc.text(agentLine, 14, 29);
+    doc.text(`Period: ${periodLabel}`, 14, 35);
+    doc.setTextColor(...gray600);
+    doc.setFontSize(8);
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'long', year: 'numeric' })}`, W - 14, 35, { align: 'right' });
+
+    let y = 46;
+
+    // ── Section helper ──
+    const sectionHeader = (title: string, color: [number, number, number]) => {
+      doc.setFillColor(...color);
+      doc.rect(14, y, 3, 7, 'F');
+      doc.setTextColor(...color);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(title, 19, y + 5.5);
+      y += 12;
+    };
+
+    // ── MILESTONE ──
+    sectionHeader('Sales Milestone', blue600);
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Metric', 'Month to Date', 'Year to Date', 'Annual Target', '% of Target (YTD)']],
+      body: [
+        ['FYCt', rm(mtdFyct), rm(ytdFyct), rm(salesTarget), ((ytdFyct / salesTarget) * 100).toFixed(1) + '%'],
+        ['FYC',  rm(mtdFyc),  rm(ytdFyc),  rm(salesTarget), ((ytdFyc  / salesTarget) * 100).toFixed(1) + '%'],
+        ['ACE',  rm(mtdAce),  rm(ytdAce),  '—', '—'],
+        ['NOC',  String(mtdNoc), String(ytdNoc), '—', '—'],
+      ],
+      headStyles: { fillColor: slate800, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 8 },
+      alternateRowStyles: { fillColor: gray100 },
+      columnStyles: { 4: { fontStyle: 'bold', textColor: blue600 } },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 6;
+
+    // Progress bars (visual)
+    const drawBar = (label: string, value: number, target: number, color: [number, number, number]) => {
+      const barW = W - 28;
+      const fillW = target > 0 ? Math.min((value / target), 1) * barW : 0;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...color);
+      doc.text(label, 14, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...gray600);
+      doc.text(`${rm(value)} of ${rm(target)}  (${target > 0 ? ((value / target) * 100).toFixed(1) : '0.0'}%)`, W - 14, y, { align: 'right' });
+      y += 4;
+      doc.setFillColor(229, 231, 235);
+      doc.roundedRect(14, y, barW, 4, 2, 2, 'F');
+      if (fillW > 0) {
+        doc.setFillColor(...color);
+        doc.roundedRect(14, y, fillW, 4, 2, 2, 'F');
+      }
+      y += 8;
+    };
+    drawBar('FYC Progress',  ytdFyc,  salesTarget, green600);
+    drawBar('FYCt Progress', ytdFyct, salesTarget, blue600);
+
+    y += 4;
+
+    // ── PIPELINE ──
+    if (y > 220) { doc.addPage(); y = 20; }
+    sectionHeader('Pipeline', [99, 102, 241]);
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Stage', 'Month to Date', 'Year to Date', 'Conversion Rate (YTD)']],
+      body: [
+        ['Prospects',      String(g), String(G), '—'],
+        ['Appointments',   String(h), String(H), divOrDash(H, G)],
+        ['Sales Meetings', String(i), String(I), divOrDash(I, H)],
+        ['Sales (Closed)', String(j), String(J), divOrDash(J, I)],
+      ],
+      headStyles: { fillColor: slate800, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 8 },
+      alternateRowStyles: { fillColor: gray100 },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 10;
+
+    // ── PRODUCTS ──
+    if (productRows.length > 0) {
+      if (y > 220) { doc.addPage(); y = 20; }
+      sectionHeader('Product Summary', [16, 185, 129]);
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Product', 'Cases', 'Total ACE']],
+        body: [
+          ...productRows.map(r => [r.name, String(r.count), rm(r.ace)]),
+          ['TOTAL', String(totalProdCount), rm(totalProdACE)],
+        ],
+        headStyles: { fillColor: slate800, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        alternateRowStyles: { fillColor: gray100 },
+        footStyles: { fontStyle: 'bold' },
+        margin: { left: 14, right: 14 },
+      });
+      y = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // ── MONTHLY BREAKDOWN ──
+    if (trendData.length > 0 && myReport) {
+      if (y > 200) { doc.addPage(); y = 20; }
+      sectionHeader('Monthly Breakdown', [168, 85, 247]);
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Month', 'FYCt', 'FYC', 'ACE', 'NOC']],
+        body: trendData.map(row => [
+          row.month, rm(row.FYCt), rm(row.FYC), rm(row.ACE), String(row.NOC),
+        ]),
+        headStyles: { fillColor: slate800, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        alternateRowStyles: { fillColor: gray100 },
+        margin: { left: 14, right: 14 },
+      });
+    }
+
+    // ── Footer ──
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+      doc.setPage(p);
+      const pageH = doc.internal.pageSize.getHeight();
+      doc.setFillColor(...gray100);
+      doc.rect(0, pageH - 10, W, 10, 'F');
+      doc.setFontSize(7);
+      doc.setTextColor(...gray600);
+      doc.text('VistaQ · Confidential', 14, pageH - 3.5);
+      doc.text(`Page ${p} of ${pageCount}`, W - 14, pageH - 3.5, { align: 'right' });
+    }
+
+    doc.save(`VistaQ_SalesReport_${MONTH_LABELS[n - 1]}_${selectedYear}.pdf`);
   };
 
   const scrollTo = (id: string) =>
     sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  const monthsLeft = Math.max(12 - n, 0);
-  const noEtlData  = !hasEtlData;
+  const noEtlData = !hasEtlData;
+
+  // Available months for selector (all 12, future months will show zero data)
+  const monthOptions = MONTH_LABELS.map((label, idx) => ({ label, value: idx + 1 }));
 
   // ─── render ───────────────────────────────────────────────────────────────
   return (
@@ -226,6 +447,16 @@ const SalesReportPage: React.FC = () => {
           <p className="text-sm text-gray-500 mt-0.5">Your personal production & pipeline analytics</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Month / Year selectors */}
+          <select
+            value={selectedMonth}
+            onChange={e => setSelectedMonth(Number(e.target.value))}
+            className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {monthOptions.map(m => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
           <select
             value={selectedYear}
             onChange={e => setSelectedYear(Number(e.target.value))}
@@ -235,15 +466,27 @@ const SalesReportPage: React.FC = () => {
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
+
+          {/* Download */}
           <div className="relative group">
             <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm">
               <Download className="w-4 h-4" />
               Download
               <ChevronDown className="w-3 h-3" />
             </button>
-            <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-30">
-              <button onClick={downloadExcel} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium">Full Report (Excel)</button>
-              <button onClick={downloadCSV}   className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium border-t border-gray-100">Export CSV</button>
+            <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-30">
+              <button onClick={downloadPDF} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 font-medium flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                Beautiful Report (PDF)
+              </button>
+              <button onClick={downloadExcel} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium flex items-center gap-2 border-t border-gray-100">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                Full Report (Excel)
+              </button>
+              <button onClick={downloadCSV} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium flex items-center gap-2 border-t border-gray-100">
+                <span className="w-2 h-2 rounded-full bg-gray-400" />
+                Export CSV
+              </button>
             </div>
           </div>
         </div>
@@ -277,7 +520,7 @@ const SalesReportPage: React.FC = () => {
         <SectionCard
           id="milestone"
           title="Sales Milestone"
-          subtitle={`Annual target: RM ${salesTarget.toLocaleString()} · ${monthsLeft} month${monthsLeft !== 1 ? 's' : ''} remaining`}
+          subtitle={`Annual target: ${rm(salesTarget)} · Period: ${periodLabel} · ${monthsLeft} month${monthsLeft !== 1 ? 's' : ''} to year end`}
         >
           {noEtlData ? (
             <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-xl text-amber-700 text-sm">
@@ -286,16 +529,16 @@ const SalesReportPage: React.FC = () => {
             </div>
           ) : (
             <>
-              {/* Period toggle */}
+              {/* Period toggle — YTD first */}
               <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
                 <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-                  {(['mtd', 'ytd'] as const).map(p => (
+                  {(['ytd', 'mtd'] as const).map(p => (
                     <button
                       key={p}
                       onClick={() => setMilestoneTab(p)}
                       className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${milestoneTab === p ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                      {p === 'mtd' ? 'Month to Date' : 'Year to Date'}
+                      {p === 'ytd' ? 'Year to Date' : 'Month to Date'}
                     </button>
                   ))}
                 </div>
@@ -307,29 +550,29 @@ const SalesReportPage: React.FC = () => {
                   {[
                     {
                       label: `FYCt ${milestoneTab.toUpperCase()}`,
-                      value: isMilMtd ? rm(myReport.month_fyct?.[n - 1] ?? 0) : rm(myReport.fyct_ytd),
-                      sub:   isMilMtd
-                        ? `${(((myReport.month_fyct?.[n - 1] ?? 0) / monthlyTarget) * 100).toFixed(1)}% of monthly target`
-                        : `${((myReport.fyct_ytd / salesTarget) * 100).toFixed(1)}% of annual target`,
+                      value: isMilYtd ? rm(ytdFyct) : rm(mtdFyct),
+                      sub:   isMilYtd
+                        ? `${((ytdFyct / salesTarget) * 100).toFixed(1)}% of annual target`
+                        : `${((mtdFyct / monthlyTarget) * 100).toFixed(1)}% of monthly target`,
                       bg: 'bg-blue-50', icon: <TrendingUp className="w-5 h-5 text-blue-600" />,
                     },
                     {
                       label: `FYC ${milestoneTab.toUpperCase()}`,
-                      value: isMilMtd ? rm(myReport.month_fyc?.[n - 1] ?? 0) : rm(myReport.fyc_ytd),
-                      sub:   isMilMtd
-                        ? `${(((myReport.month_fyc?.[n - 1] ?? 0) / monthlyTarget) * 100).toFixed(1)}% of monthly target`
-                        : `${((myReport.fyc_ytd / salesTarget) * 100).toFixed(1)}% of annual target`,
+                      value: isMilYtd ? rm(ytdFyc) : rm(mtdFyc),
+                      sub:   isMilYtd
+                        ? `${((ytdFyc / salesTarget) * 100).toFixed(1)}% of annual target`
+                        : `${((mtdFyc / monthlyTarget) * 100).toFixed(1)}% of monthly target`,
                       bg: 'bg-green-50', icon: <Award className="w-5 h-5 text-green-600" />,
                     },
                     {
                       label: `ACE ${milestoneTab.toUpperCase()}`,
-                      value: isMilMtd ? rm(myReport.month_ace?.[n - 1] ?? 0) : rm(myReport.ace_ytd),
+                      value: isMilYtd ? rm(ytdAce) : rm(mtdAce),
                       sub:   'Annualised contribution',
                       bg: 'bg-emerald-50', icon: <Target className="w-5 h-5 text-emerald-600" />,
                     },
                     {
                       label: `NOC ${milestoneTab.toUpperCase()}`,
-                      value: isMilMtd ? String(myReport.month_noc?.[n - 1] ?? 0) : String(myReport.noc_ytd),
+                      value: isMilYtd ? String(ytdNoc) : String(mtdNoc),
                       sub:   'Number of cases',
                       bg: 'bg-purple-50', icon: <Users className="w-5 h-5 text-purple-600" />,
                     },
@@ -346,7 +589,7 @@ const SalesReportPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Sales Target Progress bars — always YTD vs annual target */}
+              {/* Sales Target Progress bars */}
               {myReport && (
                 <div className="p-5 md:p-6 bg-gray-50 rounded-xl border border-gray-100">
                   <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-5">
@@ -354,16 +597,16 @@ const SalesReportPage: React.FC = () => {
                   </p>
                   <TargetBar
                     label="FYC"
-                    value={myReport.fyc_ytd}
+                    value={ytdFyc}
                     target={salesTarget}
-                    shortage={Math.max(salesTarget - myReport.fyc_ytd, 0)}
+                    shortage={Math.max(salesTarget - ytdFyc, 0)}
                     fixedColor="bg-green-500"
                   />
                   <TargetBar
                     label="FYCt"
-                    value={myReport.fyct_ytd}
+                    value={ytdFyct}
                     target={salesTarget}
-                    shortage={Math.max(salesTarget - myReport.fyct_ytd, 0)}
+                    shortage={Math.max(salesTarget - ytdFyct, 0)}
                     fixedColor="bg-blue-500"
                   />
                 </div>
@@ -382,15 +625,15 @@ const SalesReportPage: React.FC = () => {
           title="Pipeline"
           subtitle="Stage progression and conversion rates — from prospect data"
         >
-          {/* MTD / YTD toggle */}
+          {/* YTD / MTD toggle — YTD first */}
           <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-6">
-            {(['mtd', 'ytd'] as const).map(p => (
+            {(['ytd', 'mtd'] as const).map(p => (
               <button
                 key={p}
                 onClick={() => setPipelineTab(p)}
                 className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${pipelineTab === p ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
-                {p === 'mtd' ? 'Month to Date' : 'Year to Date'}
+                {p === 'ytd' ? 'Year to Date' : 'Month to Date'}
               </button>
             ))}
           </div>
@@ -398,10 +641,10 @@ const SalesReportPage: React.FC = () => {
           {/* Stage funnel — 2×2 on mobile, 4 cols on md+ */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[
-              { label: 'Prospects',     value: isPipMtd ? g : G, color: 'text-blue-600',   bg: 'bg-blue-50'   },
-              { label: 'Appointments',  value: isPipMtd ? h : H, color: 'text-purple-600', bg: 'bg-purple-50' },
-              { label: 'Sales Meetings',value: isPipMtd ? i : I, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-              { label: 'Sales',         value: isPipMtd ? j : J, color: 'text-green-600',  bg: 'bg-green-50'  },
+              { label: 'Prospects',      value: isPipYtd ? G : g, color: 'text-blue-600',   bg: 'bg-blue-50'   },
+              { label: 'Appointments',   value: isPipYtd ? H : h, color: 'text-purple-600', bg: 'bg-purple-50' },
+              { label: 'Sales Meetings', value: isPipYtd ? I : i, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+              { label: 'Sales',          value: isPipYtd ? J : j, color: 'text-green-600',  bg: 'bg-green-50'  },
             ].map(chip => (
               <div key={chip.label} className={`${chip.bg} rounded-xl p-4 text-center`}>
                 <p className="text-2xl md:text-3xl font-bold text-gray-900">{chip.value}</p>
@@ -410,10 +653,9 @@ const SalesReportPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Divider */}
           <div className="border-t border-gray-100 my-6" />
 
-          {/* Conversion rates — 3 numbers */}
+          {/* Conversion rates */}
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Conversion Rates</p>
           <div className="grid grid-cols-3 gap-3">
             {[
@@ -422,9 +664,9 @@ const SalesReportPage: React.FC = () => {
               { label: 'Closing Rate',     mtd: divOrDash(j, i), ytd: divOrDash(J, I) },
             ].map(rate => (
               <div key={rate.label} className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
-                <p className="text-xl md:text-2xl font-bold text-gray-900">{isPipMtd ? rate.mtd : rate.ytd}</p>
+                <p className="text-xl md:text-2xl font-bold text-gray-900">{isPipYtd ? rate.ytd : rate.mtd}</p>
                 <p className="text-xs font-semibold text-gray-500 mt-1 leading-tight">{rate.label}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{isPipMtd ? 'MTD' : 'YTD'}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{isPipYtd ? 'YTD' : 'MTD'}</p>
               </div>
             ))}
           </div>
@@ -443,8 +685,8 @@ const SalesReportPage: React.FC = () => {
           {productRows.length === 0 ? (
             <p className="text-sm text-gray-400 italic">No successful sales recorded yet.</p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              {/* Simplified 3-column table */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+              {/* 3-column table */}
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -471,16 +713,16 @@ const SalesReportPage: React.FC = () => {
                 </table>
               </div>
 
-              {/* Pie chart — desktop only */}
-              <div className="hidden md:block">
-                <ResponsiveContainer width="100%" height={220}>
+              {/* Pie chart — desktop only, centred vertically */}
+              <div className="hidden md:flex items-center justify-center">
+                <ResponsiveContainer width="100%" height={240}>
                   <PieChart>
                     <Pie
                       data={productRows}
                       dataKey="ace"
                       nameKey="name"
                       cx="50%" cy="50%"
-                      outerRadius={90}
+                      outerRadius={95}
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                       labelLine={false}
                     >
@@ -510,9 +752,9 @@ const SalesReportPage: React.FC = () => {
           {myReport && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               {[
-                { label: 'Avg FYCt / Month', value: rm(avgFyct), color: 'text-blue-600'   },
-                { label: 'Avg FYC / Month',  value: rm(avgFyc),  color: 'text-green-600'  },
-                { label: 'Avg ACE / Month',  value: rm(avgAce),  color: 'text-emerald-600'},
+                { label: 'Avg FYCt / Month', value: rm(avgFyct), color: 'text-blue-600'    },
+                { label: 'Avg FYC / Month',  value: rm(avgFyc),  color: 'text-green-600'   },
+                { label: 'Avg ACE / Month',  value: rm(avgAce),  color: 'text-emerald-600' },
                 { label: 'Avg NOC / Month',  value: avgNoc.toFixed(1), color: 'text-purple-600' },
               ].map(s => (
                 <div key={s.label} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
@@ -523,21 +765,44 @@ const SalesReportPage: React.FC = () => {
             </div>
           )}
 
-          {/* Preset toggle */}
-          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-5">
-            {([
-              { key: 'etl',      label: 'ETL (FYCt / FYC / ACE / NOC)' },
-              { key: 'pipeline', label: 'Pipeline'                       },
-              { key: 'all',      label: 'All'                            },
-            ] as const).map(preset => (
-              <button
-                key={preset.key}
-                onClick={() => setTrendPreset(preset.key)}
-                className={`px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${trendPreset === preset.key ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                {preset.label}
-              </button>
-            ))}
+          {/* Individual metric toggles */}
+          <div className="flex flex-wrap gap-2 mb-5">
+            {/* ETL group */}
+            <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-xl border border-gray-100">
+              <span className="self-center text-xs font-bold text-gray-400 uppercase pr-1">Production</span>
+              {ETL_LINE_CFG.map(cfg => (
+                <button
+                  key={cfg.key}
+                  onClick={() => toggleTrendLine(cfg.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    trendLines.has(cfg.key)
+                      ? 'bg-white shadow-sm text-gray-800 border border-gray-200'
+                      : 'text-gray-400 hover:text-gray-600 hover:bg-white/60'
+                  }`}
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 transition-opacity ${trendLines.has(cfg.key) ? 'opacity-100' : 'opacity-30'}`} style={{ backgroundColor: cfg.color }} />
+                  {cfg.key}
+                </button>
+              ))}
+            </div>
+            {/* Pipeline group */}
+            <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-xl border border-gray-100">
+              <span className="self-center text-xs font-bold text-gray-400 uppercase pr-1">Pipeline</span>
+              {PIPELINE_LINE_CFG.map(cfg => (
+                <button
+                  key={cfg.key}
+                  onClick={() => toggleTrendLine(cfg.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    trendLines.has(cfg.key)
+                      ? 'bg-white shadow-sm text-gray-800 border border-gray-200'
+                      : 'text-gray-400 hover:text-gray-600 hover:bg-white/60'
+                  }`}
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 transition-opacity ${trendLines.has(cfg.key) ? 'opacity-100' : 'opacity-30'}`} style={{ backgroundColor: cfg.color }} />
+                  {cfg.key}
+                </button>
+              ))}
+            </div>
           </div>
 
           <ResponsiveContainer width="100%" height={280}>
@@ -548,24 +813,29 @@ const SalesReportPage: React.FC = () => {
               <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
               <Tooltip />
               <Legend />
-              {/* ETL lines */}
-              {(trendPreset === 'etl' || trendPreset === 'all') && myReport && (
-                <>
-                  <Line yAxisId="left" type="monotone" dataKey="FYCt" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 2" />
-                  <Line yAxisId="left" type="monotone" dataKey="FYC"  stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 2" />
-                  <Line yAxisId="left" type="monotone" dataKey="ACE"  stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="4 2" />
-                  <Line yAxisId="right" type="monotone" dataKey="NOC" stroke="#a855f7" strokeWidth={2} dot={{ r: 3 }} />
-                </>
-              )}
-              {/* Pipeline lines */}
-              {(trendPreset === 'pipeline' || trendPreset === 'all') && (
-                <>
-                  <Line yAxisId="right" type="monotone" dataKey="Prospects"      stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 3 }} />
-                  <Line yAxisId="right" type="monotone" dataKey="Appointments"   stroke={CHART_COLORS[1]} strokeWidth={2} dot={{ r: 3 }} />
-                  <Line yAxisId="right" type="monotone" dataKey="Sales Meetings" stroke={CHART_COLORS[2]} strokeWidth={2} dot={{ r: 3 }} />
-                  <Line yAxisId="right" type="monotone" dataKey="Sales"          stroke={CHART_COLORS[3]} strokeWidth={2} dot={{ r: 3 }} />
-                </>
-              )}
+              {ETL_LINE_CFG.map(cfg => trendLines.has(cfg.key) && (
+                <Line
+                  key={cfg.key}
+                  yAxisId={cfg.yAxis}
+                  type="monotone"
+                  dataKey={cfg.key}
+                  stroke={cfg.color}
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  strokeDasharray={cfg.yAxis === 'left' ? '4 2' : undefined}
+                />
+              ))}
+              {PIPELINE_LINE_CFG.map(cfg => trendLines.has(cfg.key) && (
+                <Line
+                  key={cfg.key}
+                  yAxisId={cfg.yAxis}
+                  type="monotone"
+                  dataKey={cfg.key}
+                  stroke={cfg.color}
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                />
+              ))}
             </LineChart>
           </ResponsiveContainer>
         </SectionCard>
