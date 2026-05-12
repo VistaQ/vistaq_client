@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { SalesReport as SalesReportType, MONTH_LABELS } from '../types';
@@ -24,7 +25,7 @@ const pct = (v: number) => (v * 100).toFixed(1) + '%';
 
 const SECTIONS = [
   { id: 'milestone', label: 'Milestone' },
-  { id: 'pipeline',  label: 'Pipeline'  },
+  { id: 'pipeline',  label: 'Prospect'  },
   { id: 'products',  label: 'Products'  },
   { id: 'trends',    label: 'Trends'    },
 ];
@@ -84,6 +85,7 @@ const SectionCard: React.FC<{ id: string; title: string; subtitle?: string; chil
 // ─── main page ───────────────────────────────────────────────────────────────
 
 const SalesReportPage: React.FC = () => {
+  const navigate = useNavigate();
   const { currentUser } = useAuth();
   const { mySalesReport, isLoadingMySalesReport, refetchMySalesReport, getProspectsByScope } = useData();
 
@@ -458,7 +460,7 @@ const SalesReportPage: React.FC = () => {
     <div className="space-y-8 pb-12">
 
       {/* ── Page header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sales Report</h1>
           <p className="text-sm text-gray-500 mt-0.5">Sales data from company records · Progress calculated against your profile target</p>
@@ -468,7 +470,7 @@ const SalesReportPage: React.FC = () => {
           <select
             value={selectedMonth}
             onChange={e => setSelectedMonth(Number(e.target.value))}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 min-w-[90px] text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {monthOptions.map(m => (
               <option key={m.value} value={m.value}>{m.label}</option>
@@ -477,7 +479,7 @@ const SalesReportPage: React.FC = () => {
           <select
             value={selectedYear}
             onChange={e => setSelectedYear(Number(e.target.value))}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 min-w-[80px] text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {[currentYear - 1, currentYear, currentYear + 1].map(y => (
               <option key={y} value={y}>{y}</option>
@@ -547,19 +549,29 @@ const SalesReportPage: React.FC = () => {
           ) : (
             <>
               {/* Data source note */}
-              <div className="flex items-start gap-3 p-4 mb-6 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
-                <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
-                <span>
-                  Sales figures (FYCt, FYC, ACE, NOC) are sourced from your <strong>company's ETL records</strong>.
-                  All progress bars and percentage calculations compare these figures against the{' '}
-                  <strong>annual target you have set in your Profile</strong> ({rm(salesTarget)}).
-                  You can update your target anytime from the Profile page.
-                </span>
+              <div className="p-4 mb-6 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
+                <div className="flex items-start gap-3">
+                  <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
+                  <span>
+                    Sales figures (FYCt, FYC, ACE, NOC) are sourced from your <strong>company's sales report</strong>.
+                    All progress bars and percentage calculations compare these figures against the{' '}
+                    <strong>annual target you have set in your Profile</strong>.
+                    You can update your target anytime from the Profile page.
+                  </span>
+                </div>
+                <div className="mt-3 ml-7">
+                  <button
+                    onClick={() => navigate('/profile')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                  >
+                    Update my annual target
+                  </button>
+                </div>
               </div>
 
               {/* Period toggle — YTD first */}
               <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-                <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+                <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-full sm:w-fit">
                   {(['ytd', 'mtd'] as const).map(p => (
                     <button
                       key={p}
@@ -621,7 +633,7 @@ const SalesReportPage: React.FC = () => {
               {myReport && (
                 <div className="p-5 md:p-6 bg-gray-50 rounded-xl border border-gray-100">
                   <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-5">
-                    Sales Progress vs Your Profile Target · {rm(salesTarget)}
+                    Sales Progress
                   </p>
                   <TargetBar
                     label="FYC"
@@ -650,11 +662,11 @@ const SalesReportPage: React.FC = () => {
       <div ref={el => { sectionRefs.current['pipeline'] = el; }}>
         <SectionCard
           id="pipeline"
-          title="Pipeline"
+          title="Prospect"
           subtitle="Stage progression and conversion rates — from prospect data"
         >
           {/* YTD / MTD toggle — YTD first */}
-          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-6">
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-full sm:w-fit mb-6">
             {(['ytd', 'mtd'] as const).map(p => (
               <button
                 key={p}
@@ -687,14 +699,14 @@ const SalesReportPage: React.FC = () => {
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Conversion Rates</p>
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Appointment Rate', mtd: divOrDash(h, g), ytd: divOrDash(H, G) },
-              { label: 'Show-up Rate',     mtd: divOrDash(i, h), ytd: divOrDash(I, H) },
-              { label: 'Closing Rate',     mtd: divOrDash(j, i), ytd: divOrDash(J, I) },
+              { label: 'Appointment Rate', mtd: divOrDash(h, g), ytd: divOrDash(H, G), bg: 'bg-violet-50', border: 'border-violet-100', numColor: 'text-violet-700', tagBg: 'bg-violet-100 text-violet-600' },
+              { label: 'Show-up Rate',     mtd: divOrDash(i, h), ytd: divOrDash(I, H), bg: 'bg-sky-50',    border: 'border-sky-100',    numColor: 'text-sky-700',    tagBg: 'bg-sky-100 text-sky-600'    },
+              { label: 'Closing Rate',     mtd: divOrDash(j, i), ytd: divOrDash(J, I), bg: 'bg-emerald-50',border: 'border-emerald-100',numColor: 'text-emerald-700',tagBg: 'bg-emerald-100 text-emerald-600' },
             ].map(rate => (
-              <div key={rate.label} className="bg-gray-50 rounded-xl p-4 text-center border border-gray-100">
-                <p className="text-xl md:text-2xl font-bold text-gray-900">{isPipYtd ? rate.ytd : rate.mtd}</p>
-                <p className="text-xs font-semibold text-gray-500 mt-1 leading-tight">{rate.label}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{isPipYtd ? 'YTD' : 'MTD'}</p>
+              <div key={rate.label} className={`${rate.bg} ${rate.border} rounded-xl p-4 text-center border`}>
+                <p className={`text-xl md:text-2xl font-bold ${rate.numColor}`}>{isPipYtd ? rate.ytd : rate.mtd}</p>
+                <p className="text-xs font-semibold text-gray-600 mt-1 leading-tight">{rate.label}</p>
+                <span className={`inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${rate.tagBg}`}>{isPipYtd ? 'YTD' : 'MTD'}</span>
               </div>
             ))}
           </div>
@@ -774,7 +786,7 @@ const SalesReportPage: React.FC = () => {
         <SectionCard
           id="trends"
           title="Monthly Trends"
-          subtitle="Month-by-month production breakdown"
+          subtitle="Month-by-month sales breakdown"
         >
           {/* Monthly averages row */}
           {myReport && (
@@ -797,7 +809,7 @@ const SalesReportPage: React.FC = () => {
           <div className="flex flex-wrap gap-2 mb-5">
             {/* ETL group */}
             <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="self-center text-xs font-bold text-gray-400 uppercase pr-1">Production</span>
+              <span className="self-center text-xs font-bold text-gray-400 uppercase pr-1">Sales</span>
               {ETL_LINE_CFG.map(cfg => (
                 <button
                   key={cfg.key}
@@ -815,7 +827,7 @@ const SalesReportPage: React.FC = () => {
             </div>
             {/* Pipeline group */}
             <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="self-center text-xs font-bold text-gray-400 uppercase pr-1">Pipeline</span>
+              <span className="self-center text-xs font-bold text-gray-400 uppercase pr-1">Prospect Management</span>
               {PIPELINE_LINE_CFG.map(cfg => (
                 <button
                   key={cfg.key}
