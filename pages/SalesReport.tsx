@@ -824,18 +824,22 @@ const SalesReportPage: React.FC = () => {
                 </table>
               </div>
 
-              {/* Pie chart — desktop only, centred vertically */}
+              {/* Pie chart — desktop only */}
               <div className="hidden md:flex items-center justify-center">
-                <ResponsiveContainer width="100%" height={240}>
-                  <PieChart>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart margin={{ top: 30, right: 30, bottom: 30, left: 30 }}>
                     <Pie
                       data={productRows}
                       dataKey="ace"
                       nameKey="name"
-                      cx="50%" cy="50%"
-                      outerRadius={95}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      labelLine={false}
+                      cx="50%" cy="52%"
+                      outerRadius={90}
+                      labelLine={{ stroke: '#9ca3af', strokeWidth: 1 }}
+                      label={({ name, percent, x, y, textAnchor }) => (
+                        <text x={x} y={y} textAnchor={textAnchor} fill="#374151" fontSize={11} fontWeight={500}>
+                          {`${name} ${(percent * 100).toFixed(0)}%`}
+                        </text>
+                      )}
                     >
                       {productRows.map((_, idx) => (
                         <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
