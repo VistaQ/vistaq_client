@@ -297,6 +297,20 @@ const SalesReportPage: React.FC = () => {
 
     let y = 46;
 
+    // ── Data source note ──
+    doc.setFillColor(239, 246, 255); // blue-50
+    doc.setDrawColor(191, 219, 254); // blue-200
+    doc.roundedRect(14, y, W - 28, 12, 2, 2, 'FD');
+    doc.setFontSize(7.5);
+    doc.setTextColor(30, 64, 175); // blue-800
+    doc.setFont('helvetica', 'bold');
+    doc.text('Data sources:', 18, y + 5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Sales figures (FYCt, FYC, ACE, NOC) — Company ETL records   ·   Annual target (${rm(salesTarget)}) — Agent profile setting`, 42, y + 5);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Target can be updated anytime in the Profile page.', 18, y + 10);
+    y += 17;
+
     // ── Section helper ──
     const sectionHeader = (title: string, color: [number, number, number]) => {
       doc.setFillColor(...color);
@@ -313,7 +327,7 @@ const SalesReportPage: React.FC = () => {
 
     autoTable(doc, {
       startY: y,
-      head: [['Metric', 'Month to Date', 'Year to Date', 'Annual Target', '% of Target (YTD)']],
+      head: [['Metric', 'Month to Date', 'Year to Date', 'Profile Target', '% of Profile Target (YTD)']],
       body: [
         ['FYCt', rm(mtdFyct), rm(ytdFyct), rm(salesTarget), ((ytdFyct / salesTarget) * 100).toFixed(1) + '%'],
         ['FYC',  rm(mtdFyc),  rm(ytdFyc),  rm(salesTarget), ((ytdFyc  / salesTarget) * 100).toFixed(1) + '%'],
@@ -444,7 +458,7 @@ const SalesReportPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sales Report</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Your personal production & pipeline analytics</p>
+          <p className="text-sm text-gray-500 mt-0.5">Sales data from company records · Progress calculated against your profile target</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Month / Year selectors */}
@@ -520,7 +534,7 @@ const SalesReportPage: React.FC = () => {
         <SectionCard
           id="milestone"
           title="Sales Milestone"
-          subtitle={`Annual target: ${rm(salesTarget)} · Period: ${periodLabel} · ${monthsLeft} month${monthsLeft !== 1 ? 's' : ''} to year end`}
+          subtitle={`Your profile target: ${rm(salesTarget)} · Period: ${periodLabel} · ${monthsLeft} month${monthsLeft !== 1 ? 's' : ''} to year end`}
         >
           {noEtlData ? (
             <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-xl text-amber-700 text-sm">
@@ -529,6 +543,17 @@ const SalesReportPage: React.FC = () => {
             </div>
           ) : (
             <>
+              {/* Data source note */}
+              <div className="flex items-start gap-3 p-4 mb-6 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
+                <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
+                <span>
+                  Sales figures (FYCt, FYC, ACE, NOC) are sourced from your <strong>company's ETL records</strong>.
+                  All progress bars and percentage calculations compare these figures against the{' '}
+                  <strong>annual target you have set in your Profile</strong> ({rm(salesTarget)}).
+                  You can update your target anytime from the Profile page.
+                </span>
+              </div>
+
               {/* Period toggle — YTD first */}
               <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
                 <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
@@ -552,16 +577,16 @@ const SalesReportPage: React.FC = () => {
                       label: `FYCt ${milestoneTab.toUpperCase()}`,
                       value: isMilYtd ? rm(ytdFyct) : rm(mtdFyct),
                       sub:   isMilYtd
-                        ? `${((ytdFyct / salesTarget) * 100).toFixed(1)}% of annual target`
-                        : `${((mtdFyct / monthlyTarget) * 100).toFixed(1)}% of monthly target`,
+                        ? `${((ytdFyct / salesTarget) * 100).toFixed(1)}% of your profile target`
+                        : `${((mtdFyct / monthlyTarget) * 100).toFixed(1)}% of monthly profile target`,
                       bg: 'bg-blue-50', icon: <TrendingUp className="w-5 h-5 text-blue-600" />,
                     },
                     {
                       label: `FYC ${milestoneTab.toUpperCase()}`,
                       value: isMilYtd ? rm(ytdFyc) : rm(mtdFyc),
                       sub:   isMilYtd
-                        ? `${((ytdFyc / salesTarget) * 100).toFixed(1)}% of annual target`
-                        : `${((mtdFyc / monthlyTarget) * 100).toFixed(1)}% of monthly target`,
+                        ? `${((ytdFyc / salesTarget) * 100).toFixed(1)}% of your profile target`
+                        : `${((mtdFyc / monthlyTarget) * 100).toFixed(1)}% of monthly profile target`,
                       bg: 'bg-green-50', icon: <Award className="w-5 h-5 text-green-600" />,
                     },
                     {
@@ -593,7 +618,7 @@ const SalesReportPage: React.FC = () => {
               {myReport && (
                 <div className="p-5 md:p-6 bg-gray-50 rounded-xl border border-gray-100">
                   <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-5">
-                    Sales Target Progress · Annual target {rm(salesTarget)}
+                    Sales Progress vs Your Profile Target · {rm(salesTarget)}
                   </p>
                   <TargetBar
                     label="FYC"
