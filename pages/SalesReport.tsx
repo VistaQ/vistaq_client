@@ -491,15 +491,15 @@ const SalesReportPage: React.FC = () => {
             <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-30">
               <button onClick={downloadPDF} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 font-medium flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-blue-500" />
-                Beautiful Report (PDF)
+                PDF Report
               </button>
               <button onClick={downloadExcel} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium flex items-center gap-2 border-t border-gray-100">
                 <span className="w-2 h-2 rounded-full bg-green-500" />
-                Full Report (Excel)
+                Excel Report
               </button>
               <button onClick={downloadCSV} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium flex items-center gap-2 border-t border-gray-100">
                 <span className="w-2 h-2 rounded-full bg-gray-400" />
-                Export CSV
+                CSV Report
               </button>
             </div>
           </div>
