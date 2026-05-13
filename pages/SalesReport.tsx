@@ -30,15 +30,6 @@ const SECTIONS = [
   { id: 'trends',    label: 'Trends'    },
 ];
 
-// ─── Aging config ─────────────────────────────────────────────────────────────
-
-const AGING_BUCKETS = [
-  { label: '0–30 days',  min: 0,  max: 30,        bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-100',  dot: '#22c55e' },
-  { label: '31–60 days', min: 31, max: 60,        bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-100', dot: '#eab308' },
-  { label: '61–90 days', min: 61, max: 90,        bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-100', dot: '#f97316' },
-  { label: '90+ days',   min: 91, max: Infinity,  bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-100',    dot: '#ef4444' },
-];
-
 // ─── Trend line config ───────────────────────────────────────────────────────
 
 const ETL_LINE_CFG = [
@@ -167,25 +158,6 @@ const SalesReportPage: React.FC = () => {
 
   const divOrDash = (num: number, den: number) => den === 0 ? '—' : pct(num / den);
   const isPipYtd = pipelineTab === 'ytd';
-
-  // ─── Aging (all active — not filtered by period, shows current pipeline state)
-  const today = new Date();
-  const daysSince = (d: string | null | undefined): number => {
-    if (!d) return 0;
-    return Math.floor((today.getTime() - new Date(d).getTime()) / (1000 * 60 * 60 * 24));
-  };
-  // Prospect aging: entered but no appointment yet
-  const prospectAgingDays = allProspects
-    .filter(p => p.prospect_entered_at && !p.appointment_completed_at && p.sales_outcome !== 'successful')
-    .map(p => daysSince(p.prospect_entered_at));
-  // Meeting aging: had a sales meeting but no successful outcome yet
-  const meetingAgingDays = allProspects
-    .filter(p => p.sales_parts_completed?.length && p.sales_outcome !== 'successful')
-    .map(p => daysSince(p.sales_completed_at));
-  const bucketCounts = (days: number[]) =>
-    AGING_BUCKETS.map(b => ({ ...b, count: days.filter(d => d >= b.min && d <= b.max).length }));
-  const prospectBuckets = bucketCounts(prospectAgingDays);
-  const meetingBuckets  = bucketCounts(meetingAgingDays);
 
   // ─── Product summary ──────────────────────────────────────────────────────
   const successfulSales = allProspects.filter(p => p.sales_outcome === 'successful');
@@ -691,7 +663,7 @@ const SalesReportPage: React.FC = () => {
         <SectionCard
           id="pipeline"
           title="Prospect"
-          subtitle="Stage funnel, conversion rates and pipeline aging"
+          subtitle="Stage funnel and conversion rates"
         >
           {/* YTD / MTD toggle — controls funnel + conversion rates */}
           <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-full sm:w-fit mb-6">
@@ -726,7 +698,7 @@ const SalesReportPage: React.FC = () => {
 
           {/* Conversion rates — 3 coloured cards, same YTD/MTD toggle */}
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Conversion Rates</p>
-          <div className="grid grid-cols-3 gap-3 mb-8">
+          <div className="grid grid-cols-3 gap-3">
             {[
               { label: 'Appointment Rate', mtd: divOrDash(h, g), ytd: divOrDash(H, G), bg: 'bg-violet-50', border: 'border-violet-100', numColor: 'text-violet-700', tagBg: 'bg-violet-100 text-violet-600' },
               { label: 'Show-up Rate',     mtd: divOrDash(i, h), ytd: divOrDash(I, H), bg: 'bg-sky-50',    border: 'border-sky-100',    numColor: 'text-sky-700',    tagBg: 'bg-sky-100 text-sky-600'    },
@@ -740,47 +712,6 @@ const SalesReportPage: React.FC = () => {
             ))}
           </div>
 
-          <div className="border-t border-gray-100 my-6" />
-
-          {/* Aging — shows all active prospects, not filtered by period */}
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Pipeline Aging</p>
-          <p className="text-xs text-gray-400 mb-5">Active prospects only · not filtered by selected period</p>
-
-          <div className="space-y-6">
-            {/* Prospect Aging */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="w-2 h-2 rounded-full bg-blue-400" />
-                <p className="text-sm font-semibold text-gray-700">Prospect Aging</p>
-                <span className="text-xs text-gray-400">· awaiting first appointment ({prospectAgingDays.length} active)</span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {prospectBuckets.map(b => (
-                  <div key={b.label} className={`${b.bg} ${b.border} border rounded-xl p-3 md:p-4 text-center`}>
-                    <p className={`text-2xl font-bold ${b.text}`}>{b.count}</p>
-                    <p className={`text-xs font-semibold mt-1 ${b.text}`}>{b.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Meeting Aging */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                <p className="text-sm font-semibold text-gray-700">Meeting Aging</p>
-                <span className="text-xs text-gray-400">· sales meeting done, outcome pending ({meetingAgingDays.length} active)</span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {meetingBuckets.map(b => (
-                  <div key={b.label} className={`${b.bg} ${b.border} border rounded-xl p-3 md:p-4 text-center`}>
-                    <p className={`text-2xl font-bold ${b.text}`}>{b.count}</p>
-                    <p className={`text-xs font-semibold mt-1 ${b.text}`}>{b.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
         </SectionCard>
       </div>
 
@@ -924,8 +855,8 @@ const SalesReportPage: React.FC = () => {
             <LineChart data={trendData} margin={{ top: 5, right: 20, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis yAxisId="left"  tick={{ fontSize: 11 }} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="left"  tick={{ fontSize: 11 }} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} label={{ value: 'RM', angle: -90, position: 'insideLeft', offset: 12, style: { fontSize: 10, fill: '#9ca3af' } }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} label={{ value: 'Count', angle: 90, position: 'insideRight', offset: 12, style: { fontSize: 10, fill: '#9ca3af' } }} />
               <Tooltip />
               <Legend />
               {ETL_LINE_CFG.map(cfg => trendLines.has(cfg.key) && (
