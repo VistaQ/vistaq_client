@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, Prospect, ProspectStage } from '../types';
-import { Plus, Search, ChevronRight, User, Download, Eye, LayoutList, LayoutGrid, Phone, Calendar, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Search, ChevronRight, User, Download, Eye, LayoutList, LayoutGrid, Phone, Calendar, Loader2, AlertCircle, CheckCircle, DollarSign, Shield } from 'lucide-react';
 import { apiCall } from '../services/apiClient';
 import ProspectCard from '../components/ProspectCard';
 import { exportProspectsToExcel } from '../utils/exportUtils';
@@ -173,6 +173,17 @@ const Prospects: React.FC = () => {
     return !isNaN(d.getTime()) ? d.toLocaleDateString() : 'N/A';
   };
 
+  const getProspectACE = (p: Prospect) =>
+    (p.products_sold || []).reduce((sum, prod) => sum + (prod.amount || 0), 0);
+
+  const getProspectProducts = (p: Prospect) =>
+    (p.products_sold || []).map(prod => prod.productName).filter(Boolean).join(', ') || '—';
+
+  const successfulProspects = prospects.filter(p => p.sales_outcome === 'successful');
+  const totalNOC = successfulProspects.length;
+  const totalACE = successfulProspects.reduce((sum, p) => sum + getProspectACE(p), 0);
+  const showSalesSummary = totalNOC > 0;
+
   return (
     <div className="space-y-6">
       {fetchError && (
@@ -223,6 +234,40 @@ const Prospects: React.FC = () => {
             )}
         </div>
       </div>
+
+      {/* ── Closed Sales Summary ── */}
+      {showSalesSummary && (
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:gap-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl p-4 text-white shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-lg flex-shrink-0">
+              <CheckCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium opacity-80 uppercase tracking-wide">Total Closed</p>
+              <p className="text-2xl font-bold leading-none">{totalNOC}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-lg flex-shrink-0">
+              <DollarSign className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-medium opacity-80 uppercase tracking-wide">Total ACE</p>
+              <p className="text-2xl font-bold leading-none">RM {totalACE.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setStageFilter('successful')}
+            className={`col-span-2 sm:col-span-1 sm:ml-auto text-xs font-semibold px-4 py-2 rounded-lg transition-colors border ${
+              stageFilter === 'successful'
+                ? 'bg-white text-green-700 border-white'
+                : 'border-white/50 text-white hover:bg-white/20'
+            }`}
+          >
+            {stageFilter === 'successful' ? '✓ Viewing Closed Sales' : 'View Closed Sales'}
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-3">
@@ -279,6 +324,7 @@ const Prospects: React.FC = () => {
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Prospect Name</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Contact</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Stage</th>
+                    <th className="hidden md:table-cell px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Product / ACE</th>
                     <th className="hidden sm:table-cell px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Last Updated</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-right">Action</th>
                     </tr>
@@ -304,6 +350,21 @@ const Prospects: React.FC = () => {
                             <td className="px-6 py-4">
                             {getStageBadge(prospect)}
                             </td>
+                            <td className="hidden md:table-cell px-6 py-4">
+                              {prospect.sales_outcome === 'successful' ? (
+                                <div>
+                                  <div className="flex items-center gap-1 text-sm font-medium text-gray-800">
+                                    <Shield className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                                    <span className="truncate max-w-[160px]">{getProspectProducts(prospect)}</span>
+                                  </div>
+                                  <div className="text-xs font-semibold text-green-700 mt-0.5">
+                                    RM {getProspectACE(prospect).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-gray-300 text-sm">—</span>
+                              )}
+                            </td>
                             <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">
                             {formatDate(prospect.updated_at)}
                             </td>
@@ -324,7 +385,7 @@ const Prospects: React.FC = () => {
                     })}
                     {filteredProspects.length === 0 && (
                     <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                         No prospects found.
                         </td>
                     </tr>
@@ -343,11 +404,19 @@ const Prospects: React.FC = () => {
                 const canEdit = !isViewOnly && isOwner;
 
                 return (
-                    <div key={prospect.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:border-blue-200 hover:shadow-md transition-all flex flex-col justify-between h-full">
+                    <div key={prospect.id} className={`bg-white rounded-xl shadow-sm border p-5 hover:shadow-md transition-all flex flex-col justify-between h-full ${
+                      prospect.sales_outcome === 'successful'
+                        ? 'border-green-200 hover:border-green-300'
+                        : 'border-gray-100 hover:border-blue-200'
+                    }`}>
                         <div>
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center">
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mr-3 font-bold text-sm shadow-sm">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 font-bold text-sm shadow-sm ${
+                                      prospect.sales_outcome === 'successful'
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-blue-100 text-blue-600'
+                                    }`}>
                                         {prospect.prospect_name.charAt(0)}
                                     </div>
                                     <div className="overflow-hidden">
@@ -358,18 +427,32 @@ const Prospects: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div className="mb-4">
                                 {getStageBadge(prospect)}
                             </div>
+
+                            {/* Closed sale details */}
+                            {prospect.sales_outcome === 'successful' && (
+                              <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2.5 mb-3 space-y-1">
+                                <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                                  <Shield className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                                  <span className="font-medium truncate">{getProspectProducts(prospect)}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-sm font-bold text-green-700">
+                                  <DollarSign className="w-3.5 h-3.5 flex-shrink-0" />
+                                  RM {getProspectACE(prospect).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </div>
+                              </div>
+                            )}
                         </div>
-                        
+
                         <div className="border-t border-gray-50 pt-3 flex items-center justify-between mt-auto">
                             <div className="text-xs text-gray-400 flex items-center" title="Last Updated">
                                 <Calendar className="w-3 h-3 mr-1" />
                                 {formatDate(prospect.updated_at)}
                             </div>
-                            <button 
+                            <button
                                 onClick={() => handleViewProspect(prospect)}
                                 className={`${canEdit ? 'text-blue-600 hover:text-blue-800 bg-blue-50' : 'text-gray-600 hover:text-gray-800 bg-gray-50'} px-3 py-1.5 rounded-lg text-xs font-bold transition-colors`}
                             >

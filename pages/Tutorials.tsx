@@ -94,8 +94,8 @@ const AGENT_TUTORIALS: TutorialItem[] = [
     },
     {
         number: '14',
-        title: 'My Sales',
-        description: 'Review your successful sales, total ACE, and your personal sales portfolio in VistaQ.',
+        title: 'Closed Sales in Prospects',
+        description: 'Review your successful sales, total ACE, and product breakdown directly in Prospect Management — filter by "Successful" to see your closed deals.',
         url: 'https://app.tango.us/app/workflow/View-Your-Sales-in-VistaQ-32af57d2af914ad091827b030d651989',
     },
     {
