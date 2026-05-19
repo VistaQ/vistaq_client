@@ -233,7 +233,7 @@ const Dashboard: React.FC = () => {
                <BarChart2 className="w-5 h-5 mr-2 text-gray-500" />
                Performance Metrics (YTD)
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
                <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                   <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects</p>
@@ -325,14 +325,14 @@ const Dashboard: React.FC = () => {
                      <Users className="w-5 h-5 mr-2 text-blue-600" />
                      Group Overview
                   </h3>
-                  <div className="overflow-y-auto max-h-64">
+                  <div className="overflow-y-auto overflow-x-auto max-h-64">
                      {totalGroups > 0 ? (
-                        <table className="w-full">
+                        <table className="w-full min-w-[280px]">
                            <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
                               <tr>
                                  <th className="px-4 py-2 text-left">Group</th>
-                                 <th className="px-4 py-2 text-right">Sales Count</th>
-                                 <th className="px-4 py-2 text-right">Total ACE</th>
+                                 <th className="px-4 py-2 text-right whitespace-nowrap">Sales</th>
+                                 <th className="px-4 py-2 text-right whitespace-nowrap">Total ACE</th>
                               </tr>
                            </thead>
                            <tbody>
@@ -562,7 +562,7 @@ const Dashboard: React.FC = () => {
          </div>
 
          {/* YTD WIDGETS */}
-         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col items-start">
                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg mb-3"><Users className="w-5 h-5" /></div>
                <p className="text-sm font-medium text-gray-500 mb-1">Total Prospects (YTD)</p>

@@ -397,7 +397,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
             return !isNaN(d.getTime()) && isSameDay(d, date);
         });
 
-    const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    const DAY_LABELS_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -426,9 +427,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
 
             {/* Day Labels */}
             <div className="grid grid-cols-7 border-b">
-                {DAY_LABELS.map(d => (
-                    <div key={d} className="py-2 text-center text-xs font-bold text-gray-400 uppercase">
-                        {d}
+                {DAY_LABELS.map((d, i) => (
+                    <div key={DAY_LABELS_FULL[i]} className="py-2 text-center text-xs font-bold text-gray-400 uppercase">
+                        <span className="sm:hidden">{d}</span>
+                        <span className="hidden sm:inline">{DAY_LABELS_FULL[i]}</span>
                     </div>
                 ))}
             </div>
@@ -436,7 +438,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
             {/* Grid */}
             <div className="grid grid-cols-7">
                 {cells.map((date, idx) => {
-                    if (!date) return <div key={`empty-${idx}`} className="min-h-[6rem] h-full bg-gray-50/50 border-b border-r border-gray-100" />;
+                    if (!date) return <div key={`empty-${idx}`} className="min-h-[4rem] sm:min-h-[6rem] h-full bg-gray-50/50 border-b border-r border-gray-100" />;
                     const dayEvts = eventsOnDay(date);
                     const isToday = isSameDay(date, today);
                     const hasFuture = dayEvts.some(e => new Date(e.start_date) >= today);
@@ -447,13 +449,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
                         <button
                             key={date.toISOString()}
                             onClick={() => dayEvts.length > 0 ? onDayClick(date, dayEvts) : undefined}
-                            className={`min-h-[6rem] h-full flex flex-col p-1.5 border-b border-r border-gray-100 transition-colors relative w-full
+                            className={`min-h-[4rem] sm:min-h-[6rem] h-full flex flex-col p-1 sm:p-1.5 border-b border-r border-gray-100 transition-colors relative w-full
                 ${dayEvts.length > 0 ? 'cursor-pointer hover:bg-blue-50' : 'cursor-default'}
                 ${isLast ? 'border-r-0' : ''}
               `}
                         >
-                            <div className="w-full flex justify-end mb-1">
-                                <span className={`text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full transition-colors
+                            <div className="w-full flex justify-end mb-0.5 sm:mb-1">
+                                <span className={`text-[11px] sm:text-sm font-semibold w-5 h-5 sm:w-7 sm:h-7 flex items-center justify-center rounded-full transition-colors
                 ${isToday ? 'bg-blue-600 text-white' : 'text-gray-700'}
               `}>
                                     {date.getDate()}

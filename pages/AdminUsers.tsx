@@ -160,14 +160,14 @@ const AdminUsers: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
            <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
            <p className="text-sm text-gray-500">Add, edit, and remove system users.</p>
         </div>
-        <button 
+        <button
           onClick={() => handleOpenModal()}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center shadow-sm"
+          className="self-start sm:self-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center shadow-sm whitespace-nowrap"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add User
@@ -215,109 +215,111 @@ const AdminUsers: React.FC = () => {
 
       {/* Users List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-left">
-           <thead className="bg-gray-50 border-b">
-              <tr>
-                 <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Name</th>
-                 <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Role</th>
-                 <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Agent Code</th>
-                 <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Group Assignment</th>
-                 <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase">Status</th>
-                 <th className="px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Actions</th>
-              </tr>
-           </thead>
-           <tbody className="divide-y divide-gray-100">
-              {filteredUsers.map(user => (
-                 <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                       <div className="flex items-center">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 font-bold text-xs text-white
-                             ${user.role === UserRole.ADMIN ? 'bg-red-500' : 
-                               user.role === UserRole.MASTER_TRAINER ? 'bg-slate-800' :
-                               user.role === UserRole.TRAINER ? 'bg-purple-500' : 'bg-blue-500'}`}>
-                             {user.name.charAt(0)}
-                          </div>
-                          <div>
-                             <div className="font-medium text-gray-900">{user.name}</div>
-                             <div className="text-xs text-gray-500">{user.email}</div>
-                          </div>
-                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                       <span className={`px-2 py-1 rounded-full text-xs font-bold flex items-center w-fit
-                          ${user.role === UserRole.ADMIN ? 'bg-red-100 text-red-700' :
-                            user.role === UserRole.MASTER_TRAINER ? 'bg-gray-100 text-gray-700' :
-                            user.role === UserRole.TRAINER ? 'bg-purple-100 text-purple-700' : 
-                            'bg-blue-100 text-blue-700'}`}>
-                          {user.role === UserRole.MASTER_TRAINER && <Globe className="w-3 h-3 mr-1" />}
-                          {getRoleLabel(user.role)}
-                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                       {user.agent_code || '-'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                       {user.role === UserRole.TRAINER ? (
-                          user.managedGroupIds && user.managedGroupIds.length > 0
-                             ? <span className="text-purple-600">Manages {user.managedGroupIds.length} Groups</span>
-                             : <span className="text-gray-400">No Groups Assigned</span>
-                       ) : (
-                          groups.find(g => g.id === user.group_id)?.name || '-'
-                       )}
-                    </td>
-                    <td className="px-6 py-4">
-                       {(user as any).status === 'inactive' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500">
-                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" /> Inactive
-                          </span>
-                       ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" /> Active
-                          </span>
-                       )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                       <div className="flex items-center justify-end gap-3">
-                         <ToggleSwitch
-                           checked={(user as any).status !== 'inactive'}
-                           onChange={() => {
-                             if (user.id === currentUser.id) return;
-                             if ((user as any).status === 'inactive') {
-                               handleReactivateUser(user.id);
-                             } else {
-                               setConfirmDeactivateId(user.id);
-                             }
-                           }}
-                           disabled={user.id === currentUser.id}
-                           title={user.id === currentUser.id ? 'Cannot deactivate yourself' : (user as any).status === 'inactive' ? 'Reactivate user' : 'Deactivate user'}
-                         />
-                         <button onClick={() => handleOpenModal(user)} className="text-blue-600 hover:text-blue-800" title="Edit">
-                            <Edit2 className="w-4 h-4" />
-                         </button>
-                         <button onClick={() => setConfirmDeleteId(user.id)} className="text-red-600 hover:text-red-800" title="Delete">
-                            <Trash2 className="w-4 h-4" />
-                         </button>
-                       </div>
-                    </td>
-                 </tr>
-              ))}
-              {filteredUsers.length === 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left min-w-[600px]">
+             <thead className="bg-gray-50 border-b">
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    <p className="font-medium">No users match your search.</p>
-                    {(searchTerm || filterRole !== 'all' || filterStatus !== 'active') && (
-                      <button
-                        onClick={() => { setSearchTerm(''); setFilterRole('all'); setFilterStatus('active'); }}
-                        className="mt-2 text-sm text-blue-600 hover:underline"
-                      >
-                        Clear filters
-                      </button>
-                    )}
-                  </td>
+                   <th className="px-4 md:px-6 py-3 text-xs font-bold text-gray-500 uppercase">Name</th>
+                   <th className="px-4 md:px-6 py-3 text-xs font-bold text-gray-500 uppercase">Role</th>
+                   <th className="hidden sm:table-cell px-4 md:px-6 py-3 text-xs font-bold text-gray-500 uppercase">Agent Code</th>
+                   <th className="hidden md:table-cell px-4 md:px-6 py-3 text-xs font-bold text-gray-500 uppercase">Group</th>
+                   <th className="px-4 md:px-6 py-3 text-xs font-bold text-gray-500 uppercase">Status</th>
+                   <th className="px-4 md:px-6 py-3 text-xs font-bold text-gray-500 uppercase text-right">Actions</th>
                 </tr>
-              )}
-           </tbody>
-        </table>
+             </thead>
+             <tbody className="divide-y divide-gray-100">
+                {filteredUsers.map(user => (
+                   <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="px-4 md:px-6 py-4">
+                         <div className="flex items-center">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 font-bold text-xs text-white flex-shrink-0
+                               ${user.role === UserRole.ADMIN ? 'bg-red-500' :
+                                 user.role === UserRole.MASTER_TRAINER ? 'bg-slate-800' :
+                                 user.role === UserRole.TRAINER ? 'bg-purple-500' : 'bg-blue-500'}`}>
+                               {user.name.charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                               <div className="font-medium text-gray-900 truncate max-w-[120px] sm:max-w-none">{user.name}</div>
+                               <div className="text-xs text-gray-500 truncate max-w-[120px] sm:max-w-none">{user.email}</div>
+                            </div>
+                         </div>
+                      </td>
+                      <td className="px-4 md:px-6 py-4">
+                         <span className={`px-2 py-1 rounded-full text-xs font-bold flex items-center w-fit whitespace-nowrap
+                            ${user.role === UserRole.ADMIN ? 'bg-red-100 text-red-700' :
+                              user.role === UserRole.MASTER_TRAINER ? 'bg-gray-100 text-gray-700' :
+                              user.role === UserRole.TRAINER ? 'bg-purple-100 text-purple-700' :
+                              'bg-blue-100 text-blue-700'}`}>
+                            {user.role === UserRole.MASTER_TRAINER && <Globe className="w-3 h-3 mr-1" />}
+                            {getRoleLabel(user.role)}
+                         </span>
+                      </td>
+                      <td className="hidden sm:table-cell px-4 md:px-6 py-4 text-sm text-gray-600">
+                         {user.agent_code || '-'}
+                      </td>
+                      <td className="hidden md:table-cell px-4 md:px-6 py-4 text-sm text-gray-600">
+                         {user.role === UserRole.TRAINER ? (
+                            user.managedGroupIds && user.managedGroupIds.length > 0
+                               ? <span className="text-purple-600">Manages {user.managedGroupIds.length} Groups</span>
+                               : <span className="text-gray-400">No Groups Assigned</span>
+                         ) : (
+                            groups.find(g => g.id === user.group_id)?.name || '-'
+                         )}
+                      </td>
+                      <td className="px-4 md:px-6 py-4">
+                         {(user as any).status === 'inactive' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500 whitespace-nowrap">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" /> Inactive
+                            </span>
+                         ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 whitespace-nowrap">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" /> Active
+                            </span>
+                         )}
+                      </td>
+                      <td className="px-4 md:px-6 py-4 text-right">
+                         <div className="flex items-center justify-end gap-2 md:gap-3">
+                           <ToggleSwitch
+                             checked={(user as any).status !== 'inactive'}
+                             onChange={() => {
+                               if (user.id === currentUser.id) return;
+                               if ((user as any).status === 'inactive') {
+                                 handleReactivateUser(user.id);
+                               } else {
+                                 setConfirmDeactivateId(user.id);
+                               }
+                             }}
+                             disabled={user.id === currentUser.id}
+                             title={user.id === currentUser.id ? 'Cannot deactivate yourself' : (user as any).status === 'inactive' ? 'Reactivate user' : 'Deactivate user'}
+                           />
+                           <button onClick={() => handleOpenModal(user)} className="text-blue-600 hover:text-blue-800 p-1" title="Edit">
+                              <Edit2 className="w-4 h-4" />
+                           </button>
+                           <button onClick={() => setConfirmDeleteId(user.id)} className="text-red-600 hover:text-red-800 p-1" title="Delete">
+                              <Trash2 className="w-4 h-4" />
+                           </button>
+                         </div>
+                      </td>
+                   </tr>
+                ))}
+                {filteredUsers.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                      <p className="font-medium">No users match your search.</p>
+                      {(searchTerm || filterRole !== 'all' || filterStatus !== 'active') && (
+                        <button
+                          onClick={() => { setSearchTerm(''); setFilterRole('all'); setFilterStatus('active'); }}
+                          className="mt-2 text-sm text-blue-600 hover:underline"
+                        >
+                          Clear filters
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )}
+             </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Deactivate Confirmation Modal */}
@@ -361,13 +363,13 @@ const AdminUsers: React.FC = () => {
 
       {isModalOpen && editingUser && (
          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label={editingUser.id ? 'Edit User' : 'Add New User'}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-               <div className="px-6 py-4 bg-blue-600 flex justify-between items-center">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
+               <div className="px-6 py-4 bg-blue-600 flex justify-between items-center flex-shrink-0">
                   <h3 className="font-semibold text-white">{editingUser.id ? 'Edit User' : 'Add New User'}</h3>
                   <button onClick={() => setIsModalOpen(false)} aria-label="Close" className="text-white/70 hover:text-white p-1 rounded-full hover:bg-white/20 transition-colors"><X className="w-5 h-5" /></button>
                </div>
-               <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+               <div className="p-6 space-y-4 overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Name</label>
                         <input

@@ -279,7 +279,7 @@ const Prospects: React.FC = () => {
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Prospect Name</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Contact</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Stage</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Last Updated</th>
+                    <th className="hidden sm:table-cell px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Last Updated</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-right">Action</th>
                     </tr>
                 </thead>
@@ -304,7 +304,7 @@ const Prospects: React.FC = () => {
                             <td className="px-6 py-4">
                             {getStageBadge(prospect)}
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-500">
+                            <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500">
                             {formatDate(prospect.updated_at)}
                             </td>
                             <td className="px-6 py-4 text-right">
@@ -324,7 +324,7 @@ const Prospects: React.FC = () => {
                     })}
                     {filteredProspects.length === 0 && (
                     <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
                         No prospects found.
                         </td>
                     </tr>
