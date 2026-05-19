@@ -15,7 +15,6 @@ import {
   GraduationCap,
   Award,
   Star,
-  DollarSign,
   Settings,
   Gift,
   Layers,
@@ -118,10 +117,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { id: 'coaching',     label: 'Coaching',    icon: GraduationCap },
     { id: 'leaderboard',  label: 'Leaderboard', icon: Trophy },
     ...(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER
-      ? [
-          { id: 'sales',  label: 'My Sales',  icon: DollarSign },
-          { id: 'points', label: 'My Points', icon: Star },
-        ]
+      ? [{ id: 'points', label: 'My Points', icon: Star }]
       : []),
     { id: 'sales-report', label: 'Sales Report', icon: BarChart2 },
     ...(isManagement
@@ -165,10 +161,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <SidebarNavItem id="coaching"    label="Coaching"    icon={GraduationCap} />
           <SidebarNavItem id="leaderboard" label="Leaderboard" icon={Trophy} />
           {(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER) && (
-            <>
-              <SidebarNavItem id="sales"  label="My Sales"  icon={DollarSign} />
-              <SidebarNavItem id="points" label="My Points" icon={Star} />
-            </>
+            <SidebarNavItem id="points" label="My Points" icon={Star} />
           )}
           <SidebarNavItem id="sales-report" label="Sales Report" icon={BarChart2} />
           {isManagement && (

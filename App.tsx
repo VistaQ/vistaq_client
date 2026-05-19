@@ -19,7 +19,6 @@ const Reports = React.lazy(() => import('./pages/Reports'));
 const PointsHistory = React.lazy(() => import('./pages/PointsHistory'));
 const Leaderboard = React.lazy(() => import('./pages/Leaderboard'));
 const Group = React.lazy(() => import('./pages/Group'));
-const Sales = React.lazy(() => import('./pages/Sales'));
 const AdminUsers = React.lazy(() => import('./pages/AdminUsers'));
 const AdminGroups = React.lazy(() => import('./pages/AdminGroups'));
 const AdminRewards = React.lazy(() => import('./pages/AdminRewards'));
@@ -87,7 +86,7 @@ const App: React.FC = () => {
                       <Route path="events" element={<MyCalendar />} />
                       <Route path="coaching" element={<Coaching />} />
                       <Route path="leaderboard" element={<Leaderboard />} />
-                      <Route path="sales" element={<Sales />} />
+                      {/* /sales removed — successful sales are surfaced in Prospects */}
                       <Route path="points" element={<PointsHistory />} />
                       <Route path="group" element={<Group />} />
                       <Route path="group-sales-report" element={<GroupSalesReport />} />
