@@ -113,7 +113,9 @@ const SalesReportPage: React.FC = () => {
   if (!currentUser) return null;
 
   // ─── Sales target ─────────────────────────────────────────────────────────
-  const salesTarget   = parseFloat(localStorage.getItem(`salesTarget_${currentUser.id}`) ?? '0') || 400_000;
+  const salesTarget   = parseFloat(localStorage.getItem(`salesTarget_${currentUser.id}`) ?? '0') || 400_000; // FYCt target
+  const fycTargetRaw  = parseFloat(localStorage.getItem(`fycTarget_${currentUser.id}`)   ?? '0');
+  const fycTarget     = fycTargetRaw > 0 ? fycTargetRaw : salesTarget; // falls back to FYCt target if FYC target not set
   const monthlyTarget = salesTarget / 12;
 
   // ─── ETL data ─────────────────────────────────────────────────────────────
@@ -158,6 +160,35 @@ const SalesReportPage: React.FC = () => {
 
   const divOrDash = (num: number, den: number) => den === 0 ? '—' : pct(num / den);
   const isPipYtd = pipelineTab === 'ytd';
+
+  // ─── Prospect & Meeting Aging ─────────────────────────────────────────────
+  const AGING_BUCKETS = [
+    { label: '0–7 days',   min: 0,  max: 7   },
+    { label: '8–14 days',  min: 8,  max: 14  },
+    { label: '15–21 days', min: 15, max: 21  },
+    { label: '22–28 days', min: 22, max: 28  },
+    { label: '28+ days',   min: 29, max: Infinity },
+  ];
+  const agingToday = new Date();
+  const daysSince = (d: string | null | undefined): number => {
+    if (!d) return 0;
+    const dt = new Date(d);
+    return isNaN(dt.getTime()) ? 0 : Math.floor((agingToday.getTime() - dt.getTime()) / 86_400_000);
+  };
+  const openProspects = allProspects.filter(p =>
+    !p.sales_outcome && p.current_stage !== 'sales' && p.prospect_entered_at
+  );
+  const openMeetings = allProspects.filter(p =>
+    !p.sales_outcome && p.appointment_status === 'done' && p.appointment_completed_at
+  );
+  const bucketCounts = (items: typeof allProspects, dateFn: (p: typeof items[0]) => string | null | undefined) =>
+    AGING_BUCKETS.map(b => ({
+      ...b,
+      count: items.filter(p => {
+        const days = daysSince(dateFn(p));
+        return days >= b.min && days <= b.max;
+      }).length,
+    }));
 
   // ─── Product summary ──────────────────────────────────────────────────────
   const successfulSales = allProspects.filter(p => p.sales_outcome === 'successful');
@@ -210,7 +241,7 @@ const SalesReportPage: React.FC = () => {
   //          Shortage (FYC) | ACE (YTD) | NOC (YTD) | Jan FYCt | Jan FYC | Jan ACE | Jan NOC | … | Dec …
   const buildReportRow = (): Record<string, string | number> | null => {
     if (!myReport) return null;
-    const fycPct  = salesTarget > 0 ? (ytdFyc  / salesTarget) * 100 : 0;
+    const fycPct  = fycTarget  > 0 ? (ytdFyc  / fycTarget)  * 100 : 0;
     const fyctPct = salesTarget > 0 ? (ytdFyct / salesTarget) * 100 : 0;
     const row: Record<string, string | number> = {
       'Agent Code':      myReport.agent_code,
@@ -219,7 +250,7 @@ const SalesReportPage: React.FC = () => {
       '% FYCt':          `${fyctPct.toFixed(2)}%`,
       'FYC (YTD)':      ytdFyc,
       '% FYC':           `${fycPct.toFixed(2)}%`,
-      'Shortage (FYC)':  Math.max(salesTarget - ytdFyc, 0),
+      'Shortage (FYC)':  Math.max(fycTarget - ytdFyc, 0),
       'ACE (YTD)':      ytdAce,
       'NOC (YTD)':      ytdNoc,
     };
@@ -326,8 +357,8 @@ const SalesReportPage: React.FC = () => {
       startY: y,
       head: [['Metric', 'MTD', 'YTD', 'Profile Target', '% of Target', 'Shortage']],
       body: [
-        ['FYCt', rm(mtdFyct), rm(ytdFyct), rm(salesTarget), `${((ytdFyct / salesTarget) * 100).toFixed(2)}%`, rm(Math.max(salesTarget - ytdFyct, 0))],
-        ['FYC',  rm(mtdFyc),  rm(ytdFyc),  rm(salesTarget), `${((ytdFyc  / salesTarget) * 100).toFixed(2)}%`, rm(Math.max(salesTarget - ytdFyc,  0))],
+        ['FYCt', rm(mtdFyct), rm(ytdFyct), rm(salesTarget), `${(salesTarget > 0 ? (ytdFyct / salesTarget) * 100 : 0).toFixed(2)}%`, rm(Math.max(salesTarget - ytdFyct, 0))],
+        ['FYC',  rm(mtdFyc),  rm(ytdFyc),  rm(fycTarget),  `${(fycTarget  > 0 ? (ytdFyc  / fycTarget)  * 100 : 0).toFixed(2)}%`, rm(Math.max(fycTarget  - ytdFyc,  0))],
         ['ACE',  rm(mtdAce),  rm(ytdAce),  '—', '—', '—'],
         ['NOC',  String(mtdNoc), String(ytdNoc), '—', '—', '—'],
       ],
@@ -362,7 +393,7 @@ const SalesReportPage: React.FC = () => {
       }
       y += 8;
     };
-    drawBar('FYC Progress',  ytdFyc,  salesTarget, green600);
+    drawBar('FYC Progress',  ytdFyc,  fycTarget,   green600);
     drawBar('FYCt Progress', ytdFyct, salesTarget, blue600);
 
     y += 4;
@@ -539,7 +570,7 @@ const SalesReportPage: React.FC = () => {
         <SectionCard
           id="milestone"
           title="Sales Milestone"
-          subtitle={`Your profile target: ${rm(salesTarget)} · Period: ${periodLabel} · ${monthsLeft} month${monthsLeft !== 1 ? 's' : ''} to year end`}
+          subtitle={`FYCt target: ${rm(salesTarget)} · FYC target: ${rm(fycTarget)} · ${periodLabel} · ${monthsLeft} month${monthsLeft !== 1 ? 's' : ''} to year end`}
         >
           {noEtlData ? (
             <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-xl text-amber-700 text-sm">
@@ -600,7 +631,7 @@ const SalesReportPage: React.FC = () => {
                       label: `FYC ${milestoneTab.toUpperCase()}`,
                       value: isMilYtd ? rm(ytdFyc) : rm(mtdFyc),
                       sub:   isMilYtd
-                        ? `${((ytdFyc / salesTarget) * 100).toFixed(1)}% of your profile target`
+                        ? `${(fycTarget > 0 ? (ytdFyc / fycTarget) * 100 : 0).toFixed(1)}% of your FYC target`
                         : `${((mtdFyc / monthlyTarget) * 100).toFixed(1)}% of monthly profile target`,
                       bg: 'bg-green-50', icon: <Award className="w-5 h-5 text-green-600" />,
                     },
@@ -638,8 +669,8 @@ const SalesReportPage: React.FC = () => {
                   <TargetBar
                     label="FYC"
                     value={ytdFyc}
-                    target={salesTarget}
-                    shortage={Math.max(salesTarget - ytdFyc, 0)}
+                    target={fycTarget}
+                    shortage={Math.max(fycTarget - ytdFyc, 0)}
                     fixedColor="bg-green-500"
                   />
                   <TargetBar
@@ -710,6 +741,51 @@ const SalesReportPage: React.FC = () => {
                 <span className={`inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${rate.tagBg}`}>{isPipYtd ? 'YTD' : 'MTD'}</span>
               </div>
             ))}
+          </div>
+
+          {/* ── Aging ── */}
+          <div className="border-t border-gray-100 mt-8 pt-6">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Prospect & Meeting Aging</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Prospect Aging */}
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-2">Open Prospects</p>
+                <div className="space-y-1.5">
+                  {bucketCounts(openProspects, p => p.prospect_entered_at).map(b => {
+                    const maxCount = Math.max(...bucketCounts(openProspects, p => p.prospect_entered_at).map(x => x.count), 1);
+                    const pct = maxCount > 0 ? (b.count / maxCount) * 100 : 0;
+                    return (
+                      <div key={b.label} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 w-20 flex-shrink-0">{b.label}</span>
+                        <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                          <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs font-bold text-gray-700 w-5 text-right">{b.count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Meeting Aging */}
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-2">Open Sales Meetings</p>
+                <div className="space-y-1.5">
+                  {bucketCounts(openMeetings, p => p.appointment_completed_at).map(b => {
+                    const maxCount = Math.max(...bucketCounts(openMeetings, p => p.appointment_completed_at).map(x => x.count), 1);
+                    const pct = maxCount > 0 ? (b.count / maxCount) * 100 : 0;
+                    return (
+                      <div key={b.label} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 w-20 flex-shrink-0">{b.label}</span>
+                        <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                          <div className="bg-orange-400 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs font-bold text-gray-700 w-5 text-right">{b.count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
 
         </SectionCard>

@@ -10,7 +10,8 @@ const Profile: React.FC = () => {
   const { currentUser, updateProfile, refreshCurrentUser, changePassword } = useAuth();
 
   const [groups, setGroups] = useState<Group[]>([]);
-  const [salesTarget, setSalesTarget] = useState<string>('');
+  const [salesTarget, setSalesTarget] = useState<string>('');   // FYCt target
+  const [fycTarget, setFycTarget]     = useState<string>('');   // FYC target
 
   const [formData, setFormData] = useState<Partial<User>>({});
   const [newPassword, setNewPassword] = useState('');
@@ -32,6 +33,8 @@ const Profile: React.FC = () => {
           });
           const saved = localStorage.getItem(`salesTarget_${currentUser.id}`);
           setSalesTarget(saved ?? '');
+          const savedFyc = localStorage.getItem(`fycTarget_${currentUser.id}`);
+          setFycTarget(savedFyc ?? '');
       }
   }, [currentUser]);
 
@@ -83,13 +86,25 @@ const Profile: React.FC = () => {
 
   const handleSaveTarget = (e: React.FormEvent) => {
       e.preventDefault();
-      const val = parseFloat(salesTarget.replace(/,/g, ''));
-      if (isNaN(val) || val <= 0) {
-          setStatus({ msg: 'Please enter a valid target amount greater than 0.', type: 'error' });
+      const fyctVal = parseFloat(salesTarget.replace(/,/g, ''));
+      const fycVal  = parseFloat(fycTarget.replace(/,/g, ''));
+
+      if (isNaN(fyctVal) || fyctVal <= 0) {
+          setStatus({ msg: 'Please enter a valid FYCt target greater than 0.', type: 'error' });
           return;
       }
-      localStorage.setItem(`salesTarget_${currentUser.id}`, String(val));
-      setStatus({ msg: 'Sales target saved successfully!', type: 'success' });
+      if (fycTarget && (isNaN(fycVal) || fycVal <= 0)) {
+          setStatus({ msg: 'Please enter a valid FYC target greater than 0, or leave it blank.', type: 'error' });
+          return;
+      }
+
+      localStorage.setItem(`salesTarget_${currentUser.id}`, String(fyctVal));
+      if (!isNaN(fycVal) && fycVal > 0) {
+          localStorage.setItem(`fycTarget_${currentUser.id}`, String(fycVal));
+      } else {
+          localStorage.removeItem(`fycTarget_${currentUser.id}`);
+      }
+      setStatus({ msg: 'Sales targets saved successfully!', type: 'success' });
   };
 
   return (
@@ -224,40 +239,65 @@ const Profile: React.FC = () => {
            </div>
        </div>
 
-       {/* Sales Target — Agent & Group Leader only */}
+       {/* Sales Targets — Agent & Group Leader only */}
        {canSetTarget && (
            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                <h3 className="text-lg font-bold text-gray-800 mb-1 flex items-center border-b pb-2">
                    <Target className="w-5 h-5 mr-2 text-green-600" />
-                   Annual Sales Target
+                   Annual Sales Targets
                </h3>
                <p className="text-sm text-gray-500 mb-5 mt-3">
-                   Set your personal annual FYCt target in RM. This figure drives the progress bars and shortage calculations on your Sales Report and Dashboard.
+                   Set your personal annual FYCt and FYC targets in RM. These figures drive the progress bars, shortage calculations, and statistics on your Sales Report and Dashboard.
                </p>
-               <form onSubmit={handleSaveTarget} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-                   <div className="flex-1 w-full sm:max-w-xs">
-                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Annual Target (RM)</label>
-                       <div className="relative">
-                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">RM</span>
-                           <input
-                               type="number"
-                               min="1"
-                               step="1000"
-                               value={salesTarget}
-                               onChange={e => setSalesTarget(e.target.value)}
-                               placeholder="e.g. 400000"
-                               className="block w-full pl-10 bg-gray-50 border-gray-300 text-gray-900 rounded-lg border p-2.5 focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:border-green-500"
-                           />
+               <form onSubmit={handleSaveTarget} className="space-y-4">
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                       {/* FYCt Target */}
+                       <div>
+                           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">FYCt Annual Target (RM) <span className="text-red-500">*</span></label>
+                           <div className="relative">
+                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">RM</span>
+                               <input
+                                   type="number"
+                                   value={salesTarget}
+                                   onChange={e => setSalesTarget(e.target.value)}
+                                   placeholder="e.g. 400000"
+                                   className="block w-full pl-10 bg-gray-50 border-gray-300 text-gray-900 rounded-lg border p-2.5 focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:border-green-500"
+                               />
+                           </div>
+                           {salesTarget && !isNaN(parseFloat(salesTarget)) && (
+                               <p className="text-xs text-gray-400 mt-1">
+                                   ≈ RM {(parseFloat(salesTarget) / 12).toLocaleString(undefined, { maximumFractionDigits: 0 })} / month
+                               </p>
+                           )}
                        </div>
-                       {salesTarget && !isNaN(parseFloat(salesTarget)) && (
-                           <p className="text-xs text-gray-400 mt-1">
-                               ≈ RM {(parseFloat(salesTarget) / 12).toLocaleString(undefined, { maximumFractionDigits: 0 })} / month
-                           </p>
-                       )}
+                       {/* FYC Target */}
+                       <div>
+                           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">FYC Annual Target (RM) <span className="text-gray-400 font-normal normal-case">(optional)</span></label>
+                           <div className="relative">
+                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">RM</span>
+                               <input
+                                   type="number"
+                                   value={fycTarget}
+                                   onChange={e => setFycTarget(e.target.value)}
+                                   placeholder="e.g. 300000"
+                                   className="block w-full pl-10 bg-gray-50 border-gray-300 text-gray-900 rounded-lg border p-2.5 focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:border-green-500"
+                               />
+                           </div>
+                           {fycTarget && !isNaN(parseFloat(fycTarget)) && (
+                               <p className="text-xs text-gray-400 mt-1">
+                                   ≈ RM {(parseFloat(fycTarget) / 12).toLocaleString(undefined, { maximumFractionDigits: 0 })} / month
+                               </p>
+                           )}
+                           {!fycTarget && (
+                               <p className="text-xs text-gray-400 mt-1">If blank, FYCt target is used for FYC calculations.</p>
+                           )}
+                       </div>
                    </div>
-                   <button type="submit" className="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 flex items-center shadow-sm font-medium whitespace-nowrap">
-                       <Save className="w-4 h-4 mr-2" /> Save Target
-                   </button>
+                   <div>
+                       <button type="submit" className="bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 flex items-center shadow-sm font-medium whitespace-nowrap">
+                           <Save className="w-4 h-4 mr-2" /> Save Targets
+                       </button>
+                   </div>
                </form>
            </div>
        )}

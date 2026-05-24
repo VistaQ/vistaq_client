@@ -655,6 +655,7 @@ const MyCalendar: React.FC = () => {
         status: 'upcoming' as 'upcoming' | 'completed' | 'cancelled'
     });
     const [eventError, setEventError] = useState('');
+    const [conflictWarning, setConflictWarning] = useState<string | null>(null);
     const [agentSearch, setAgentSearch] = useState('');
 
     if (!currentUser) return null;
@@ -815,7 +816,7 @@ const MyCalendar: React.FC = () => {
             alert('Please select at least one group or agent to share this event with.');
             return;
         }
-        // ── Double Booking Check ──────────────────────────────────
+        // ── Conflict Check — warning only, does NOT block creation ────
         const { hasConflict, conflictWith } = checkConflict(
             occupiedSlots,
             formData.date,
@@ -823,12 +824,15 @@ const MyCalendar: React.FC = () => {
             formData.endTime || formData.startTime,
             editingEventId ? formData.eventTitle : undefined
         );
-        if (hasConflict) {
-            setEventError(`This time slot conflicts with "${conflictWith}" already in your calendar. Please choose a different date or time.`);
+        if (hasConflict && !conflictWarning) {
+            // First attempt — surface the warning and stop here.
+            // Second call (conflictWarning already set) proceeds through.
+            setConflictWarning(`This time slot overlaps with "${conflictWith}". You can still create the event — click Save again to confirm.`);
             return;
         }
+        setConflictWarning(null);
         setEventError('');
-        // ─────────────────────────────────────────────────────────
+        // ──────────────────────────────────────────────────────────────
 
         const eventData = {
             event_title: formData.eventTitle,
@@ -850,6 +854,7 @@ const MyCalendar: React.FC = () => {
             await addEvent(eventData);
         }
         setIsEventModalOpen(false);
+        setConflictWarning(null);
         setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: [], targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming' });
     };
 
@@ -998,7 +1003,7 @@ const MyCalendar: React.FC = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
                                         <label className={labelClass}>Date <span className="text-red-500">*</span></label>
-                                        <input type="date" className={inputClass} value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
+                                        <input type="date" className={inputClass} value={formData.date} onChange={e => { setConflictWarning(null); setFormData({ ...formData, date: e.target.value }); }} />
                                     </div>
                                     <div>
                                         <label className={labelClass}>Start Time <span className="text-red-500">*</span></label>
@@ -1006,7 +1011,7 @@ const MyCalendar: React.FC = () => {
                                     </div>
                                     <div>
                                         <label className={labelClass}>End Time</label>
-                                        <input type="time" className={inputClass} value={formData.endTime} onChange={e => setFormData({ ...formData, endTime: e.target.value })} />
+                                        <input type="time" className={inputClass} value={formData.endTime} onChange={e => { setConflictWarning(null); setFormData({ ...formData, endTime: e.target.value }); }} />
                                     </div>
                                 </div>
                                 {editingEventId && (
@@ -1199,11 +1204,21 @@ const MyCalendar: React.FC = () => {
                                     </div>
                                 )}
 
-                                {/* Conflict Error */}
+                                {/* Validation Error */}
                                 {eventError && (
                                     <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                                         <span className="font-bold mt-0.5">⚠</span>
                                         <span>{eventError}</span>
+                                    </div>
+                                )}
+                                {/* Conflict Warning — non-blocking */}
+                                {conflictWarning && (
+                                    <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-800">
+                                        <span className="font-bold mt-0.5 flex-shrink-0">⚠</span>
+                                        <div>
+                                            <p className="font-semibold mb-0.5">Time Overlap Detected</p>
+                                            <p>{conflictWarning}</p>
+                                        </div>
                                     </div>
                                 )}
                             </div>
