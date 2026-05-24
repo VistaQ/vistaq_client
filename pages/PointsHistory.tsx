@@ -70,7 +70,8 @@ const PointsHistory: React.FC = () => {
     if (!currentUser) return;
     setLoading(true);
     setError(null);
-    const params = new URLSearchParams({ userId: currentUser.id, limit: '200' });
+    // Keep limit at 100 — the backend enforces a page-size cap
+    const params = new URLSearchParams({ userId: currentUser.id, limit: '100' });
     apiCall<AgentPointsResponse>(`/agent-points?${params.toString()}`)
       .then(res => {
         if (res.success) setPointsData(res.data);
@@ -82,18 +83,22 @@ const PointsHistory: React.FC = () => {
 
   useEffect(() => { loadPoints(); }, [currentUser?.id]);
 
-  // Fetch leaderboard rank (YTD / total points)
+  // Fetch leaderboard rank (YTD / total points) — non-critical, silently ignored on error
   useEffect(() => {
     if (!currentUser) return;
     apiCall<LBResponse>('/leaderboard/stats?period=ytd')
       .then(res => {
-        if (res.success) {
-          const sorted = [...res.data.individual].sort((a, b) => b.total_points - a.total_points);
+        try {
+          const individuals: LBEntry[] = res?.data?.individual ?? [];
+          if (!Array.isArray(individuals)) return;
+          const sorted = [...individuals].sort((a, b) => b.total_points - a.total_points);
           const idx = sorted.findIndex(e => e.user_id === currentUser.id);
           setLbRank(idx >= 0 ? idx + 1 : null);
+        } catch {
+          // malformed response — just don't show rank
         }
       })
-      .catch(() => {}); // non-critical
+      .catch(() => {}); // 4xx/5xx — rank chip simply won't appear
   }, [currentUser?.id]);
 
   if (!currentUser) return null;
