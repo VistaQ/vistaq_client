@@ -225,6 +225,7 @@ const GroupSalesReport: React.FC = () => {
   const [sortMetric,    setSortMetric]    = useState<'fyc' | 'fyct'>('fyc');
   const [trendLines,    setTrendLines]    = useState<Set<string>>(() => new Set(['FYCt', 'FYC']));
   const [selectedAgent, setSelectedAgent] = useState<SalesReportType | null>(null);
+  const [showDownload,  setShowDownload]  = useState(false);
 
   const toggleTrend = (key: string) =>
     setTrendLines(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
@@ -391,22 +392,30 @@ const GroupSalesReport: React.FC = () => {
           </select>
 
           {/* Download */}
-          <div className="relative group">
-            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm">
+          <div className="relative">
+            <button
+              onClick={() => setShowDownload(v => !v)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+            >
               <Download className="w-4 h-4" />
               Download
-              <ChevronDown className="w-3 h-3" />
+              <ChevronDown className={`w-3 h-3 transition-transform ${showDownload ? 'rotate-180' : ''}`} />
             </button>
-            <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-30">
-              <button onClick={downloadExcel} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                Excel Report
-              </button>
-              <button onClick={downloadCSV} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium border-t border-gray-100 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-gray-400" />
-                CSV Report
-              </button>
-            </div>
+            {showDownload && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setShowDownload(false)} />
+                <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-30">
+                  <button onClick={() => { downloadExcel(); setShowDownload(false); }} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500" />
+                    Excel Report
+                  </button>
+                  <button onClick={() => { downloadCSV(); setShowDownload(false); }} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 font-medium border-t border-gray-100 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-gray-400" />
+                    CSV Report
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -506,20 +515,98 @@ const GroupSalesReport: React.FC = () => {
             </div>
           </div>
 
-          {/* Agent table */}
-          <div className="overflow-x-auto">
+          {/* ── Mobile agent cards (< md) ── */}
+          <div className="md:hidden divide-y divide-gray-100">
+            {sortedReports.map((r, idx) => {
+              const agentFyc  = sum(r, 'month_fyc');
+              const agentFyct = sum(r, 'month_fyct');
+              const agentAce  = sum(r, 'month_ace');
+              const agentNoc  = sum(r, 'month_noc');
+              const tPct      = (agentFyc / DEFAULT_TARGET) * 100;
+              const shortage  = Math.max(DEFAULT_TARGET - agentFyc, 0);
+              const barColor  = tPct >= 100 ? 'bg-green-500' : tPct >= 75 ? 'bg-blue-500' : tPct >= 25 ? 'bg-amber-400' : 'bg-red-400';
+              const textColor = tPct >= 100 ? 'text-green-600' : tPct >= 75 ? 'text-blue-600' : tPct >= 25 ? 'text-amber-600' : 'text-red-500';
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => setSelectedAgent(r)}
+                  className="w-full text-left px-4 py-4 hover:bg-gray-50/70 transition-colors"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <span className="text-xs text-gray-400 font-bold mr-2">#{idx + 1}</span>
+                      <span className="text-sm font-semibold text-gray-900">{r.agent_name}</span>
+                      <span className="ml-2 text-xs text-gray-400">{r.agent_code}</span>
+                    </div>
+                    <span className={`text-sm font-bold ${textColor}`}>{tPct.toFixed(1)}%</span>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-2">
+                    <div className={`h-2 rounded-full ${barColor}`} style={{ width: `${Math.min(tPct, 100)}%` }} />
+                  </div>
+                  {/* Stat row */}
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase font-semibold">FYC</p>
+                      <p className="text-xs font-bold text-green-700">{rm(agentFyc)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase font-semibold">FYCt</p>
+                      <p className="text-xs font-bold text-blue-700">{rm(agentFyct)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase font-semibold">ACE</p>
+                      <p className="text-xs font-bold text-gray-700">{rm(agentAce)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase font-semibold">NOC</p>
+                      <p className="text-xs font-bold text-gray-700">{agentNoc}</p>
+                    </div>
+                  </div>
+                  {shortage > 0 && (
+                    <p className="text-[10px] text-red-400 mt-1.5">Shortage: {rm(shortage)}</p>
+                  )}
+                </button>
+              );
+            })}
+            {/* Mobile totals */}
+            <div className="px-4 py-3 bg-gray-50 border-t-2 border-gray-200">
+              <p className="text-xs font-bold text-gray-500 uppercase mb-2">Group Total</p>
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase font-semibold">FYC</p>
+                  <p className="text-xs font-bold text-green-700">{rm(totalFyc)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase font-semibold">FYCt</p>
+                  <p className="text-xs font-bold text-blue-700">{rm(totalFyct)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase font-semibold">ACE</p>
+                  <p className="text-xs font-bold text-gray-700">{rm(totalAce)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase font-semibold">NOC</p>
+                  <p className="text-xs font-bold text-gray-700">{totalNoc}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Desktop/tablet agent table (md+) ── */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left w-8">#</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Agent</th>
-                  <th className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">FYCt YTD</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">FYCt YTD</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">FYC YTD</th>
-                  <th className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Progress</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Progress</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Target %</th>
-                  <th className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">ACE</th>
-                  <th className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">NOC</th>
-                  <th className="hidden md:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Shortage</th>
+                  <th className="hidden lg:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">ACE</th>
+                  <th className="hidden lg:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">NOC</th>
+                  <th className="hidden lg:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Shortage</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">View</th>
                 </tr>
               </thead>
@@ -543,15 +630,15 @@ const GroupSalesReport: React.FC = () => {
                           <span className="ml-2 text-xs text-gray-400 font-normal">{r.agent_code}</span>
                         </button>
                       </td>
-                      <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-blue-700 font-medium">{rm(agentFyct)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-blue-700 font-medium">{rm(agentFyct)}</td>
                       <td className="px-4 py-3 text-sm text-right text-green-700 font-medium">{rm(agentFyc)}</td>
-                      <td className="hidden md:table-cell px-4 py-3">
+                      <td className="px-4 py-3">
                         <MiniBar pct={tPct} />
                       </td>
                       <td className={`px-4 py-3 text-sm text-right font-bold ${tColor}`}>{tPct.toFixed(1)}%</td>
-                      <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-gray-700">{rm(agentAce)}</td>
-                      <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-gray-700">{agentNoc}</td>
-                      <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-red-500">{rm(Math.max(DEFAULT_TARGET - agentFyc, 0))}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-sm text-right text-gray-700">{rm(agentAce)}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-sm text-right text-gray-700">{agentNoc}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-sm text-right text-red-500">{rm(Math.max(DEFAULT_TARGET - agentFyc, 0))}</td>
                       <td className="px-4 py-3 text-center">
                         <button
                           onClick={() => setSelectedAgent(r)}
@@ -568,13 +655,13 @@ const GroupSalesReport: React.FC = () => {
                 <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold">
                   <td className="px-4 py-3" />
                   <td className="px-4 py-3 text-sm text-gray-900">Group Total</td>
-                  <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-blue-700">{rm(totalFyct)}</td>
+                  <td className="px-4 py-3 text-sm text-right text-blue-700">{rm(totalFyct)}</td>
                   <td className="px-4 py-3 text-sm text-right text-green-700">{rm(totalFyc)}</td>
-                  <td className="hidden md:table-cell px-4 py-3" />
+                  <td className="px-4 py-3" />
                   <td className="px-4 py-3 text-sm text-right text-gray-500">{groupFycPct.toFixed(1)}% avg</td>
-                  <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-gray-900">{rm(totalAce)}</td>
-                  <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-gray-900">{totalNoc}</td>
-                  <td className="hidden md:table-cell px-4 py-3 text-sm text-right text-gray-500">—</td>
+                  <td className="hidden lg:table-cell px-4 py-3 text-sm text-right text-gray-900">{rm(totalAce)}</td>
+                  <td className="hidden lg:table-cell px-4 py-3 text-sm text-right text-gray-900">{totalNoc}</td>
+                  <td className="hidden lg:table-cell px-4 py-3 text-sm text-right text-gray-500">—</td>
                   <td className="px-4 py-3" />
                 </tr>
               </tbody>

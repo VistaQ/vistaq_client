@@ -142,8 +142,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
 
-      {/* ── Sidebar — Desktop only (lg+) ──────────────────────────────────── */}
-      <aside className="hidden lg:flex flex-col w-72 bg-sidebar-primary border-r border-gray-800 shadow-xl z-20">
+      {/* ── Sidebar — Desktop only (xl+) ──────────────────────────────────── */}
+      <aside className="hidden xl:flex flex-col w-72 bg-sidebar-primary border-r border-gray-800 shadow-xl z-20">
         <div className="flex flex-col justify-center h-24 px-8 border-b border-gray-800/50 bg-sidebar-primary">
           <div className="flex items-center">
             <img src="/vistaq-logo.png" alt="VistaQ" className="h-12 w-auto" />
@@ -228,8 +228,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* ── Right side: header + content ──────────────────────────────────── */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
 
-        {/* Mobile / Tablet top bar (hidden on lg+) */}
-        <header className="lg:hidden flex items-center justify-between h-16 px-4 bg-sidebar-primary border-b border-gray-800 shadow-md z-20 text-white flex-shrink-0">
+        {/* Mobile / Tablet top bar (hidden on xl+) */}
+        <header className="xl:hidden flex items-center justify-between h-16 px-4 bg-sidebar-primary border-b border-gray-800 shadow-md z-20 text-white flex-shrink-0">
           <img src="/vistaq-logo.png" alt="VistaQ" className="h-8 w-auto" />
           <div className="flex items-center gap-1">
             <div className="[&_button]:text-gray-300 [&_button:hover]:text-white [&_button:hover]:bg-white/10">
@@ -248,7 +248,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {/* ── Full-screen mobile / tablet menu ──────────────────────────── */}
         {isMobileMenuOpen && (
           <div
-            className="fixed inset-0 z-50 lg:hidden flex flex-col bg-sidebar-primary"
+            className="fixed inset-0 z-50 xl:hidden flex flex-col bg-sidebar-primary"
             role="dialog"
             aria-modal="true"
             aria-label="Navigation menu"
@@ -328,13 +328,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         )}
 
-        {/* Desktop top-bar — notification bell (lg+) */}
-        <div className="hidden lg:flex items-center justify-end h-14 px-8 border-b border-gray-100 bg-white flex-shrink-0">
+        {/* Desktop top-bar — notification bell (xl+) */}
+        <div className="hidden xl:flex items-center justify-end h-14 px-8 border-b border-gray-100 bg-white flex-shrink-0">
           <NotificationBell />
         </div>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-8 relative bg-gray-50">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 xl:p-8 relative bg-gray-50">
           {children}
         </main>
       </div>
