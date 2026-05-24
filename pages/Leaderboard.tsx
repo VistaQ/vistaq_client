@@ -7,7 +7,7 @@ import { apiCall } from '../services/apiClient';
 import type { components } from '../types.generated';
 
 type Tab = 'individual' | 'group';
-type Metric = 'points' | 'prospects';
+type Metric = 'points' | 'prospects' | 'noc' | 'ace' | 'fyct' | 'fyc' | 'acs';
 type Period = 'mtd' | 'ytd';
 
 type IndividualEntry = components['schemas']['LeaderboardStatsIndividualObject'];
@@ -22,12 +22,19 @@ type StatsResponse = {
   };
 };
 
-// Metrics that are future/placeholder — not yet backed by real data
-const PLACEHOLDER_METRICS: string[] = ['noc', 'ace', 'fyct', 'fyc', 'acs'];
+const METRIC_OPTIONS: { value: Metric; label: string }[] = [
+  { value: 'points',    label: 'Total Points'     },
+  { value: 'prospects', label: 'Total Prospects'  },
+  { value: 'noc',       label: 'NOC (Sales)'      },
+  { value: 'ace',       label: 'ACE (RM)'         },
+  { value: 'fyct',      label: 'FYCt (RM)'        },
+  { value: 'fyc',       label: 'FYC (RM)'         },
+  { value: 'acs',       label: 'ACS (Avg Case)'   },
+];
 
 const Leaderboard: React.FC = () => {
   const { currentUser } = useAuth();
-  const { badgeTiers } = useData();
+  const { badgeTiers, salesReports } = useData();
 
   const [tab, setTab] = useState<Tab>('individual');
   const [metric, setMetric] = useState<Metric>('points');
@@ -60,26 +67,66 @@ const Leaderboard: React.FC = () => {
     return reversed.find(b => pts >= b.threshold) || sortedBadges[0];
   };
 
-  const getScore = (entry: IndividualEntry | GroupEntry): number =>
-    metric === 'prospects' ? entry.prospects_added : entry.total_points;
+  // Build a lookup from agent_id → salesReport for sales-based metrics
+  const salesReportByAgent = useMemo(() => {
+    const map: Record<string, typeof salesReports[0]> = {};
+    for (const r of salesReports) map[r.agent_id] = r;
+    return map;
+  }, [salesReports]);
+
+  const getIndividualScore = (entry: IndividualEntry): number => {
+    const r = salesReportByAgent[entry.user_id];
+    switch (metric) {
+      case 'prospects': return entry.prospects_added;
+      case 'noc':       return entry.sales_successful;
+      case 'ace':       return r?.ace_ytd  ?? 0;
+      case 'fyct':      return r?.fyct_ytd ?? 0;
+      case 'fyc':       return r?.fyc_ytd  ?? 0;
+      case 'acs': {
+        const noc = entry.sales_successful;
+        const ace = r?.ace_ytd ?? 0;
+        return noc > 0 ? ace / noc : 0;
+      }
+      default:          return entry.total_points;
+    }
+  };
+
+  const getGroupScore = (group: GroupEntry): number => {
+    if (metric === 'points') return group.total_points;
+    if (metric === 'prospects') return group.prospects_added;
+    if (metric === 'noc') return group.sales_successful;
+    // For ACE/FYCt/FYC/ACS — aggregate from member salesReports
+    const members = statsData?.individual.filter(i => i.group_id === group.group_id) ?? [];
+    const aceSum  = members.reduce((s, m) => s + (salesReportByAgent[m.user_id]?.ace_ytd  ?? 0), 0);
+    const fyctSum = members.reduce((s, m) => s + (salesReportByAgent[m.user_id]?.fyct_ytd ?? 0), 0);
+    const fycSum  = members.reduce((s, m) => s + (salesReportByAgent[m.user_id]?.fyc_ytd  ?? 0), 0);
+    const nocSum  = members.reduce((s, m) => s + m.sales_successful, 0);
+    switch (metric) {
+      case 'ace':  return aceSum;
+      case 'fyct': return fyctSum;
+      case 'fyc':  return fycSum;
+      case 'acs':  return nocSum > 0 ? aceSum / nocSum : 0;
+      default:     return group.total_points;
+    }
+  };
 
   // ── Individual tab rankings ──────────────────────────────────────────────
   const individualRanked = useMemo(() => {
     if (!statsData) return [];
     return statsData.individual
       .map(entry => {
-        const score = getScore(entry);
-        return { entry, score, badge: getCurrentBadge(score) };
+        const score = getIndividualScore(entry);
+        return { entry, score, badge: getCurrentBadge(entry.total_points) };
       })
       .sort((a, b) => b.score - a.score);
-  }, [statsData, metric, sortedBadges]);
+  }, [statsData, metric, sortedBadges, salesReportByAgent]);
 
   // ── Group tab rankings ───────────────────────────────────────────────────
   const groupRanked = useMemo(() => {
     if (!statsData) return [];
     return statsData.groups
       .map(group => {
-        const totalScore = getScore(group);
+        const totalScore = getGroupScore(group);
         const members = statsData.individual.filter(i => i.group_id === group.group_id);
         const topMember = members.reduce<IndividualEntry | null>((best, m) =>
           !best || m.total_points > best.total_points ? m : best
@@ -87,7 +134,7 @@ const Leaderboard: React.FC = () => {
         return { group, totalScore, topMemberName: topMember?.name ?? '—' };
       })
       .sort((a, b) => b.totalScore - a.totalScore);
-  }, [statsData, metric]);
+  }, [statsData, metric, salesReportByAgent]);
 
   const ranked = tab === 'individual' ? individualRanked : groupRanked;
   const top3 = ranked.slice(0, 3);
@@ -100,7 +147,12 @@ const Leaderboard: React.FC = () => {
     <Award key="3" className="w-6 h-6 text-amber-600" />,
   ];
 
-  const metricLabel = metric === 'points' ? 'Total Points' : 'Total Prospects';
+  const metricLabel = METRIC_OPTIONS.find(o => o.value === metric)?.label ?? 'Score';
+  const isRmMetric = metric === 'ace' || metric === 'fyct' || metric === 'fyc' || metric === 'acs';
+  const formatScore = (score: number) =>
+    isRmMetric
+      ? `RM ${score.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+      : score.toLocaleString();
   const periodLabel = period === 'mtd' ? 'Month to Date' : 'Year to Date';
 
   return (
@@ -137,11 +189,8 @@ const Leaderboard: React.FC = () => {
             onChange={e => setMetric(e.target.value as Metric)}
             className="appearance-none text-sm border border-gray-200 rounded-lg pl-3 pr-8 py-2 bg-white text-gray-700 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
           >
-            <option value="points">Total Points</option>
-            <option value="prospects">Total Prospects</option>
-            <option disabled>── Coming Soon ──</option>
-            {PLACEHOLDER_METRICS.map(m => (
-              <option key={m} value={m} disabled>{m.toUpperCase()} (Coming soon)</option>
+            {METRIC_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -233,7 +282,7 @@ const Leaderboard: React.FC = () => {
                           </p>
                           <p className="text-slate-400 text-xs truncate max-w-[100px] text-center">{e.entry.group_name || '—'}</p>
                           <p className={`font-extrabold mt-1 ${scoreColor}`}>
-                            {metric === 'points' ? `${e.score.toLocaleString()} pts` : `${e.score} prospects`}
+                            {formatScore(e.score)}
                           </p>
                           <span className={`text-xs px-2 py-0.5 rounded-full mt-1 font-semibold ${e.badge.bg} ${e.badge.color}`}>
                             {e.badge.name}
@@ -256,7 +305,7 @@ const Leaderboard: React.FC = () => {
                           <p className="text-white font-bold text-sm mt-2 max-w-[100px] text-center truncate">{g.group.group_name}</p>
                           <p className="text-slate-400 text-xs truncate max-w-[100px] text-center">{g.group.member_count} members</p>
                           <p className={`font-extrabold mt-1 ${scoreColor}`}>
-                            {metric === 'points' ? `${g.totalScore.toLocaleString()} pts` : `${g.totalScore} prospects`}
+                            {formatScore(g.totalScore)}
                           </p>
                         </div>
                         <div className={`${top3.length === 3 ? podiumHeights[podiumIdx] : 'h-20'} w-24 md:w-32 rounded-t-xl flex items-center justify-center ${podiumGradient}`}>
@@ -299,8 +348,8 @@ const Leaderboard: React.FC = () => {
                           {e.badge.name}
                         </span>
                         <div className="text-right flex-shrink-0">
-                          <p className="font-bold text-gray-900 text-sm">{e.score.toLocaleString()}</p>
-                          <p className="text-xs text-gray-400">{metric === 'points' ? 'pts' : 'prospects'}</p>
+                          <p className="font-bold text-gray-900 text-sm">{formatScore(e.score)}</p>
+                          <p className="text-xs text-gray-400">{metricLabel}</p>
                         </div>
                       </div>
                     );
@@ -317,8 +366,8 @@ const Leaderboard: React.FC = () => {
                           <p className="text-xs text-gray-400">{g.group.member_count} members · Top: {g.topMemberName}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <p className="font-bold text-gray-900 text-sm">{g.totalScore.toLocaleString()}</p>
-                          <p className="text-xs text-gray-400">{metric === 'points' ? 'pts' : 'prospects'}</p>
+                          <p className="font-bold text-gray-900 text-sm">{formatScore(g.totalScore)}</p>
+                          <p className="text-xs text-gray-400">{metricLabel}</p>
                         </div>
                       </div>
                     );
@@ -364,8 +413,8 @@ const Leaderboard: React.FC = () => {
                         </span>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="font-extrabold text-gray-900">{e.score.toLocaleString()}</p>
-                        <p className="text-xs text-gray-400">{metric === 'points' ? 'points' : 'prospects'}</p>
+                        <p className="font-extrabold text-gray-900">{formatScore(e.score)}</p>
+                        <p className="text-xs text-gray-400">{metricLabel}</p>
                       </div>
                     </div>
                   );
@@ -384,8 +433,8 @@ const Leaderboard: React.FC = () => {
                         <p className="text-xs text-gray-500">{g.group.member_count} members · Top: {g.topMemberName}</p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="font-extrabold text-gray-900">{g.totalScore.toLocaleString()}</p>
-                        <p className="text-xs text-gray-400">{metric === 'points' ? 'points' : 'prospects'}</p>
+                        <p className="font-extrabold text-gray-900">{formatScore(g.totalScore)}</p>
+                        <p className="text-xs text-gray-400">{metricLabel}</p>
                       </div>
                     </div>
                   );

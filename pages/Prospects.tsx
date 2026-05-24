@@ -59,16 +59,25 @@ const Prospects: React.FC = () => {
     return 'new_prospect';
   };
 
-  const filteredProspects = prospects.filter(p => {
-    if (stageFilter !== 'all' && getProspectStatus(p) !== stageFilter) return false;
-    if (searchTerm) {
-      return (
-        (p.prospect_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (p.prospect_phone || '').includes(searchTerm)
-      );
-    }
-    return true;
-  });
+  const filteredProspects = prospects
+    .filter(p => {
+      if (stageFilter !== 'all' && getProspectStatus(p) !== stageFilter) return false;
+      if (searchTerm) {
+        return (
+          (p.prospect_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (p.prospect_phone || '').includes(searchTerm)
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const da = new Date(a.updated_at).getTime();
+      const db = new Date(b.updated_at).getTime();
+      if (isNaN(db) && isNaN(da)) return 0;
+      if (isNaN(db)) return -1;
+      if (isNaN(da)) return 1;
+      return db - da; // most recent first
+    });
 
   const stageCounts: Record<ProspectStatus, number> = {
     all:               prospects.length,

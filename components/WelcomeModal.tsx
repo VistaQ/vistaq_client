@@ -38,12 +38,16 @@ const WelcomeModal: React.FC = () => {
   const { currentUser } = useAuth();
   const { prospects, getProspectsByScope, salesReports, dashboardStats } = useData();
 
-  // Show on every login for Agent and Group Leader
+  // Show once per browser session for Agent and Group Leader.
+  // sessionStorage key is keyed by user ID so switching accounts works correctly.
   const isTargetRole =
     currentUser?.role === UserRole.AGENT ||
     currentUser?.role === UserRole.GROUP_LEADER;
 
-  const [visible, setVisible] = useState(isTargetRole);
+  const sessionKey = `welcomeShown_${currentUser?.id ?? 'anon'}`;
+  const alreadyShownThisSession = sessionStorage.getItem(sessionKey) === '1';
+
+  const [visible, setVisible] = useState(isTargetRole && !alreadyShownThisSession);
 
   const myProspects = useMemo(() => {
     if (!currentUser) return [];
@@ -203,8 +207,13 @@ const WelcomeModal: React.FC = () => {
     return items.sort((a, b) => order[a.priority] - order[b.priority]).slice(0, 3);
   }, [stats]);
 
-  const handleAction = (url: string) => {
+  const dismiss = () => {
+    sessionStorage.setItem(sessionKey, '1');
     setVisible(false);
+  };
+
+  const handleAction = (url: string) => {
+    dismiss();
     navigate(url);
   };
 
@@ -219,7 +228,7 @@ const WelcomeModal: React.FC = () => {
         {/* ── Header ── */}
         <div className="relative bg-gradient-to-br from-blue-600 to-indigo-700 px-8 pt-8 pb-6 text-white">
           <button
-            onClick={() => setVisible(false)}
+            onClick={dismiss}
             className="absolute top-4 right-4 p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X className="w-4 h-4" />
@@ -235,12 +244,12 @@ const WelcomeModal: React.FC = () => {
         </div>
 
         {/* ── Stats grid ── */}
-        <div className="grid grid-cols-4 divide-x divide-gray-100 border-b border-gray-100">
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 border-b border-gray-100">
           {[
             { label: 'Prospects',  value: stats.total,     icon: Users,          color: 'text-blue-600'   },
-            { label: 'Appts',      value: stats.inAppt,    icon: Calendar,       color: 'text-purple-600' },
+            { label: 'Appointments', value: stats.inAppt,    icon: Calendar,       color: 'text-purple-600' },
             { label: 'Meetings',   value: stats.inSales,   icon: Briefcase,      color: 'text-amber-600'  },
-            { label: 'Sales Won',  value: stats.won,       icon: CheckCircle2,   color: 'text-green-600'  },
+            { label: 'Successful Sales', value: stats.won, icon: CheckCircle2,   color: 'text-green-600'  },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="flex flex-col items-center justify-center py-5 px-2">
               <Icon className={`w-5 h-5 ${color} mb-1.5`} />
@@ -294,7 +303,7 @@ const WelcomeModal: React.FC = () => {
         {/* ── Footer ── */}
         <div className="px-6 pb-6">
           <button
-            onClick={() => setVisible(false)}
+            onClick={dismiss}
             className="w-full py-3 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors active:scale-[0.98]"
           >
             Let's have a productive day 🚀

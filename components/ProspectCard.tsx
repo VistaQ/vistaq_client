@@ -183,9 +183,15 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
       return;
     }
 
-    // Block save if there is an unresolved appointment conflict
-    if (appointmentConflict.has && !formData.sales_outcome) {
-      alert(`Cannot save: this time slot conflicts with "${appointmentConflict.with}". Please choose a different date or time.`);
+    // Appointment conflict is informational only — does not block save
+
+    // Validate: non-successful outcome requires a reason
+    if (formData.sales_outcome === 'unsuccessful' && !formData.unsuccessful_reason?.trim()) {
+      showNotification(
+        'Reason Required',
+        'Please select a reason for the non-successful outcome. This helps track why a sale didn\'t go through and improves future planning.',
+        'error'
+      );
       return;
     }
 
@@ -470,11 +476,11 @@ const ProspectCard: React.FC<Props> = ({ prospect, onClose }) => {
 
                 {/* Conflict Warning */}
                 {appointmentConflict.has && (
-                  <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-300 rounded-lg">
-                    <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-red-700">
-                      <p className="font-bold">Time Conflict!</p>
-                      <p>You already have <span className="font-semibold capitalize">{appointmentConflict.type === 'coaching' ? 'a Coaching Session' : appointmentConflict.type === 'event' ? 'an Event' : 'an Appointment'}</span> — <span className="font-semibold">&ldquo;{appointmentConflict.with}&rdquo;</span> — scheduled at this time. Please choose a different date or time.
+                  <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-300 rounded-lg">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-800">
+                      <p className="font-bold">Time Overlap</p>
+                      <p>You already have <span className="font-semibold capitalize">{appointmentConflict.type === 'coaching' ? 'a Coaching Session' : appointmentConflict.type === 'event' ? 'an Event' : 'an Appointment'}</span> — <span className="font-semibold">&ldquo;{appointmentConflict.with}&rdquo;</span> — at this time. You can still save with this time slot.
                       </p>
                     </div>
                   </div>
