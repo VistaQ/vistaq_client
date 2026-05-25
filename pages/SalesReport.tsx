@@ -745,46 +745,85 @@ const SalesReportPage: React.FC = () => {
 
           {/* ── Aging ── */}
           <div className="border-t border-gray-100 mt-8 pt-6">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Prospect & Meeting Aging</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Prospect Aging */}
-              <div>
-                <p className="text-sm font-semibold text-gray-700 mb-2">Open Prospects</p>
-                <div className="space-y-1.5">
-                  {bucketCounts(openProspects, p => p.prospect_entered_at).map(b => {
-                    const maxCount = Math.max(...bucketCounts(openProspects, p => p.prospect_entered_at).map(x => x.count), 1);
-                    const pct = maxCount > 0 ? (b.count / maxCount) * 100 : 0;
-                    return (
-                      <div key={b.label} className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500 w-20 flex-shrink-0">{b.label}</span>
-                        <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-                          <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                        </div>
-                        <span className="text-xs font-bold text-gray-700 w-5 text-right">{b.count}</span>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-5">Prospect &amp; Meeting Aging</p>
+            <div className="space-y-6">
+              {(
+                [
+                  { label: 'Open Prospects',     items: openProspects,  dateFn: (p: typeof openProspects[0]) => p.prospect_entered_at,        accent: 'bg-blue-500',   ring: 'ring-blue-200'   },
+                  { label: 'Open Sales Meetings', items: openMeetings,   dateFn: (p: typeof openMeetings[0]) => p.appointment_completed_at,    accent: 'bg-orange-400', ring: 'ring-orange-200' },
+                ] as const
+              ).map(({ label, items, dateFn, accent, ring }) => {
+                const buckets = bucketCounts(items, dateFn);
+                const maxCount = Math.max(...buckets.map(b => b.count), 1);
+                // Urgency colours for each bucket: fresh → stale → overdue
+                const nodeColors = [
+                  'bg-emerald-500',
+                  'bg-yellow-400',
+                  'bg-orange-400',
+                  'bg-red-500',
+                  'bg-red-700',
+                ];
+                const total = buckets.reduce((s, b) => s + b.count, 0);
+                return (
+                  <div key={label}>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-gray-700">{label}</p>
+                      <span className="text-xs text-gray-400">{total} open</span>
+                    </div>
+
+                    {/* Timeline track — scrollable on very small screens */}
+                    <div className="overflow-x-auto pb-1">
+                      <div className="flex items-end min-w-[280px]">
+                        {buckets.map((b, idx) => {
+                          const isLast = idx === buckets.length - 1;
+                          // Node size scales with count relative to max (min 28px, max 56px)
+                          const sizePx = b.count === 0 ? 28 : Math.round(28 + ((b.count / maxCount) * 28));
+                          const nodeColor = b.count === 0 ? 'bg-gray-200' : nodeColors[idx];
+                          const textColor = b.count === 0 ? 'text-gray-400' : 'text-white';
+                          return (
+                            <div key={b.label} className="flex items-center flex-1 min-w-0">
+                              {/* Node + label column */}
+                              <div className="flex flex-col items-center flex-shrink-0">
+                                {/* Count bubble */}
+                                <div
+                                  className={`${nodeColor} ${b.count > 0 ? `ring-4 ${ring}` : ''} ${textColor} rounded-full flex items-center justify-center font-bold transition-all`}
+                                  style={{ width: sizePx, height: sizePx, fontSize: sizePx < 36 ? 11 : 13 }}
+                                >
+                                  {b.count}
+                                </div>
+                                {/* Label */}
+                                <span className="text-[10px] text-gray-500 mt-1.5 text-center leading-tight whitespace-nowrap">
+                                  {b.label}
+                                </span>
+                              </div>
+                              {/* Connector line */}
+                              {!isLast && (
+                                <div className="flex-1 h-0.5 bg-gray-200 mx-1 mb-5" />
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-              {/* Meeting Aging */}
-              <div>
-                <p className="text-sm font-semibold text-gray-700 mb-2">Open Sales Meetings</p>
-                <div className="space-y-1.5">
-                  {bucketCounts(openMeetings, p => p.appointment_completed_at).map(b => {
-                    const maxCount = Math.max(...bucketCounts(openMeetings, p => p.appointment_completed_at).map(x => x.count), 1);
-                    const pct = maxCount > 0 ? (b.count / maxCount) * 100 : 0;
-                    return (
-                      <div key={b.label} className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500 w-20 flex-shrink-0">{b.label}</span>
-                        <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-                          <div className="bg-orange-400 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+
+                    {/* Urgency legend — single line */}
+                    <div className="flex items-center gap-3 mt-3 flex-wrap">
+                      {[
+                        { color: 'bg-emerald-500', text: 'Fresh' },
+                        { color: 'bg-yellow-400',  text: 'Ageing' },
+                        { color: 'bg-orange-400',  text: 'Stale' },
+                        { color: 'bg-red-500',     text: 'Overdue' },
+                        { color: 'bg-red-700',     text: 'Critical' },
+                      ].map(l => (
+                        <div key={l.text} className="flex items-center gap-1">
+                          <span className={`w-2 h-2 rounded-full ${l.color} flex-shrink-0`} />
+                          <span className="text-[10px] text-gray-400">{l.text}</span>
                         </div>
-                        <span className="text-xs font-bold text-gray-700 w-5 text-right">{b.count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
