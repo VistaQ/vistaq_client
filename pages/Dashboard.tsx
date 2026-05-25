@@ -439,8 +439,10 @@ const Dashboard: React.FC = () => {
    const totalAppointmentsYTD = personalYtd?.appointments_set ?? 0;
    const totalSalesMeetingsYTD = personalYtd?.sales_meetings ?? 0;
 
-   // Personal annual sales target — set in Profile, stored in localStorage
-   const salesTarget = parseFloat(localStorage.getItem(`salesTarget_${currentUser?.id}`) ?? '0') || 400_000;
+   // Personal annual sales targets — set in Profile, stored in localStorage
+   const salesTarget = parseFloat(localStorage.getItem(`salesTarget_${currentUser?.id}`) ?? '0') || 400_000; // FYCt target
+   const fycTargetRaw = parseFloat(localStorage.getItem(`fycTarget_${currentUser?.id}`) ?? '0');
+   const fycTarget = fycTargetRaw > 0 ? fycTargetRaw : salesTarget; // falls back to FYCt target if FYC target not set
 
    // --- ETL-sourced NOC / ACE / ACS — use mySalesReport (same source as Sales Report page) ---
    const myReport = mySalesReport ?? undefined;
@@ -606,11 +608,11 @@ const Dashboard: React.FC = () => {
          {/* MDRT Progress Widget */}
          {(() => {
             const monthsLeft = Math.max(12 - (new Date().getMonth() + 1), 0);
-            const fycPct = myReport ? Math.min((myReport.fyc_ytd / salesTarget) * 100, 100) : 0;
             const fyctPct = myReport ? Math.min((myReport.fyct_ytd / salesTarget) * 100, 100) : 0;
+            const fycPct  = myReport ? Math.min((myReport.fyc_ytd  / fycTarget)   * 100, 100) : 0;
             const barColors: Record<string, string> = {
-               FYC:  'from-green-500 to-green-400',
                FYCt: 'from-blue-500 to-blue-400',
+               FYC:  'from-green-500 to-green-400',
             };
 
             return (
@@ -618,7 +620,9 @@ const Dashboard: React.FC = () => {
                   <div className="flex items-center justify-between mb-4">
                      <div>
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Sales Target Progress</p>
-                        <p className="text-sm text-gray-500 mt-0.5">Target: RM {salesTarget.toLocaleString()} · {monthsLeft} months remaining</p>
+                        <p className="text-sm text-gray-500 mt-0.5">
+                           FYCt: RM {salesTarget.toLocaleString()} · FYC: RM {fycTarget.toLocaleString()} · {monthsLeft} months remaining
+                        </p>
                      </div>
                      <button
                         onClick={() => navigate('/sales-report')}
@@ -633,8 +637,8 @@ const Dashboard: React.FC = () => {
                      <p className="text-sm text-gray-400 italic">No ETL data for this year yet. Contact your admin.</p>
                   ) : (
                      <div className="space-y-3">
-                        {[{ label: 'FYC', ytd: myReport.fyc_ytd, shortage: Math.max(salesTarget - myReport.fyc_ytd, 0), pct: fycPct },
-                          { label: 'FYCt', ytd: myReport.fyct_ytd, shortage: Math.max(salesTarget - myReport.fyct_ytd, 0), pct: fyctPct }].map(item => (
+                        {[{ label: 'FYCt', ytd: myReport.fyct_ytd, target: salesTarget, shortage: Math.max(salesTarget - myReport.fyct_ytd, 0), pct: fyctPct },
+                          { label: 'FYC',  ytd: myReport.fyc_ytd,  target: fycTarget,   shortage: Math.max(fycTarget  - myReport.fyc_ytd,  0), pct: fycPct  }].map(item => (
                            <div key={item.label}>
                               <div className="flex justify-between text-sm mb-1">
                                  <span className="font-semibold text-gray-700">{item.label}</span>
