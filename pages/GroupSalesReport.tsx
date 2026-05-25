@@ -4,14 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { UserRole, SalesReport as SalesReportType, MONTH_LABELS } from '../types';
-import { CHART_COLORS } from '../constants/tokens';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
 } from 'recharts';
 import {
   Download, TrendingUp, Award, Target, Users,
-  ChevronDown, AlertCircle, Loader2, ArrowLeft, X,
+  ChevronDown, AlertCircle, Loader2, ArrowLeft,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -62,144 +61,6 @@ const GroupBar: React.FC<{
   </div>
 );
 
-// ─── Agent detail slide-over ─────────────────────────────────────────────────
-
-const AgentPanel: React.FC<{
-  agent: SalesReportType;
-  selectedMonth: number;
-  selectedYear: number;
-  onClose: () => void;
-}> = ({ agent, selectedMonth, selectedYear, onClose }) => {
-  const n = selectedMonth;
-  const [lines, setLines] = useState<Set<string>>(() => new Set(['FYCt', 'FYC']));
-  const toggle = (key: string) =>
-    setLines(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
-
-  const ytdFyct = (agent.month_fyct ?? []).slice(0, n).reduce((s, v) => s + v, 0);
-  const ytdFyc  = (agent.month_fyc  ?? []).slice(0, n).reduce((s, v) => s + v, 0);
-  const ytdAce  = (agent.month_ace  ?? []).slice(0, n).reduce((s, v) => s + v, 0);
-  const ytdNoc  = (agent.month_noc  ?? []).slice(0, n).reduce((s, v) => s + v, 0);
-  const fycPct  = (ytdFyc  / DEFAULT_TARGET) * 100;
-  const fyctPct = (ytdFyct / DEFAULT_TARGET) * 100;
-
-  const trendData = MONTH_LABELS.slice(0, n).map((month, idx) => ({
-    month,
-    FYCt: agent.month_fyct?.[idx] ?? 0,
-    FYC:  agent.month_fyc?.[idx]  ?? 0,
-    ACE:  agent.month_ace?.[idx]  ?? 0,
-    NOC:  agent.month_noc?.[idx]  ?? 0,
-  }));
-
-  const periodLabel = `Jan–${MONTH_LABELS[n - 1]} ${selectedYear}`;
-
-  return (
-    <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
-      <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Panel — full-width on mobile, capped at lg on desktop */}
-      <div className="w-full sm:max-w-lg bg-white shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-5 bg-slate-800 text-white flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Agent Report</p>
-            <h2 className="text-lg font-bold leading-tight">{agent.agent_name}</h2>
-            <p className="text-sm text-slate-400 mt-0.5">{agent.agent_code} · {periodLabel}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors flex-shrink-0">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: 'FYCt YTD', value: rm(ytdFyct), bg: 'bg-blue-50',    icon: <TrendingUp className="w-4 h-4 text-blue-600" /> },
-              { label: 'FYC YTD',  value: rm(ytdFyc),  bg: 'bg-green-50',   icon: <Award      className="w-4 h-4 text-green-600" /> },
-              { label: 'ACE YTD',  value: rm(ytdAce),  bg: 'bg-emerald-50', icon: <Target     className="w-4 h-4 text-emerald-600" /> },
-              { label: 'NOC YTD',  value: String(ytdNoc), bg: 'bg-purple-50', icon: <Users    className="w-4 h-4 text-purple-600" /> },
-            ].map(c => (
-              <div key={c.label} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className={`p-1.5 ${c.bg} rounded-lg`}>{c.icon}</div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase">{c.label}</p>
-                </div>
-                <p className="text-xl font-bold text-gray-900">{c.value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Progress bars */}
-          <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-4">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Sales Progress vs Target ({rm(DEFAULT_TARGET)})</p>
-            {[
-              { label: 'FYC',  value: ytdFyc,  pct: fycPct,  fill: 'bg-green-500', textColor: 'text-green-700' },
-              { label: 'FYCt', value: ytdFyct, pct: fyctPct, fill: 'bg-blue-500',  textColor: 'text-blue-700'  },
-            ].map(bar => (
-              <div key={bar.label}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className={`text-sm font-semibold ${bar.textColor}`}>{bar.label}</span>
-                  <span className="text-sm font-bold text-gray-800">{bar.pct.toFixed(1)}%</span>
-                </div>
-                <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                  <div className={`h-3 rounded-full ${bar.fill} transition-all duration-700`} style={{ width: `${Math.min(bar.pct, 100)}%` }} />
-                </div>
-                <div className="flex justify-between mt-1 text-xs text-gray-500">
-                  <span>{rm(bar.value)}</span>
-                  <span>Shortage: {rm(Math.max(DEFAULT_TARGET - bar.value, 0))}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Monthly trend */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Monthly Breakdown</p>
-            </div>
-            <div className="flex flex-wrap gap-1.5 mb-4">
-              {TREND_LINES.map(cfg => (
-                <button
-                  key={cfg.key}
-                  onClick={() => toggle(cfg.key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
-                    lines.has(cfg.key) ? 'bg-white shadow-sm text-gray-800 border-gray-200' : 'bg-gray-50 text-gray-400 border-transparent hover:text-gray-600'
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${lines.has(cfg.key) ? 'opacity-100' : 'opacity-30'}`} style={{ backgroundColor: cfg.color }} />
-                  {cfg.key}
-                </button>
-              ))}
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={trendData} margin={{ top: 5, right: 20, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis yAxisId="left"  tick={{ fontSize: 10 }} tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Legend />
-                {TREND_LINES.map(cfg => lines.has(cfg.key) && (
-                  <Line
-                    key={cfg.key}
-                    yAxisId={cfg.yAxis}
-                    type="monotone"
-                    dataKey={cfg.key}
-                    stroke={cfg.color}
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ─── main page ───────────────────────────────────────────────────────────────
 
 const GroupSalesReport: React.FC = () => {
@@ -213,9 +74,7 @@ const GroupSalesReport: React.FC = () => {
 
   const [selectedYear,  setSelectedYear]  = useState(currentYear);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
-  const [sortMetric,    setSortMetric]    = useState<'fyc' | 'fyct'>('fyc');
   const [trendLines,    setTrendLines]    = useState<Set<string>>(() => new Set(['FYCt', 'FYC']));
-  const [selectedAgent, setSelectedAgent] = useState<SalesReportType | null>(null);
   const [showDownload,  setShowDownload]  = useState(false);
 
   const toggleTrend = (key: string) =>
@@ -261,11 +120,7 @@ const GroupSalesReport: React.FC = () => {
 
   // ── Sorted agents ────────────────────────────────────────────────────────
 
-  const sortedReports = [...reports].sort((a, b) =>
-    sortMetric === 'fyc'
-      ? sum(b, 'month_fyc')  - sum(a, 'month_fyc')
-      : sum(b, 'month_fyct') - sum(a, 'month_fyct')
-  );
+  const sortedReports = [...reports].sort((a, b) => sum(b, 'month_fyct') - sum(a, 'month_fyct'));
 
   // ── Monthly trend data ───────────────────────────────────────────────────
 
@@ -333,16 +188,6 @@ const GroupSalesReport: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12">
-
-      {/* Agent detail slide-over */}
-      {selectedAgent && (
-        <AgentPanel
-          agent={selectedAgent}
-          selectedMonth={selectedMonth}
-          selectedYear={selectedYear}
-          onClose={() => setSelectedAgent(null)}
-        />
-      )}
 
       {/* ── Page header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -466,73 +311,58 @@ const GroupSalesReport: React.FC = () => {
         {/* ── Section 2: Agent Sales Progress ── */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 md:px-8 py-5 border-b border-gray-100 bg-gray-50/50">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h2 className="text-lg font-bold text-gray-900">Agent Sales Progress</h2>
-                  <span className="text-xs text-gray-400">{agentsTargetAchieved} of {reports.length} reached target</span>
-                </div>
-                {/* Group progress bars — FYC (green) + FYCt (blue) */}
-                <GroupBar
-                  label="Group FYC"
-                  value={totalFyc}
-                  total={groupTarget}
-                  pct={groupFycPct}
-                  color="#22c55e"
-                  fillClass="bg-green-500"
-                />
-                <GroupBar
-                  label="Group FYCt"
-                  value={totalFyct}
-                  total={groupTarget}
-                  pct={groupFyctPct}
-                  color="#3b82f6"
-                  fillClass="bg-blue-500"
-                />
+            <div>
+              <div className="flex items-center gap-3 flex-wrap mb-1">
+                <h2 className="text-lg font-bold text-gray-900">Agent Sales Progress</h2>
+                <span className="text-xs text-gray-400">{agentsTargetAchieved} of {reports.length} reached target</span>
               </div>
-              {/* Sort toggle */}
-              <div className="flex gap-1 bg-gray-100 rounded-xl p-1 flex-shrink-0 self-start mt-1">
-                <span className="self-center text-xs font-semibold text-gray-400 px-2">Sort</span>
-                {(['fyc', 'fyct'] as const).map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setSortMetric(m)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${sortMetric === m ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                  >
-                    {m.toUpperCase()}
-                  </button>
-                ))}
-              </div>
+              {/* Group progress bars — FYCt first, then FYC */}
+              <GroupBar
+                label="Group FYCt"
+                value={totalFyct}
+                total={groupTarget}
+                pct={groupFyctPct}
+                color="#3b82f6"
+                fillClass="bg-blue-500"
+              />
+              <GroupBar
+                label="Group FYC"
+                value={totalFyc}
+                total={groupTarget}
+                pct={groupFycPct}
+                color="#22c55e"
+                fillClass="bg-green-500"
+              />
             </div>
           </div>
 
-          {/* ── Agent card grid — all screen sizes ── */}
+          {/* ── Agent cards — single column, all screen sizes ── */}
           <div className="p-4 sm:p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+            <div className="space-y-3">
               {sortedReports.map((r, idx) => {
                 const agentFyc  = sum(r, 'month_fyc');
                 const agentFyct = sum(r, 'month_fyct');
                 const agentAce  = sum(r, 'month_ace');
                 const agentNoc  = sum(r, 'month_noc');
-                const tPct      = (agentFyc / DEFAULT_TARGET) * 100;
+                const fyctPct   = (agentFyct / DEFAULT_TARGET) * 100;
+                const fycPct    = (agentFyc  / DEFAULT_TARGET) * 100;
                 const shortage  = Math.max(DEFAULT_TARGET - agentFyc, 0);
-                const statusCfg = tPct >= 100
-                  ? { bar: 'bg-green-500',  badge: 'bg-green-100 text-green-700 border-green-200',   label: 'Target Met' }
-                  : tPct >= 75
-                  ? { bar: 'bg-blue-500',   badge: 'bg-blue-100 text-blue-700 border-blue-200',       label: 'On Track' }
-                  : tPct >= 25
-                  ? { bar: 'bg-amber-400',  badge: 'bg-amber-100 text-amber-700 border-amber-200',    label: 'Progressing' }
-                  : { bar: 'bg-red-400',    badge: 'bg-red-50 text-red-600 border-red-200',           label: 'Needs Attention' };
+                const statusCfg = fycPct >= 100
+                  ? { badge: 'bg-green-100 text-green-700 border-green-200',  label: 'Target Met' }
+                  : fycPct >= 75
+                  ? { badge: 'bg-blue-100 text-blue-700 border-blue-200',     label: 'On Track' }
+                  : fycPct >= 25
+                  ? { badge: 'bg-amber-100 text-amber-700 border-amber-200',  label: 'Progressing' }
+                  : { badge: 'bg-red-50 text-red-600 border-red-200',         label: 'Needs Attention' };
                 return (
-                  <button
+                  <div
                     key={r.id}
-                    onClick={() => setSelectedAgent(r)}
-                    className="w-full text-left bg-gray-50 hover:bg-blue-50/40 border border-gray-100 hover:border-blue-200 rounded-2xl p-4 transition-all group active:scale-[0.98]"
+                    className="bg-gray-50 border border-gray-100 rounded-2xl p-4"
                   >
                     {/* Name + status */}
-                    <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-start justify-between gap-2 mb-4">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="flex-shrink-0 w-7 h-7 rounded-full bg-white border border-gray-200 group-hover:border-blue-200 flex items-center justify-center text-xs font-bold text-gray-500 transition-colors">
+                        <span className="flex-shrink-0 w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-500">
                           {idx + 1}
                         </span>
                         <div className="min-w-0">
@@ -545,39 +375,52 @@ const GroupSalesReport: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Progress bar */}
+                    {/* FYCt progress bar */}
                     <div className="mb-3">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">FYC vs Target</span>
-                        <span className="text-xs font-bold text-gray-700">{tPct.toFixed(1)}%</span>
-                      </div>
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div className={`h-2 rounded-full ${statusCfg.bar} transition-all duration-700`} style={{ width: `${Math.min(tPct, 100)}%` }} />
-                      </div>
-                    </div>
-
-                    {/* Stats 2×2 */}
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { key: 'FYCt', value: rm(agentFyct), label: 'text-[10px] font-bold text-blue-400 uppercase mb-0.5',   num: 'text-sm font-bold text-blue-700 truncate' },
-                        { key: 'FYC',  value: rm(agentFyc),  label: 'text-[10px] font-bold text-green-400 uppercase mb-0.5',  num: 'text-sm font-bold text-green-700 truncate' },
-                        { key: 'ACE',  value: rm(agentAce),  label: 'text-[10px] font-bold text-gray-400 uppercase mb-0.5',   num: 'text-sm font-bold text-gray-700 truncate' },
-                        { key: 'NOC',  value: String(agentNoc), label: 'text-[10px] font-bold text-purple-400 uppercase mb-0.5', num: 'text-sm font-bold text-purple-700' },
-                      ].map(s => (
-                        <div key={s.key} className="bg-white rounded-xl p-2.5 border border-gray-100">
-                          <p className={s.label}>{s.key}</p>
-                          <p className={s.num}>{s.value}</p>
+                        <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wide">FYCt</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">{rm(agentFyct)}</span>
+                          <span className="text-xs font-bold text-blue-700">{fyctPct.toFixed(1)}%</span>
                         </div>
-                      ))}
+                      </div>
+                      <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-2.5 rounded-full bg-blue-500 transition-all duration-700" style={{ width: `${Math.min(fyctPct, 100)}%` }} />
+                      </div>
                     </div>
 
-                    {shortage > 0 && (
-                      <div className="mt-2.5 flex items-center gap-1.5 text-xs text-red-500 font-semibold">
-                        <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                        Shortage {rm(shortage)}
+                    {/* FYC progress bar */}
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] font-bold text-green-500 uppercase tracking-wide">FYC</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">{rm(agentFyc)}</span>
+                          <span className="text-xs font-bold text-green-700">{fycPct.toFixed(1)}%</span>
+                        </div>
                       </div>
-                    )}
-                  </button>
+                      <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className={`h-2.5 rounded-full transition-all duration-700 ${fycPct >= 100 ? 'bg-green-500' : fycPct >= 75 ? 'bg-green-400' : fycPct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${Math.min(fycPct, 100)}%` }} />
+                      </div>
+                    </div>
+
+                    {/* ACE · NOC · Shortage */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="bg-white rounded-xl px-3 py-2 border border-gray-100 flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">ACE</span>
+                        <span className="text-xs font-bold text-gray-700">{rm(agentAce)}</span>
+                      </div>
+                      <div className="bg-white rounded-xl px-3 py-2 border border-gray-100 flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-purple-400 uppercase">NOC</span>
+                        <span className="text-xs font-bold text-purple-700">{agentNoc}</span>
+                      </div>
+                      {shortage > 0 && (
+                        <div className="flex items-center gap-1.5 text-xs text-red-500 font-semibold">
+                          <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                          Shortage {rm(shortage)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
