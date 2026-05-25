@@ -543,7 +543,7 @@ const SalesReportPage: React.FC = () => {
       </div>
 
       {/* ── Section nav — dark blue ── */}
-      <div className="sticky top-0 z-20 bg-slate-800 rounded-xl shadow-md px-4 py-3 flex gap-1 overflow-x-auto">
+      <div className="hidden xl:flex sticky top-0 z-20 bg-slate-800 rounded-xl shadow-md px-4 py-3 gap-1 overflow-x-auto">
         {SECTIONS.map(s => (
           <button
             key={s.id}
