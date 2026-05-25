@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import {
   Download, TrendingUp, Award, Target, Users,
-  ChevronDown, AlertCircle, Loader2, ArrowLeft, X, Eye,
+  ChevronDown, AlertCircle, Loader2, ArrowLeft, X,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -42,15 +42,6 @@ const StatCard: React.FC<{
     </div>
     <p className="text-2xl font-bold text-gray-900">{value}</p>
     <p className="text-xs text-gray-400 mt-1">{sub}</p>
-  </div>
-);
-
-const MiniBar: React.FC<{ pct: number }> = ({ pct }) => (
-  <div className="h-2 w-20 bg-gray-200 rounded-full overflow-hidden">
-    <div
-      className={`h-2 rounded-full transition-all duration-500 ${pct >= 100 ? 'bg-green-500' : pct >= 75 ? 'bg-blue-500' : pct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`}
-      style={{ width: `${Math.min(pct, 100)}%` }}
-    />
   </div>
 );
 
@@ -515,157 +506,104 @@ const GroupSalesReport: React.FC = () => {
             </div>
           </div>
 
-          {/* ── Mobile agent cards (< md) ── */}
-          <div className="md:hidden divide-y divide-gray-100">
-            {sortedReports.map((r, idx) => {
-              const agentFyc  = sum(r, 'month_fyc');
-              const agentFyct = sum(r, 'month_fyct');
-              const agentAce  = sum(r, 'month_ace');
-              const agentNoc  = sum(r, 'month_noc');
-              const tPct      = (agentFyc / DEFAULT_TARGET) * 100;
-              const shortage  = Math.max(DEFAULT_TARGET - agentFyc, 0);
-              const barColor  = tPct >= 100 ? 'bg-green-500' : tPct >= 75 ? 'bg-blue-500' : tPct >= 25 ? 'bg-amber-400' : 'bg-red-400';
-              const textColor = tPct >= 100 ? 'text-green-600' : tPct >= 75 ? 'text-blue-600' : tPct >= 25 ? 'text-amber-600' : 'text-red-500';
-              return (
-                <button
-                  key={r.id}
-                  onClick={() => setSelectedAgent(r)}
-                  className="w-full text-left px-4 py-4 hover:bg-gray-50/70 transition-colors"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <span className="text-xs text-gray-400 font-bold mr-2">#{idx + 1}</span>
-                      <span className="text-sm font-semibold text-gray-900">{r.agent_name}</span>
-                      <span className="ml-2 text-xs text-gray-400">{r.agent_code}</span>
+          {/* ── Agent card grid — all screen sizes ── */}
+          <div className="p-4 sm:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+              {sortedReports.map((r, idx) => {
+                const agentFyc  = sum(r, 'month_fyc');
+                const agentFyct = sum(r, 'month_fyct');
+                const agentAce  = sum(r, 'month_ace');
+                const agentNoc  = sum(r, 'month_noc');
+                const tPct      = (agentFyc / DEFAULT_TARGET) * 100;
+                const shortage  = Math.max(DEFAULT_TARGET - agentFyc, 0);
+                const statusCfg = tPct >= 100
+                  ? { bar: 'bg-green-500',  badge: 'bg-green-100 text-green-700 border-green-200',   label: 'Target Met' }
+                  : tPct >= 75
+                  ? { bar: 'bg-blue-500',   badge: 'bg-blue-100 text-blue-700 border-blue-200',       label: 'On Track' }
+                  : tPct >= 25
+                  ? { bar: 'bg-amber-400',  badge: 'bg-amber-100 text-amber-700 border-amber-200',    label: 'Progressing' }
+                  : { bar: 'bg-red-400',    badge: 'bg-red-50 text-red-600 border-red-200',           label: 'Needs Attention' };
+                return (
+                  <button
+                    key={r.id}
+                    onClick={() => setSelectedAgent(r)}
+                    className="w-full text-left bg-gray-50 hover:bg-blue-50/40 border border-gray-100 hover:border-blue-200 rounded-2xl p-4 transition-all group active:scale-[0.98]"
+                  >
+                    {/* Name + status */}
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="flex-shrink-0 w-7 h-7 rounded-full bg-white border border-gray-200 group-hover:border-blue-200 flex items-center justify-center text-xs font-bold text-gray-500 transition-colors">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-gray-900 truncate leading-snug">{r.agent_name}</p>
+                          <p className="text-xs text-gray-400">{r.agent_code}</p>
+                        </div>
+                      </div>
+                      <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-full border ${statusCfg.badge}`}>
+                        {statusCfg.label}
+                      </span>
                     </div>
-                    <span className={`text-sm font-bold ${textColor}`}>{tPct.toFixed(1)}%</span>
+
+                    {/* Progress bar */}
+                    <div className="mb-3">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">FYC vs Target</span>
+                        <span className="text-xs font-bold text-gray-700">{tPct.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div className={`h-2 rounded-full ${statusCfg.bar} transition-all duration-700`} style={{ width: `${Math.min(tPct, 100)}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Stats 2×2 */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { key: 'FYCt', value: rm(agentFyct), label: 'text-[10px] font-bold text-blue-400 uppercase mb-0.5',   num: 'text-sm font-bold text-blue-700 truncate' },
+                        { key: 'FYC',  value: rm(agentFyc),  label: 'text-[10px] font-bold text-green-400 uppercase mb-0.5',  num: 'text-sm font-bold text-green-700 truncate' },
+                        { key: 'ACE',  value: rm(agentAce),  label: 'text-[10px] font-bold text-gray-400 uppercase mb-0.5',   num: 'text-sm font-bold text-gray-700 truncate' },
+                        { key: 'NOC',  value: String(agentNoc), label: 'text-[10px] font-bold text-purple-400 uppercase mb-0.5', num: 'text-sm font-bold text-purple-700' },
+                      ].map(s => (
+                        <div key={s.key} className="bg-white rounded-xl p-2.5 border border-gray-100">
+                          <p className={s.label}>{s.key}</p>
+                          <p className={s.num}>{s.value}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {shortage > 0 && (
+                      <div className="mt-2.5 flex items-center gap-1.5 text-xs text-red-500 font-semibold">
+                        <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                        Shortage {rm(shortage)}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Group totals summary */}
+            <div className="mt-4 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                Group Total · {periodLabel}
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { key: 'FYCt', value: rm(totalFyct),      dot: 'bg-blue-400',   num: 'text-base font-bold text-blue-700' },
+                  { key: 'FYC',  value: rm(totalFyc),       dot: 'bg-green-400',  num: 'text-base font-bold text-green-700' },
+                  { key: 'ACE',  value: rm(totalAce),       dot: 'bg-gray-400',   num: 'text-base font-bold text-gray-700' },
+                  { key: 'NOC',  value: String(totalNoc),   dot: 'bg-purple-400', num: 'text-base font-bold text-purple-700' },
+                ].map(s => (
+                  <div key={s.key} className="bg-white rounded-xl p-3 border border-slate-100">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.dot}`} />
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">{s.key}</p>
+                    </div>
+                    <p className={`${s.num} truncate`}>{s.value}</p>
                   </div>
-                  {/* Progress bar */}
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-2">
-                    <div className={`h-2 rounded-full ${barColor}`} style={{ width: `${Math.min(tPct, 100)}%` }} />
-                  </div>
-                  {/* Stat row */}
-                  <div className="grid grid-cols-4 gap-2 text-center">
-                    <div>
-                      <p className="text-[10px] text-gray-400 uppercase font-semibold">FYC</p>
-                      <p className="text-xs font-bold text-green-700">{rm(agentFyc)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-gray-400 uppercase font-semibold">FYCt</p>
-                      <p className="text-xs font-bold text-blue-700">{rm(agentFyct)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-gray-400 uppercase font-semibold">ACE</p>
-                      <p className="text-xs font-bold text-gray-700">{rm(agentAce)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-gray-400 uppercase font-semibold">NOC</p>
-                      <p className="text-xs font-bold text-gray-700">{agentNoc}</p>
-                    </div>
-                  </div>
-                  {shortage > 0 && (
-                    <p className="text-[10px] text-red-400 mt-1.5">Shortage: {rm(shortage)}</p>
-                  )}
-                </button>
-              );
-            })}
-            {/* Mobile totals */}
-            <div className="px-4 py-3 bg-gray-50 border-t-2 border-gray-200">
-              <p className="text-xs font-bold text-gray-500 uppercase mb-2">Group Total</p>
-              <div className="grid grid-cols-4 gap-2 text-center">
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase font-semibold">FYC</p>
-                  <p className="text-xs font-bold text-green-700">{rm(totalFyc)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase font-semibold">FYCt</p>
-                  <p className="text-xs font-bold text-blue-700">{rm(totalFyct)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase font-semibold">ACE</p>
-                  <p className="text-xs font-bold text-gray-700">{rm(totalAce)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-400 uppercase font-semibold">NOC</p>
-                  <p className="text-xs font-bold text-gray-700">{totalNoc}</p>
-                </div>
+                ))}
               </div>
             </div>
-          </div>
-
-          {/* ── Desktop/tablet agent table (md+) ── */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left w-8">#</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Agent</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">FYCt YTD</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">FYC YTD</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-left">Progress</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Target %</th>
-                  <th className="hidden lg:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">ACE</th>
-                  <th className="hidden lg:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">NOC</th>
-                  <th className="hidden lg:table-cell px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Shortage</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">View</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {sortedReports.map((r, idx) => {
-                  const agentFyc  = sum(r, 'month_fyc');
-                  const agentFyct = sum(r, 'month_fyct');
-                  const agentAce  = sum(r, 'month_ace');
-                  const agentNoc  = sum(r, 'month_noc');
-                  const tPct      = (agentFyc / DEFAULT_TARGET) * 100;
-                  const tColor    = tPct >= 100 ? 'text-green-600' : tPct >= 75 ? 'text-blue-600' : tPct >= 25 ? 'text-amber-600' : 'text-red-500';
-                  return (
-                    <tr key={r.id} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-3 text-xs text-gray-400 font-bold">{idx + 1}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-800">
-                        <button
-                          onClick={() => setSelectedAgent(r)}
-                          className="text-left hover:text-blue-600 transition-colors"
-                        >
-                          {r.agent_name}
-                          <span className="ml-2 text-xs text-gray-400 font-normal">{r.agent_code}</span>
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-blue-700 font-medium">{rm(agentFyct)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-green-700 font-medium">{rm(agentFyc)}</td>
-                      <td className="px-4 py-3">
-                        <MiniBar pct={tPct} />
-                      </td>
-                      <td className={`px-4 py-3 text-sm text-right font-bold ${tColor}`}>{tPct.toFixed(1)}%</td>
-                      <td className="hidden lg:table-cell px-4 py-3 text-sm text-right text-gray-700">{rm(agentAce)}</td>
-                      <td className="hidden lg:table-cell px-4 py-3 text-sm text-right text-gray-700">{agentNoc}</td>
-                      <td className="hidden lg:table-cell px-4 py-3 text-sm text-right text-red-500">{rm(Math.max(DEFAULT_TARGET - agentFyc, 0))}</td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => setSelectedAgent(r)}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                          title={`View ${r.agent_name}'s report`}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {/* Totals row */}
-                <tr className="border-t-2 border-gray-200 bg-gray-50 font-bold">
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3 text-sm text-gray-900">Group Total</td>
-                  <td className="px-4 py-3 text-sm text-right text-blue-700">{rm(totalFyct)}</td>
-                  <td className="px-4 py-3 text-sm text-right text-green-700">{rm(totalFyc)}</td>
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3 text-sm text-right text-gray-500">{groupFycPct.toFixed(1)}% avg</td>
-                  <td className="hidden lg:table-cell px-4 py-3 text-sm text-right text-gray-900">{rm(totalAce)}</td>
-                  <td className="hidden lg:table-cell px-4 py-3 text-sm text-right text-gray-900">{totalNoc}</td>
-                  <td className="hidden lg:table-cell px-4 py-3 text-sm text-right text-gray-500">—</td>
-                  <td className="px-4 py-3" />
-                </tr>
-              </tbody>
-            </table>
           </div>
         </div>
 
