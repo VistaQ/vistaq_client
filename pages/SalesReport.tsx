@@ -263,13 +263,45 @@ const SalesReportPage: React.FC = () => {
     return row;
   };
 
-  // ─── Download: Excel ─────────────────────────────────────────────────────
+  // ─── Download: Excel (ETL-standard format) ───────────────────────────────
   const downloadExcel = () => {
     const row = buildReportRow();
     if (!row) return;
-    const ws = XLSX.utils.json_to_sheet([row]);
+
+    // Sheet 1 — ETL summary row (matches company format)
+    const wsSummary = XLSX.utils.json_to_sheet([row]);
+    // Set column widths: first 9 columns wider, monthly columns narrower
+    const colWidths = [
+      { wch: 14 }, // Agent Code
+      { wch: 24 }, // Agent Name
+      { wch: 14 }, // FYCt (YTD)
+      { wch: 10 }, // % FYCt
+      { wch: 14 }, // FYC (YTD)
+      { wch: 10 }, // % FYC
+      { wch: 16 }, // Shortage (FYC)
+      { wch: 14 }, // ACE (YTD)
+      { wch: 10 }, // NOC (YTD)
+      ...Array(48).fill({ wch: 12 }), // 12 months × 4 metrics
+    ];
+    wsSummary['!cols'] = colWidths;
+
+    // Sheet 2 — monthly breakdown (human-readable)
+    const monthlyRows = myReport
+      ? MONTH_LABELS.map((month, idx) => ({
+          Month:  month,
+          'FYCt': myReport!.month_fyct?.[idx] ?? 0,
+          'FYC':  myReport!.month_fyc?.[idx]  ?? 0,
+          'ACE':  myReport!.month_ace?.[idx]  ?? 0,
+          'NOC':  myReport!.month_noc?.[idx]  ?? 0,
+        }))
+      : [];
+
+    const wsMonthly = XLSX.utils.json_to_sheet(monthlyRows);
+    wsMonthly['!cols'] = [{ wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 8 }];
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Sales Report');
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'ETL Summary');
+    if (monthlyRows.length > 0) XLSX.utils.book_append_sheet(wb, wsMonthly, 'Monthly Breakdown');
     XLSX.writeFile(wb, `VistaQ_SalesReport_${MONTH_LABELS[n - 1]}_${selectedYear}.xlsx`);
   };
 
@@ -295,155 +327,300 @@ const SalesReportPage: React.FC = () => {
   // ─── Download: PDF ────────────────────────────────────────────────────────
   const downloadPDF = () => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const W = doc.internal.pageSize.getWidth();
-    const slate800   = [30, 41, 59]   as [number, number, number];
-    const green600   = [22, 163, 74]  as [number, number, number];
-    const blue600    = [37, 99, 235]  as [number, number, number];
-    const gray100    = [243, 244, 246] as [number, number, number];
-    const gray600    = [75, 85, 99]   as [number, number, number];
+    const PW = doc.internal.pageSize.getWidth();
+    const PH = doc.internal.pageSize.getHeight();
+    const M  = 14; // margin
+    const CW = PW - M * 2; // content width
 
-    // ── Header bar ──
-    doc.setFillColor(...slate800);
-    doc.rect(0, 0, W, 38, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
+    // ── Palette ──
+    const navy     = [15,  23,  42]  as [number,number,number]; // slate-900
+    const blue600  = [37,  99,  235] as [number,number,number];
+    const blue50   = [239, 246, 255] as [number,number,number];
+    const green600 = [22,  163, 74]  as [number,number,number];
+    const green50  = [240, 253, 244] as [number,number,number];
+    const teal600  = [13,  148, 136] as [number,number,number];
+    const teal50   = [240, 253, 250] as [number,number,number];
+    const purple600= [124, 58,  237] as [number,number,number];
+    const purple50 = [245, 243, 255] as [number,number,number];
+    const slate700 = [51,  65,  85]  as [number,number,number];
+    const slate500 = [100, 116, 139] as [number,number,number];
+    const slate200 = [226, 232, 240] as [number,number,number];
+    const slate50c = [248, 250, 252] as [number,number,number];
+    const red500   = [239, 68,  68]  as [number,number,number];
+    const white    = [255, 255, 255] as [number,number,number];
+    const muted    = [148, 163, 184] as [number,number,number]; // slate-400
+
+    let y = 0;
+    const checkPage = (need: number) => { if (y + need > PH - 18) { doc.addPage(); y = 20; } };
+
+    // ════════════════════════════════════════════════════════════
+    // PAGE 1 — HEADER BANNER
+    // ════════════════════════════════════════════════════════════
+    // Navy background
+    doc.setFillColor(...navy);
+    doc.rect(0, 0, PW, 54, 'F');
+    // Blue accent stripe at top
+    doc.setFillColor(...blue600);
+    doc.rect(0, 0, PW, 2.5, 'F');
+
+    // Brand name
+    doc.setTextColor(...white);
     doc.setFont('helvetica', 'bold');
-    doc.text('VistaQ', 14, 13);
-    doc.setFontSize(11);
+    doc.setFontSize(22);
+    doc.text('VistaQ', M, 17);
+    // Report title
     doc.setFont('helvetica', 'normal');
-    doc.text('Sales Report', 14, 21);
-    doc.setFontSize(9);
-    doc.setTextColor(180, 190, 210);
-    const agentLine = myReport
-      ? `${myReport.agent_name}  ·  ${myReport.agent_code}`
-      : currentUser?.name ?? '';
-    doc.text(agentLine, 14, 29);
-    doc.text(`Period: ${periodLabel}`, 14, 35);
-    doc.setTextColor(...gray600);
+    doc.setFontSize(10);
+    doc.setTextColor(...muted);
+    doc.text('Sales Performance Report', M, 26);
+    // Period + date
     doc.setFontSize(8);
-    doc.text(`Generated: ${new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'long', year: 'numeric' })}`, W - 14, 35, { align: 'right' });
+    doc.text(`Period: ${periodLabel}`, M, 34);
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'long', year: 'numeric' })}`, M, 41);
+    doc.text(`Data source: Company ETL records  ·  FYCt Target: ${rm(salesTarget)}  ·  FYC Target: ${rm(fycTarget)}`, M, 48);
 
-    let y = 46;
-
-    // ── Data source note ──
-    doc.setFillColor(239, 246, 255); // blue-50
-    doc.setDrawColor(191, 219, 254); // blue-200
-    doc.roundedRect(14, y, W - 28, 12, 2, 2, 'FD');
-    doc.setFontSize(7.5);
-    doc.setTextColor(30, 64, 175); // blue-800
-    doc.setFont('helvetica', 'bold');
-    doc.text('Data sources:', 18, y + 5);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Sales figures (FYCt, FYC, ACE, NOC) — Company ETL records   ·   Annual target (${rm(salesTarget)}) — Agent profile setting`, 42, y + 5);
-    doc.setFont('helvetica', 'italic');
-    doc.text('Target can be updated anytime in the Profile page.', 18, y + 10);
-    y += 17;
-
-    // ── Section helper ──
-    const sectionHeader = (title: string, color: [number, number, number]) => {
-      doc.setFillColor(...color);
-      doc.rect(14, y, 3, 7, 'F');
-      doc.setTextColor(...color);
-      doc.setFontSize(11);
+    // Agent block (right side)
+    if (myReport) {
+      doc.setTextColor(...white);
       doc.setFont('helvetica', 'bold');
-      doc.text(title, 19, y + 5.5);
-      y += 12;
-    };
-
-    // ── MILESTONE ──
-    sectionHeader('Sales Milestone', blue600);
-
-    autoTable(doc, {
-      startY: y,
-      head: [['Metric', 'MTD', 'YTD', 'Profile Target', '% of Target', 'Shortage']],
-      body: [
-        ['FYCt', rm(mtdFyct), rm(ytdFyct), rm(salesTarget), `${(salesTarget > 0 ? (ytdFyct / salesTarget) * 100 : 0).toFixed(2)}%`, rm(Math.max(salesTarget - ytdFyct, 0))],
-        ['FYC',  rm(mtdFyc),  rm(ytdFyc),  rm(fycTarget),  `${(fycTarget  > 0 ? (ytdFyc  / fycTarget)  * 100 : 0).toFixed(2)}%`, rm(Math.max(fycTarget  - ytdFyc,  0))],
-        ['ACE',  rm(mtdAce),  rm(ytdAce),  '—', '—', '—'],
-        ['NOC',  String(mtdNoc), String(ytdNoc), '—', '—', '—'],
-      ],
-      headStyles: { fillColor: slate800, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-      bodyStyles: { fontSize: 8 },
-      alternateRowStyles: { fillColor: gray100 },
-      columnStyles: {
-        4: { fontStyle: 'bold', textColor: blue600 },
-        5: { textColor: [220, 38, 38] },
-      },
-      margin: { left: 14, right: 14 },
-    });
-    y = (doc as any).lastAutoTable.finalY + 6;
-
-    // Progress bars (visual)
-    const drawBar = (label: string, value: number, target: number, color: [number, number, number]) => {
-      const barW = W - 28;
-      const fillW = target > 0 ? Math.min((value / target), 1) * barW : 0;
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...color);
-      doc.text(label, 14, y);
+      doc.setFontSize(12);
+      doc.text(myReport.agent_name, PW - M, 19, { align: 'right' });
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(...gray600);
-      doc.text(`${rm(value)} of ${rm(target)}  (${target > 0 ? ((value / target) * 100).toFixed(1) : '0.0'}%)`, W - 14, y, { align: 'right' });
-      y += 4;
-      doc.setFillColor(229, 231, 235);
-      doc.roundedRect(14, y, barW, 4, 2, 2, 'F');
-      if (fillW > 0) {
-        doc.setFillColor(...color);
-        doc.roundedRect(14, y, fillW, 4, 2, 2, 'F');
-      }
-      y += 8;
-    };
-    drawBar('FYC Progress',  ytdFyc,  fycTarget,   green600);
-    drawBar('FYCt Progress', ytdFyct, salesTarget, blue600);
+      doc.setFontSize(8.5);
+      doc.setTextColor(...muted);
+      doc.text(myReport.agent_code, PW - M, 27, { align: 'right' });
+    } else {
+      doc.setTextColor(...white);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text(currentUser?.name ?? '', PW - M, 19, { align: 'right' });
+    }
 
+    y = 62;
+
+    // ── KPI Summary Cards ──
+    const cardW = (CW - 9) / 4;
+    const kpiCards: Array<{ label: string; value: string; sub: string; color: [number,number,number]; bg: [number,number,number] }> = [
+      { label: 'FYCt YTD',  value: rm(ytdFyct),        sub: `Avg ${rm(avgFyct)} / mo`, color: blue600,   bg: blue50   },
+      { label: 'FYC YTD',   value: rm(ytdFyc),          sub: `Avg ${rm(avgFyc)} / mo`,  color: green600,  bg: green50  },
+      { label: 'ACE YTD',   value: rm(ytdAce),          sub: `Avg ${rm(avgAce)} / mo`,  color: teal600,   bg: teal50   },
+      { label: 'NOC YTD',   value: String(ytdNoc),      sub: `${avgNoc.toFixed(1)} avg / mo`,  color: purple600, bg: purple50 },
+    ];
+    kpiCards.forEach((c, i) => {
+      const cx = M + i * (cardW + 3);
+      // Card background
+      doc.setFillColor(...c.bg);
+      doc.setDrawColor(...c.color);
+      doc.roundedRect(cx, y, cardW, 24, 2, 2, 'FD');
+      // Coloured top strip
+      doc.setFillColor(...c.color);
+      doc.roundedRect(cx, y, cardW, 4, 2, 2, 'F');
+      doc.rect(cx, y + 2, cardW, 2, 'F'); // fill lower corners of strip
+      // Label
+      doc.setTextColor(...c.color);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.text(c.label, cx + cardW / 2, y + 10, { align: 'center' });
+      // Value
+      doc.setTextColor(...slate700);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text(c.value, cx + cardW / 2, y + 17, { align: 'center' });
+      // Sub-label
+      doc.setTextColor(...slate500);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.text(c.sub, cx + cardW / 2, y + 22, { align: 'center' });
+    });
+    y += 31;
+
+    // ── Target Progress Bars ──
+    // Section label
+    doc.setFillColor(...slate50c);
+    doc.setDrawColor(...slate200);
+    doc.roundedRect(M, y, CW, 7, 1.5, 1.5, 'FD');
+    doc.setTextColor(...slate700);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('Sales Target Progress', M + 4, y + 5);
+    y += 11;
+
+    const drawProgressBar = (
+      label: string, value: number, target: number,
+      color: [number,number,number],
+    ) => {
+      const pct    = target > 0 ? Math.min(value / target, 1) : 0;
+      const fillW  = pct * CW;
+      const pctStr = `${(pct * 100).toFixed(1)}%`;
+      const short  = Math.max(target - value, 0);
+      // Label row
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(...color);
+      doc.text(label, M, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...slate500);
+      doc.text(`${rm(value)}  of  ${rm(target)}`, PW - M - 18, y, { align: 'right' });
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...color);
+      doc.text(pctStr, PW - M, y, { align: 'right' });
+      y += 4.5;
+      // Track
+      doc.setFillColor(...slate200);
+      doc.roundedRect(M, y, CW, 5, 2, 2, 'F');
+      // Fill
+      if (fillW > 0.5) {
+        doc.setFillColor(...color);
+        doc.roundedRect(M, y, fillW, 5, 2, 2, 'F');
+      }
+      y += 7.5;
+      // Shortage chip
+      if (short > 0) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(...red500);
+        doc.text(`Shortage: ${rm(short)}`, PW - M, y - 1, { align: 'right' });
+      }
+      y += 2;
+    };
+
+    drawProgressBar('FYCt', ytdFyct, salesTarget, blue600);
+    drawProgressBar('FYC',  ytdFyc,  fycTarget,   green600);
     y += 4;
 
-    // ── PIPELINE ──
-    if (y > 220) { doc.addPage(); y = 20; }
-    sectionHeader('Pipeline', [99, 102, 241]);
+    // ── Pipeline ──
+    checkPage(55);
+    doc.setFillColor(...slate50c);
+    doc.setDrawColor(...slate200);
+    doc.roundedRect(M, y, CW, 7, 1.5, 1.5, 'FD');
+    doc.setTextColor(...slate700);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('Pipeline', M + 4, y + 5);
+    y += 11;
 
     autoTable(doc, {
       startY: y,
-      head: [['Stage', 'Month to Date', 'Year to Date', 'Conversion Rate (YTD)']],
+      head: [['Stage', 'MTD', 'YTD', 'Conv. Rate (YTD)']],
       body: [
         ['Prospects',      String(g), String(G), '—'],
         ['Appointments',   String(h), String(H), divOrDash(H, G)],
         ['Sales Meetings', String(i), String(I), divOrDash(I, H)],
         ['Sales (Closed)', String(j), String(J), divOrDash(J, I)],
       ],
-      headStyles: { fillColor: slate800, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-      bodyStyles: { fontSize: 8 },
-      alternateRowStyles: { fillColor: gray100 },
-      margin: { left: 14, right: 14 },
+      headStyles:           { fillColor: navy, textColor: white, fontStyle: 'bold', fontSize: 8.5, cellPadding: 3 },
+      bodyStyles:           { fontSize: 8.5, cellPadding: 2.5 },
+      alternateRowStyles:   { fillColor: slate50c },
+      columnStyles:         { 3: { fontStyle: 'bold', textColor: [37, 99, 235] } },
+      margin:               { left: M, right: M },
     });
-    y = (doc as any).lastAutoTable.finalY + 10;
+    y = (doc as any).lastAutoTable.finalY + 6;
 
-    // ── PRODUCTS ──
+    // Conversion rate summary chips (3 in a row)
+    const convData = [
+      { label: 'Appt Rate',    value: divOrDash(H, G), color: [99,  102, 241] as [number,number,number], bg: [238, 242, 255] as [number,number,number] },
+      { label: 'Show-up Rate', value: divOrDash(I, H), color: [14,  165, 233] as [number,number,number], bg: [240, 249, 255] as [number,number,number] },
+      { label: 'Closing Rate', value: divOrDash(J, I), color: [16,  185, 129] as [number,number,number], bg: [240, 253, 250] as [number,number,number] },
+    ];
+    const chipW = (CW - 6) / 3;
+    checkPage(18);
+    convData.forEach((cr, i) => {
+      const cx = M + i * (chipW + 3);
+      doc.setFillColor(...cr.bg);
+      doc.setDrawColor(...cr.color);
+      doc.roundedRect(cx, y, chipW, 15, 2, 2, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(...cr.color);
+      doc.text(cr.value, cx + chipW / 2, y + 9, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(...slate500);
+      doc.text(cr.label, cx + chipW / 2, y + 13.5, { align: 'center' });
+    });
+    y += 21;
+
+    // ── ETL Summary table ──
+    checkPage(40);
+    doc.setFillColor(...slate50c);
+    doc.setDrawColor(...slate200);
+    doc.roundedRect(M, y, CW, 7, 1.5, 1.5, 'FD');
+    doc.setTextColor(...slate700);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('ETL Summary', M + 4, y + 5);
+    y += 11;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Metric', 'MTD', 'YTD', 'Profile Target', '% of Target', 'Shortage']],
+      body: [
+        ['FYCt', rm(mtdFyct), rm(ytdFyct), rm(salesTarget), `${(salesTarget > 0 ? (ytdFyct / salesTarget) * 100 : 0).toFixed(1)}%`, rm(Math.max(salesTarget - ytdFyct, 0))],
+        ['FYC',  rm(mtdFyc),  rm(ytdFyc),  rm(fycTarget),  `${(fycTarget  > 0 ? (ytdFyc  / fycTarget)  * 100 : 0).toFixed(1)}%`, rm(Math.max(fycTarget  - ytdFyc,  0))],
+        ['ACE',  rm(mtdAce),  rm(ytdAce),  '—', '—', '—'],
+        ['NOC',  String(mtdNoc), String(ytdNoc), '—', '—', '—'],
+      ],
+      headStyles:         { fillColor: navy, textColor: white, fontStyle: 'bold', fontSize: 8.5, cellPadding: 3 },
+      bodyStyles:         { fontSize: 8.5, cellPadding: 2.5 },
+      alternateRowStyles: { fillColor: slate50c },
+      columnStyles: {
+        4: { fontStyle: 'bold', textColor: blue600 },
+        5: { textColor: red500 },
+      },
+      margin: { left: M, right: M },
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+
+    // ── Products ──
     if (productRows.length > 0) {
-      if (y > 220) { doc.addPage(); y = 20; }
-      sectionHeader('Product Summary', [16, 185, 129]);
+      checkPage(40);
+      doc.setFillColor(...slate50c);
+      doc.setDrawColor(...slate200);
+      doc.roundedRect(M, y, CW, 7, 1.5, 1.5, 'FD');
+      doc.setTextColor(...slate700);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('Product Summary', M + 4, y + 5);
+      y += 11;
 
       autoTable(doc, {
         startY: y,
         head: [['Product', 'Cases', 'Total ACE']],
         body: [
           ...productRows.map(r => [r.name, String(r.count), rm(r.ace)]),
-          ['TOTAL', String(totalProdCount), rm(totalProdACE)],
         ],
-        headStyles: { fillColor: slate800, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-        bodyStyles: { fontSize: 8 },
-        alternateRowStyles: { fillColor: gray100 },
-        footStyles: { fontStyle: 'bold' },
-        margin: { left: 14, right: 14 },
+        foot: [['Total', String(totalProdCount), rm(totalProdACE)]],
+        headStyles:   { fillColor: navy, textColor: white, fontStyle: 'bold', fontSize: 8.5, cellPadding: 3 },
+        bodyStyles:   { fontSize: 8.5, cellPadding: 2.5 },
+        footStyles:   { fillColor: slate200, fontStyle: 'bold', fontSize: 8.5, cellPadding: 2.5, textColor: slate700 },
+        alternateRowStyles: { fillColor: slate50c },
+        margin: { left: M, right: M },
       });
-      y = (doc as any).lastAutoTable.finalY + 10;
+      y = (doc as any).lastAutoTable.finalY + 8;
     }
 
-    // ── MONTHLY BREAKDOWN ──
+    // ════════════════════════════════════════════════════════════
+    // PAGE 2 — MONTHLY BREAKDOWN
+    // ════════════════════════════════════════════════════════════
     if (myReport) {
       doc.addPage();
-      y = 20;
-      sectionHeader('Monthly Breakdown', [168, 85, 247]);
+
+      // Thin header bar on continuation pages
+      doc.setFillColor(...navy);
+      doc.rect(0, 0, PW, 14, 'F');
+      doc.setFillColor(...blue600);
+      doc.rect(0, 0, PW, 2.5, 'F');
+      doc.setTextColor(...white);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('VistaQ  ·  Monthly Breakdown', M, 10);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...muted);
+      doc.text(periodLabel, PW - M, 10, { align: 'right' });
+      y = 22;
 
       autoTable(doc, {
         startY: y,
@@ -455,24 +632,37 @@ const SalesReportPage: React.FC = () => {
           rm(myReport!.month_ace?.[idx]  ?? 0),
           String(myReport!.month_noc?.[idx] ?? 0),
         ]),
-        headStyles: { fillColor: slate800, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-        bodyStyles: { fontSize: 8 },
-        alternateRowStyles: { fillColor: gray100 },
-        margin: { left: 14, right: 14 },
+        foot: [
+          ['YTD Total',    rm(ytdFyct), rm(ytdFyc), rm(ytdAce), String(ytdNoc)],
+          ['Monthly Avg',  rm(avgFyct), rm(avgFyc), rm(avgAce), avgNoc.toFixed(1)],
+        ],
+        headStyles:   { fillColor: navy, textColor: white, fontStyle: 'bold', fontSize: 9, cellPadding: 3.5 },
+        bodyStyles:   { fontSize: 9, cellPadding: 3 },
+        footStyles:   { fillColor: slate200, fontStyle: 'bold', fontSize: 9, cellPadding: 3, textColor: slate700 },
+        alternateRowStyles: { fillColor: slate50c },
+        columnStyles: {
+          1: { textColor: blue600 },
+          2: { textColor: green600 },
+          3: { textColor: teal600 },
+          4: { textColor: purple600 },
+        },
+        margin: { left: M, right: M },
       });
     }
 
-    // ── Footer ──
+    // ════════════════════════════════════════════════════════════
+    // FOOTER — all pages
+    // ════════════════════════════════════════════════════════════
     const pageCount = (doc as any).internal.getNumberOfPages();
     for (let p = 1; p <= pageCount; p++) {
       doc.setPage(p);
-      const pageH = doc.internal.pageSize.getHeight();
-      doc.setFillColor(...gray100);
-      doc.rect(0, pageH - 10, W, 10, 'F');
+      doc.setFillColor(...navy);
+      doc.rect(0, PH - 10, PW, 10, 'F');
       doc.setFontSize(7);
-      doc.setTextColor(...gray600);
-      doc.text('VistaQ · Confidential', 14, pageH - 3.5);
-      doc.text(`Page ${p} of ${pageCount}`, W - 14, pageH - 3.5, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...muted);
+      doc.text('VistaQ  ·  Sales Performance Report  ·  Confidential', M, PH - 3.5);
+      doc.text(`Page ${p} of ${pageCount}`, PW - M, PH - 3.5, { align: 'right' });
     }
 
     doc.save(`VistaQ_SalesReport_${MONTH_LABELS[n - 1]}_${selectedYear}.pdf`);
