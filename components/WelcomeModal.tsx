@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { UserRole, ProspectStage } from '../types';
+import { APP_VERSION } from '../constants/tokens';
 
 // ─── Greeting ─────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,10 @@ const WelcomeModal: React.FC = () => {
 
   const sessionKey = `welcomeShown_${currentUser?.id ?? 'anon'}`;
   const alreadyShownThisSession = sessionStorage.getItem(sessionKey) === '1';
-  const [visible, setVisible] = useState(isTargetRole && !alreadyShownThisSession);
+  // Don't show while the What's New modal is still up (same session)
+  const whatsNewKey = `whatsNew_v${APP_VERSION}_${currentUser?.id ?? 'anon'}`;
+  const whatsNewDismissed = localStorage.getItem(whatsNewKey) === '1';
+  const [visible, setVisible] = useState(isTargetRole && !alreadyShownThisSession && whatsNewDismissed);
 
   const myProspects = useMemo(() => {
     if (!currentUser) return [];
