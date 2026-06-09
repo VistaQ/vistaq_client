@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import WelcomeModal from './WelcomeModal';
+import WhatsNewModal from './WhatsNewModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -148,7 +149,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex items-center">
             <img src="/vistaq-logo.png" alt="VistaQ" className="h-12 w-auto" />
           </div>
-          <p className="text-xs text-gray-400 mt-1 tracking-wide">Version 2.0</p>
+          <p className="text-xs text-gray-400 mt-1 tracking-wide">Version 3.0</p>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-6 space-y-1">
@@ -339,7 +340,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </main>
       </div>
 
-      {/* Welcome modal */}
+      {/* What's New modal — shows once per version, blocks daily briefing until dismissed */}
+      <WhatsNewModal />
+      {/* Daily Briefing modal */}
       <WelcomeModal />
     </div>
   );

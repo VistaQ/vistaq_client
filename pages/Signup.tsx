@@ -169,6 +169,7 @@ const Signup: React.FC = () => {
             <img src="/vistaq-logo.png" alt="VistaQ" className="h-16 w-auto" />
           </div>
           <p className="text-blue-100 text-sm tracking-wide">Join the Sales Team</p>
+          <p className="text-blue-200/70 text-sm mt-1">Version 3.0</p>
         </div>
 
         <div className="p-8">
