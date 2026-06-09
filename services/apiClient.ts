@@ -55,12 +55,13 @@ export const apiCall = async <T = any>(endpoint: string, options: ApiCallOptions
   }
 
   if (response.status === 401) {
-    // Only hard-redirect when a token existed (session expired).
+    // Only trigger the session-expired flow when a token existed (session expired).
     // Unauthenticated calls (no token) should just throw so the caller handles it.
     if (localStorage.getItem('authToken')) {
       localStorage.removeItem('authToken');
       localStorage.removeItem('authUser');
-      window.location.href = '/login';
+      // Notify AuthContext to show the session expired modal instead of a hard redirect.
+      window.dispatchEvent(new CustomEvent('vistaq:session-expired'));
     }
     throw { status: 401, message: 'Session expired. Please log in again.' } as ApiError;
   }
