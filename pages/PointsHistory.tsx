@@ -145,9 +145,12 @@ const PointsHistory: React.FC = () => {
       : 'N/A';
   };
 
-  const prospectEntries = pointsData.breakdown.filter(e => e.category === 'prospect');
-  const salesEntries    = pointsData.breakdown.filter(e => e.category === 'sales');
-  const coachingEntries = pointsData.breakdown.filter(e => e.category === 'coaching');
+  // Filter out entries tied to deleted prospects (subject is null) so they never surface in any category.
+  const validBreakdown = pointsData.breakdown.filter(e => e.subject != null);
+
+  const prospectEntries = validBreakdown.filter(e => e.category === 'prospect');
+  const salesEntries    = validBreakdown.filter(e => e.category === 'sales');
+  const coachingEntries = validBreakdown.filter(e => e.category === 'coaching');
 
   const historyEntries = historyCategory === 'prospect' ? prospectEntries
     : historyCategory === 'sales'    ? salesEntries
@@ -435,7 +438,7 @@ const PointsHistory: React.FC = () => {
             </div>
 
             {/* Modal body */}
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto flex-1 px-4 py-3 space-y-2">
               {historyEntries.length === 0 ? (
                 <div className="flex flex-col items-center py-16 text-gray-400">
                   <TrendingUp className="w-8 h-8 mb-3" />
@@ -449,34 +452,22 @@ const PointsHistory: React.FC = () => {
                   </p>
                 </div>
               ) : (
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
-                    <tr>
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Action</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Subject</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase text-right">Points</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {historyEntries.map(entry => (
-                      <tr key={entry.id} className="hover:bg-blue-50 transition-colors">
-                        <td className="px-6 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(entry.date)}</td>
-                        <td className="px-6 py-3 text-sm text-gray-700 font-medium">{entry.action}</td>
-                        <td className="px-6 py-3 text-sm text-gray-600 truncate max-w-[160px]">
-                          {entry.subject ?? <span className="italic text-gray-400">(deleted prospect)</span>}
-                        </td>
-                        <td className="px-6 py-3 text-right">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                            entry.points < 0 ? 'bg-rose-100 text-rose-700' : 'bg-green-100 text-green-700'
-                          }`}>
-                            {entry.points >= 0 ? `+${entry.points}` : entry.points} pts
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                historyEntries.map(entry => (
+                  <div key={entry.id} className="flex items-center justify-between gap-3 bg-gray-50 hover:bg-blue-50 transition-colors rounded-xl px-4 py-3 border border-gray-100">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{entry.subject}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{entry.action}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                        entry.points < 0 ? 'bg-rose-100 text-rose-700' : 'bg-green-100 text-green-700'
+                      }`}>
+                        {entry.points >= 0 ? `+${entry.points}` : entry.points} pts
+                      </span>
+                      <span className="text-[11px] text-gray-400">{formatDate(entry.date)}</span>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>
