@@ -135,3 +135,45 @@ export const TRAINING_MODE_LABELS: Record<TrainingMode, string> = {
   online: 'Online',
   face_to_face: 'Face to Face',
 };
+
+// ─── Sales Report (ETL Import) ───────────────────────────────────────────────
+
+/** Per-agent annual sales-report rollup. See GET /api/sales-reports and /me. */
+export type SalesReport = components['schemas']['SalesReport'];
+
+/** Audit row for a past upload batch. See GET /api/sales-reports/uploads. */
+export type UploadAuditEntry = components['schemas']['UploadAuditEntry'];
+
+export const MDRT_TARGET = 400_000; // RM — fixed for all agents
+export const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// ─── Agent Codes ─────────────────────────────────────────────────────────────
+
+export type AgentCode = {
+  agentCode: string;
+  isUsed: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// ─── In-app Notifications ────────────────────────────────────────────────────
+
+export type NotificationType =
+  | 'achievement'   // badge unlocked, milestone reached
+  | 'event'         // calendar event reminder
+  | 'coaching'      // coaching session reminder
+  | 'milestone'     // MDRT / sales target update
+  | 'etl'           // ETL data uploaded (admin)
+  | 'announcement'  // general system announcement
+  | 'system';       // system / technical
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  created_at: string;        // ISO timestamp
+  read_at: string | null;    // null = unread
+  action_url?: string;       // if set, clicking navigates here
+  action_label?: string;     // label for the action button
+}

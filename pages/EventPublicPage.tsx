@@ -140,14 +140,16 @@ const EventPublicPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col">
             {/* Minimal navbar */}
-            <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-                <Link to="/login" className="flex items-center gap-2 text-blue-600 font-bold text-lg tracking-tight">
-                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
-                        <CalendarDays className="w-4 h-4 text-white" />
-                    </div>
-                    VistaQ
+            <header className="bg-blue-900 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+                <Link to="/login">
+                    <img src="/vistaq-logo.png" alt="VistaQ" className="h-8 w-auto" />
                 </Link>
-                <span className="text-xs text-gray-400 font-medium">Public Event</span>
+                <Link
+                    to="/login"
+                    className="px-4 py-1.5 text-sm font-semibold text-blue-900 bg-white rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                    Login
+                </Link>
             </header>
 
             <main className="flex-1 flex items-start justify-center p-4 pt-8 pb-16">
@@ -201,11 +203,22 @@ const EventPublicPage: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Venue */}
+                            {/* Venue / Location */}
                             {event.venue && (
                                 <div className="flex items-start gap-3 text-sm text-gray-700">
                                     <MapPin className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                                    <span>{event.venue}</span>
+                                    {/^https?:\/\//i.test(event.venue) ? (
+                                        <a
+                                            href={event.venue}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:underline break-all"
+                                        >
+                                            {event.venue}
+                                        </a>
+                                    ) : (
+                                        <span>{event.venue}</span>
+                                    )}
                                 </div>
                             )}
 
@@ -294,7 +307,6 @@ const EventPublicPage: React.FC = () => {
                     <p className="text-center text-xs text-gray-400 mt-6">
                         Powered by{' '}
                         <Link to="/login" className="text-blue-500 hover:underline font-medium">VistaQ</Link>
-                        {' '}· Event management for sales teams
                     </p>
                 </div>
             </main>

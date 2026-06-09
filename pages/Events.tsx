@@ -5,7 +5,8 @@ import { UserRole, Event, Group, User } from '../types';
 import { apiCall } from '../services/apiClient';
 import {
     CalendarDays, Plus, MapPin, User as UserIcon, Users, X, Clock, Link as LinkIcon,
-    Edit2, ExternalLink, LayoutGrid, ChevronLeft, ChevronRight, Archive, Search, Check, Loader2, AlertCircle
+    Edit2, ExternalLink, LayoutGrid, ChevronLeft, ChevronRight, Archive, Search, Check, Loader2, AlertCircle,
+    Globe, Lock,
 } from 'lucide-react';
 
 /* ─── Helpers ─────────────────────────────────────────────── */
@@ -99,7 +100,13 @@ const EventDetailPopup: React.FC<EventDetailPopupProps> = ({ event, onClose, onE
                                 </div>
                             </div>
                             <div>
-                                <span className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1 block">Event</span>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">Event</span>
+                                    {event.visibility === 'private'
+                                        ? <span className="flex items-center gap-1 text-[10px] font-bold bg-white/20 text-white px-1.5 py-0.5 rounded-full"><Lock className="w-2.5 h-2.5" />Private</span>
+                                        : <span className="flex items-center gap-1 text-[10px] font-bold bg-white/20 text-white px-1.5 py-0.5 rounded-full"><Globe className="w-2.5 h-2.5" />Public</span>
+                                    }
+                                </div>
                                 <h2 className="text-lg font-bold leading-tight">{event.event_title}</h2>
                                 {event.status && event.status !== 'upcoming' && (
                                     <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${event.status === 'completed' ? 'bg-green-400/30 text-green-100' : 'bg-red-400/30 text-red-100'
@@ -390,7 +397,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
             return !isNaN(d.getTime()) && isSameDay(d, date);
         });
 
-    const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    const DAY_LABELS_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -419,9 +427,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
 
             {/* Day Labels */}
             <div className="grid grid-cols-7 border-b">
-                {DAY_LABELS.map(d => (
-                    <div key={d} className="py-2 text-center text-xs font-bold text-gray-400 uppercase">
-                        {d}
+                {DAY_LABELS.map((d, i) => (
+                    <div key={DAY_LABELS_FULL[i]} className="py-2 text-center text-xs font-bold text-gray-400 uppercase">
+                        <span className="sm:hidden">{d}</span>
+                        <span className="hidden sm:inline">{DAY_LABELS_FULL[i]}</span>
                     </div>
                 ))}
             </div>
@@ -429,7 +438,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
             {/* Grid */}
             <div className="grid grid-cols-7">
                 {cells.map((date, idx) => {
-                    if (!date) return <div key={`empty-${idx}`} className="min-h-[6rem] h-full bg-gray-50/50 border-b border-r border-gray-100" />;
+                    if (!date) return <div key={`empty-${idx}`} className="min-h-[4rem] sm:min-h-[6rem] h-full bg-gray-50/50 border-b border-r border-gray-100" />;
                     const dayEvts = eventsOnDay(date);
                     const isToday = isSameDay(date, today);
                     const hasFuture = dayEvts.some(e => new Date(e.start_date) >= today);
@@ -440,13 +449,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ events, isAdmin, includeArc
                         <button
                             key={date.toISOString()}
                             onClick={() => dayEvts.length > 0 ? onDayClick(date, dayEvts) : undefined}
-                            className={`min-h-[6rem] h-full flex flex-col p-1.5 border-b border-r border-gray-100 transition-colors relative w-full
+                            className={`min-h-[4rem] sm:min-h-[6rem] h-full flex flex-col p-1 sm:p-1.5 border-b border-r border-gray-100 transition-colors relative w-full
                 ${dayEvts.length > 0 ? 'cursor-pointer hover:bg-blue-50' : 'cursor-default'}
                 ${isLast ? 'border-r-0' : ''}
               `}
                         >
-                            <div className="w-full flex justify-end mb-1">
-                                <span className={`text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full transition-colors
+                            <div className="w-full flex justify-end mb-0.5 sm:mb-1">
+                                <span className={`text-[11px] sm:text-sm font-semibold w-5 h-5 sm:w-7 sm:h-7 flex items-center justify-center rounded-full transition-colors
                 ${isToday ? 'bg-blue-600 text-white' : 'text-gray-700'}
               `}>
                                     {date.getDate()}
@@ -526,9 +535,12 @@ const Events: React.FC = () => {
         targetAgentIds: [] as string[],
         allGroups: false,
         allAgents: false,
-        status: 'upcoming' as 'upcoming' | 'completed' | 'cancelled'
+        status: 'upcoming' as 'upcoming' | 'completed' | 'cancelled',
+        visibility: 'public' as 'public' | 'private',
     });
     const [agentSearch, setAgentSearch] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     if (!currentUser) return null;
     if (isLoadingEvents) return (
@@ -609,38 +621,45 @@ const Events: React.FC = () => {
                 targetAgentIds: event.agentIds || [],
                 allGroups: false,
                 allAgents: false,
-                status: (event.status || 'upcoming') as 'upcoming' | 'completed' | 'cancelled'
+                status: (event.status || 'upcoming') as 'upcoming' | 'completed' | 'cancelled',
+                visibility: (event.visibility || 'public') as 'public' | 'private',
             });
         } else {
             setEditingEventId(null);
             const initialGroups = (currentUser.role === UserRole.GROUP_LEADER && currentUser.group_id) ? [currentUser.group_id] : [];
-            setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: initialGroups, targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming' });
+            // Default visibility: public for agent/group_leader, private for others
+            const defaultVisibility: 'public' | 'private' =
+                currentUser.role === UserRole.AGENT || currentUser.role === UserRole.GROUP_LEADER
+                    ? 'public' : 'private';
+            setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: initialGroups, targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming', visibility: defaultVisibility });
         }
         setIsModalOpen(true);
         setDetailEvent(null);
     };
 
     const handleSave = async () => {
+        setSaveError(null);
         if (!formData.eventTitle || !formData.date || !formData.startTime || !formData.description) {
-            alert('Please fill in all required fields (Title, Date, Start Time, Description).');
-            return;
-        }
-        if (formData.eventType === 'face-to-face' && !formData.venue) {
-            alert('Please enter a Venue / Location for a Face to Face event.');
-            return;
-        }
-        if (formData.eventType === 'online' && !formData.meetingLink) {
-            alert('Please enter a Meeting URL for an Online event.');
+            setSaveError('Please fill in all required fields: Title, Date, Start Time, and Description.');
             return;
         }
         const isAgentPersonal = currentUser.role === UserRole.AGENT;
+        // Venue/link are optional for agents (personal calendar events)
+        if (!isAgentPersonal && formData.eventType === 'face-to-face' && !formData.venue) {
+            setSaveError('Please enter a Venue / Location for a Face to Face event.');
+            return;
+        }
+        if (!isAgentPersonal && formData.eventType === 'online' && !formData.meetingLink) {
+            setSaveError('Please enter a Meeting URL for an Online event.');
+            return;
+        }
         const hasGroupTarget = formData.groupIds.length > 0;
         const hasAgentTarget = formData.targetAgentIds.length > 0;
         if (!isAgentPersonal && !hasGroupTarget && !hasAgentTarget && currentUser.role !== UserRole.GROUP_LEADER) {
-            alert('Please select at least one group or agent to share this event with.');
+            setSaveError('Please select at least one group or agent to share this event with.');
             return;
         }
-        const eventData = {
+        const eventData: Record<string, unknown> = {
             event_title: formData.eventTitle,
             description: formData.description,
             date: formData.date,
@@ -649,19 +668,32 @@ const Events: React.FC = () => {
             type: (formData.eventType === 'online' ? 'Online' : 'Face to Face') as 'Online' | 'Face to Face',
             venue: formData.eventType === 'face-to-face' ? formData.venue : undefined,
             meeting_link: formData.eventType === 'online' ? formData.meetingLink : undefined,
-            groupIds: formData.groupIds,
-            agentIds: isAgentPersonal
-                ? [currentUser.id]
-                : formData.targetAgentIds.length > 0 ? formData.targetAgentIds : undefined,
+            visibility: formData.visibility,
+            status: formData.status,
+            isAgent: isAgentPersonal, // tells DataContext to omit groupIds/agentIds for agents
         };
-        if (editingEventId) {
-            await updateEvent(editingEventId, eventData);
-        } else {
-            await addEvent(eventData);
+        // Non-agents: include audience targeting
+        if (!isAgentPersonal) {
+            eventData.groupIds = formData.groupIds;
+            if (formData.targetAgentIds.length > 0) eventData.agentIds = formData.targetAgentIds;
         }
-        setIsModalOpen(false);
-        setEditingEventId(null);
-        setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: [], targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming' });
+        setIsSaving(true);
+        try {
+            if (editingEventId) {
+                await updateEvent(editingEventId, eventData);
+            } else {
+                await addEvent(eventData);
+            }
+            setIsModalOpen(false);
+            setEditingEventId(null);
+            setSaveError(null);
+            setFormData({ eventTitle: '', description: '', date: '', startTime: '', endTime: '', eventType: 'online', venue: '', meetingLink: '', groupIds: [], targetAgentIds: [], allGroups: false, allAgents: false, status: 'upcoming', visibility: 'public' });
+        } catch (err: any) {
+            const msg = err?.response?.data?.message || err?.message || 'Something went wrong. Please try again.';
+            setSaveError(msg);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const toggleGroup = (id: string) => {
@@ -858,6 +890,10 @@ const Events: React.FC = () => {
                                             {evt.status.charAt(0).toUpperCase() + evt.status.slice(1)}
                                         </span>
                                     )}
+                                    {evt.visibility === 'private'
+                                        ? <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500"><Lock className="w-2.5 h-2.5" />Private</span>
+                                        : <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600"><Globe className="w-2.5 h-2.5" />Public</span>
+                                    }
                                 </div>
                             </div>
                         );
@@ -1010,7 +1046,45 @@ const Events: React.FC = () => {
 
                             <hr className="border-gray-200" />
 
-                            {/* ── Section 4: Audience ── */}
+                            {/* ── Section 4: Visibility ── */}
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                                    <Globe className="w-4 h-4 text-blue-500" />
+                                    Visibility
+                                </h3>
+                                <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, visibility: 'public' }))}
+                                        className={`flex-1 flex items-center gap-2.5 p-3 rounded-xl border-2 text-sm font-medium transition-all ${formData.visibility === 'public'
+                                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                            : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                                    >
+                                        <Globe className="w-4 h-4 flex-shrink-0" />
+                                        <div className="text-left">
+                                            <div className="font-semibold">Public</div>
+                                            <div className="text-xs font-normal opacity-75">Shareable link, visible to all</div>
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, visibility: 'private' }))}
+                                        className={`flex-1 flex items-center gap-2.5 p-3 rounded-xl border-2 text-sm font-medium transition-all ${formData.visibility === 'private'
+                                            ? 'border-gray-700 bg-gray-50 text-gray-800'
+                                            : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                                    >
+                                        <Lock className="w-4 h-4 flex-shrink-0" />
+                                        <div className="text-left">
+                                            <div className="font-semibold">Private</div>
+                                            <div className="text-xs font-normal opacity-75">Only visible to assigned audience</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <hr className="border-gray-200" />
+
+                            {/* ── Section 5: Audience ── */}
                             <div className="space-y-4">
                                 <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                                     <Users className="w-4 h-4 text-blue-500" />
@@ -1136,16 +1210,24 @@ const Events: React.FC = () => {
                         </div>
 
                         {/* Footer */}
-                        <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-                            <button type="button" onClick={() => setIsModalOpen(false)}
-                                className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl transition-all">
-                                Cancel
-                            </button>
-                            <button onClick={handleSave}
-                                className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-md shadow-blue-500/20">
-                                <Check className="w-4 h-4" />
-                                {editingEventId ? 'Update Event' : 'Publish Event'}
-                            </button>
+                        <div className="p-6 border-t border-gray-100 bg-gray-50 space-y-3">
+                            {saveError && (
+                                <div className="flex items-start gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                    <span>{saveError}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-end gap-3">
+                                <button type="button" onClick={() => { setIsModalOpen(false); setSaveError(null); }}
+                                    className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl transition-all">
+                                    Cancel
+                                </button>
+                                <button onClick={handleSave} disabled={isSaving}
+                                    className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed rounded-xl transition-all shadow-md shadow-blue-500/20">
+                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                    {isSaving ? 'Saving…' : editingEventId ? 'Update Event' : 'Publish Event'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -1,14 +1,12 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, CoachingSessionCreateBody, CoachingSessionUpdateBody, PointConfig, Group, DashboardStats, GroupStats } from '../types';
+import { Prospect, User, UserRole, BadgeTier, Event, CoachingSession, CoachingSessionCreateBody, CoachingSessionUpdateBody, Group, DashboardStats, GroupStats, SalesReport } from '../types';
 import { apiCall } from '../services/apiClient';
 import { toLocalISO } from '../utils/dateUtils';
-import { DEFAULT_POINT_CONFIG } from '../services/points';
 
 interface DataContextType {
   prospects: Prospect[];
   badgeTiers: BadgeTier[];
-  pointConfig: PointConfig;
   events: Event[];
   addProspect: (p: Partial<Prospect>) => Promise<Prospect>;
   updateProspect: (id: string, updates: Partial<Prospect>) => Promise<void>;
@@ -17,7 +15,6 @@ interface DataContextType {
   getGroupProspects: (groupId: string) => Prospect[];
   deleteProspect: (id: string) => Promise<void>;
   updateBadgeTiers: (tiers: BadgeTier[]) => Promise<void>;
-  updatePointConfig: (cfg: PointConfig) => Promise<void>;
 
   // Event Methods
   addEvent: (evt: Partial<Event>) => Promise<void>;
@@ -50,6 +47,14 @@ interface DataContextType {
   joinCoachingSession: (sessionId: string) => Promise<void>;
   markNonAttendees: (sessionId: string) => Promise<void>;
   refetchCoachingSessions: () => Promise<void>;
+
+  // Sales Reports (ETL)
+  salesReports: SalesReport[];
+  isLoadingSalesReports: boolean;
+  refetchSalesReports: (year?: number) => Promise<void>;
+  mySalesReport: SalesReport | null;
+  isLoadingMySalesReport: boolean;
+  refetchMySalesReport: (year?: number) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -61,7 +66,6 @@ const DEFAULT_MILESTONES: BadgeTier[] = DEFAULT_BADGE_TIERS;
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [badgeTiers, setBadgeTiers] = useState<BadgeTier[]>(DEFAULT_MILESTONES);
-  const [pointConfig, setPointConfig] = useState<PointConfig>(DEFAULT_POINT_CONFIG);
   const [events, setEvents] = useState<Event[]>([]);
   const [coachingSessions, setCoachingSessions] = useState<CoachingSession[]>([]);
   const [isLoadingProspects, setIsLoadingProspects] = useState(false);
@@ -72,6 +76,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [groupStats, setGroupStats] = useState<GroupStats[]>([]);
   const [isLoadingDashboardStats, setIsLoadingDashboardStats] = useState(false);
+  const [salesReports, setSalesReports] = useState<SalesReport[]>([]);
+  const [isLoadingSalesReports, setIsLoadingSalesReports] = useState(false);
+  const [mySalesReport, setMySalesReport] = useState<SalesReport | null>(null);
+  const [isLoadingMySalesReport, setIsLoadingMySalesReport] = useState(false);
 
   const getCurrentUserId = (): string | null => {
     try {
@@ -162,6 +170,38 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (e) { console.error('[DataContext] fetchGroupStats:', e); }
   };
 
+  const fetchSalesReports = async (year = new Date().getFullYear()) => {
+    if (!localStorage.getItem('authToken')) { setSalesReports([]); return; }
+    setIsLoadingSalesReports(true);
+    try {
+      const res = await apiCall(`/sales-reports?year=${year}`);
+      setSalesReports(Array.isArray(res.data) ? res.data as SalesReport[] : []);
+    } catch (e) {
+      console.error('[DataContext] fetchSalesReports:', e);
+      setSalesReports([]);
+    } finally {
+      setIsLoadingSalesReports(false);
+    }
+  };
+
+  const fetchMySalesReport = async (year = new Date().getFullYear()) => {
+    if (!localStorage.getItem('authToken')) { setMySalesReport(null); return; }
+    setIsLoadingMySalesReport(true);
+    try {
+      const res = await apiCall(`/sales-reports/me?year=${year}`);
+      setMySalesReport((res.data as SalesReport) ?? null);
+    } catch (e: any) {
+      // 404 = "No sales report for this year" → render as empty, not an error
+      if (e?.status === 404) setMySalesReport(null);
+      else {
+        console.error('[DataContext] fetchMySalesReport:', e);
+        setMySalesReport(null);
+      }
+    } finally {
+      setIsLoadingMySalesReport(false);
+    }
+  };
+
   // Track authentication state to trigger refetch on login
   const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('authToken'));
   const [userRole, setUserRole] = useState<string | null>(() => {
@@ -202,15 +242,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [authToken, userRole]);
 
-  // 1. Sync Prospects + config when authenticated or user role changes, clear on logout
+  // 1. Sync Prospects when authenticated or user role changes, clear on logout
   useEffect(() => {
     if (authToken) {
       fetchProspects();
-      fetchPointConfig();
     } else {
-      // Clear data on logout
       setProspects([]);
-      setPointConfig(DEFAULT_POINT_CONFIG);
     }
   }, [authToken]);
 
@@ -229,6 +266,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!authToken) {
       setDashboardStats(null);
       setGroupStats([]);
+    }
+  }, [authToken]);
+
+  // 5. Clear sales reports on logout (fetch is triggered by SalesReport page on mount)
+  useEffect(() => {
+    if (!authToken) {
+      setSalesReports([]);
+      setMySalesReport(null);
     }
   }, [authToken]);
 
@@ -301,22 +346,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setBadgeTiers(tiers);
   };
 
-  const fetchPointConfig = async () => {
-    try {
-      const data = await apiCall('/config/points');
-      if (data && typeof data === 'object') {
-        setPointConfig({ ...DEFAULT_POINT_CONFIG, ...data });
-      }
-    } catch (_e) {
-      // Use defaults if endpoint not available yet
-    }
-  };
-
-  const updatePointConfig = async (cfg: PointConfig) => {
-    await apiCall('/config/points', { method: 'PUT', data: cfg });
-    setPointConfig(cfg);
-  };
-
   // --- SCOPING HELPER ---
   const getGroupProspects = (groupId: string): Prospect[] => {
     return prospects.filter(p => p.group_id === groupId);
@@ -343,22 +372,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const date: string = (evt as any).date;
     const startTime: string = (evt as any).startTime;
     const endTime: string = (evt as any).endTime;
+    const isAgent = (evt as any).isAgent as boolean | undefined;
     const payload: Record<string, unknown> = {
       title: evt.event_title || 'New Event',
       description: evt.description || '',
-      groupIds: evt.groupIds || [],
       startDate: toLocalISO(date, startTime),
     };
     if (endTime) payload.endDate = toLocalISO(date, endTime);
     if (evt.type) payload.type = evt.type;
     if (evt.meeting_link) payload.link = evt.meeting_link;
     if (evt.venue) payload.venue = evt.venue;
-    if (evt.agentIds?.length) payload.agentIds = evt.agentIds;
+    if (evt.visibility) payload.visibility = evt.visibility;
+    // Agents: omit groupIds/agentIds — server auto-assigns self
+    if (!isAgent) {
+      payload.groupIds = evt.groupIds || [];
+      if (evt.agentIds?.length) payload.agentIds = evt.agentIds;
+    }
     await apiCall('/events', { method: 'POST', data: payload });
     await fetchEvents();
   };
 
   const updateEvent = async (id: string, evt: Partial<Event>) => {
+    const isAgent = (evt as any).isAgent as boolean | undefined;
     const payload: Record<string, unknown> = {};
     if (evt.event_title) payload.title = evt.event_title;
     const date: string = (evt as any).date;
@@ -372,8 +407,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (evt.type) payload.type = evt.type;
     if (evt.meeting_link) payload.link = evt.meeting_link;
     if (evt.venue) payload.venue = evt.venue;
-    if (evt.groupIds) payload.groupIds = evt.groupIds;
-    if (evt.agentIds?.length) payload.agentIds = evt.agentIds;
+    if (evt.visibility) payload.visibility = evt.visibility;
+    if (evt.status) payload.status = evt.status;
+    // Agents: omit groupIds/agentIds — server auto-assigns self
+    if (!isAgent) {
+      if (evt.groupIds) payload.groupIds = evt.groupIds;
+      if (evt.agentIds?.length) payload.agentIds = evt.agentIds;
+    }
     await apiCall(`/events/${id}`, { method: 'PUT', data: payload });
     await fetchEvents();
   };
@@ -416,16 +456,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <DataContext.Provider value={{
-      prospects, badgeTiers, pointConfig, events,
+      prospects, badgeTiers, events,
       isLoadingProspects, isLoadingEvents, isLoadingCoaching,
       eventsError, coachingError,
       addProspect, updateProspect, importProspects, deleteProspect,
-      getProspectsByScope, getGroupProspects, updateBadgeTiers, updatePointConfig,
+      getProspectsByScope, getGroupProspects, updateBadgeTiers,
       addEvent, updateEvent, deleteEvent, getEventsForUser, refetchEvents: fetchEvents,
       coachingSessions, addCoachingSession, updateCoachingSession, deleteCoachingSession,
       joinCoachingSession, markNonAttendees, refetchCoachingSessions: fetchCoachingSessions,
       dashboardStats, groupStats, isLoadingDashboardStats,
-      refetchDashboardStats: fetchDashboardStats, refetchGroupStats: fetchGroupStats
+      refetchDashboardStats: fetchDashboardStats, refetchGroupStats: fetchGroupStats,
+      salesReports, isLoadingSalesReports, refetchSalesReports: fetchSalesReports,
+      mySalesReport, isLoadingMySalesReport, refetchMySalesReport: fetchMySalesReport
     }}>
       {children}
     </DataContext.Provider>

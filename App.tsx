@@ -3,6 +3,7 @@ import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
+import { NotificationProvider } from './context/NotificationContext';
 import Layout from './components/Layout';
 import GlobalNotification from './components/GlobalNotification';
 import SessionTimeoutModal from './components/SessionTimeoutModal';
@@ -18,10 +19,10 @@ const Reports = React.lazy(() => import('./pages/Reports'));
 const PointsHistory = React.lazy(() => import('./pages/PointsHistory'));
 const Leaderboard = React.lazy(() => import('./pages/Leaderboard'));
 const Group = React.lazy(() => import('./pages/Group'));
-const Sales = React.lazy(() => import('./pages/Sales'));
 const AdminUsers = React.lazy(() => import('./pages/AdminUsers'));
 const AdminGroups = React.lazy(() => import('./pages/AdminGroups'));
 const AdminRewards = React.lazy(() => import('./pages/AdminRewards'));
+const AdminAgentCodes = React.lazy(() => import('./pages/AdminAgentCodes'));
 const Import = React.lazy(() => import('./pages/Import'));
 const MyCalendar = React.lazy(() => import('./pages/MyCalendar'));
 const Profile = React.lazy(() => import('./pages/Profile'));
@@ -35,6 +36,9 @@ const Tutorials = React.lazy(() => import('./pages/Tutorials'));
 const Coaching = React.lazy(() => import('./pages/Coaching'));
 const AddToHomeScreen = React.lazy(() => import('./pages/AddToHomeScreen'));
 const EventPublicPage = React.lazy(() => import('./pages/EventPublicPage'));
+const SalesReport = React.lazy(() => import('./pages/SalesReport'));
+const GroupSalesReport = React.lazy(() => import('./pages/GroupSalesReport'));
+const Notifications = React.lazy(() => import('./pages/Notifications'));
 
 const PageSpinner: React.FC = () => (
   <div className="flex h-full min-h-[60vh] items-center justify-center">
@@ -55,6 +59,7 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <DataProvider>
+        <NotificationProvider>
         <GlobalNotification />
         <SessionTimeoutModal />
         <Suspense fallback={<PageSpinner />}>
@@ -81,17 +86,21 @@ const App: React.FC = () => {
                       <Route path="events" element={<MyCalendar />} />
                       <Route path="coaching" element={<Coaching />} />
                       <Route path="leaderboard" element={<Leaderboard />} />
-                      <Route path="sales" element={<Sales />} />
+                      {/* /sales removed — successful sales are surfaced in Prospects */}
                       <Route path="points" element={<PointsHistory />} />
                       <Route path="group" element={<Group />} />
+                      <Route path="group-sales-report" element={<GroupSalesReport />} />
+                      <Route path="sales-report" element={<SalesReport />} />
                       <Route path="reports" element={<Reports />} />
                       <Route path="import" element={<Import />} />
                       <Route path="profile" element={<Profile />} />
                       <Route path="tutorials" element={<Tutorials />} />
+                      <Route path="notifications" element={<Notifications />} />
                       <Route path="add-to-home-screen" element={<AddToHomeScreen />} />
                       <Route path="users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
                       <Route path="admin-groups" element={<AdminRoute><AdminGroups /></AdminRoute>} />
                       <Route path="admin-rewards" element={<AdminRoute><AdminRewards /></AdminRoute>} />
+                      <Route path="admin-agent-codes" element={<AdminRoute><AdminAgentCodes /></AdminRoute>} />
                       {/* Catch-all: unknown protected paths redirect to dashboard */}
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
@@ -104,6 +113,7 @@ const App: React.FC = () => {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Suspense>
+        </NotificationProvider>
       </DataProvider>
     </AuthProvider>
   );

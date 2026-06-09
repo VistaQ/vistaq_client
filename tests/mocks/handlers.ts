@@ -229,9 +229,7 @@ export const handlers = [
   http.delete(`${BASE}/prospects/:id`, () => new HttpResponse(null, { status: 204 })),
 
   // ─── Config (legacy) ───
-  http.get(`${BASE}/config/points`, () => HttpResponse.json({ data: {} })),
   http.get(`${BASE}/config/badges`, () => HttpResponse.json({ data: [] })),
-  http.put(`${BASE}/config/points`, () => HttpResponse.json({ data: {} })),
 
   // ─── Point Configs (AdminRewards) ───
   http.get(`${BASE}/point-configs`, () =>

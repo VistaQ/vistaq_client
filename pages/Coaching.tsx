@@ -4,63 +4,221 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, Group, User, COACHING_TYPE_LABELS, TRAINING_MODE_LABELS } from '../types';
 import { apiCall } from '../services/apiClient';
-import { MessageSquarePlus, CalendarDays, MapPin, Users, CheckCircle2, ChevronRight, Clock, XCircle, Info, AlignLeft, Edit2, LogIn, Loader2, AlertCircle } from 'lucide-react';
+import {
+    MessageSquarePlus, CalendarDays, MapPin, Users, CheckCircle2, Clock,
+    XCircle, Info, AlignLeft, Edit2, LogIn, Loader2, AlertCircle,
+    LayoutList, LayoutGrid, ChevronDown, X,
+} from 'lucide-react';
 import CreateCoachingModal from '../components/CreateCoachingModal';
-import { CoachingSession } from '../types';
+import { CoachingSession, PointConfig } from '../types';
+import { DEFAULT_POINT_CONFIG } from '../services/points';
 
-// ─── Timing helpers (±15 min window) ──────────────────────────────────────────
+// ─── Timing helpers (±2 hour window) ─────────────────────────────────────────
 
-/** Returns the exact moment the Join button opens: 15 minutes before start */
+const JOIN_WINDOW_BEFORE_MS = 2 * 60 * 60 * 1000; // 2 hours before start
+const JOIN_WINDOW_AFTER_MS  = 2 * 60 * 60 * 1000; // 2 hours after end
+
 const getJoinWindowStart = (session: CoachingSession): Date =>
-    new Date(new Date(session.start_date).getTime() - 15 * 60 * 1000);
+    new Date(new Date(session.start_date).getTime() - JOIN_WINDOW_BEFORE_MS);
 
-/** Returns the exact moment the Join button closes: 15 minutes after end */
 const getJoinWindowEnd = (session: CoachingSession): Date =>
-    new Date(new Date(session.end_date ?? session.start_date).getTime() + 15 * 60 * 1000);
+    new Date(new Date(session.end_date ?? session.start_date).getTime() + JOIN_WINDOW_AFTER_MS);
 
-/** True while the Join button should be active (15 min before start → 15 min after end) */
 const isJoinWindowOpen = (session: CoachingSession): boolean => {
     try {
         const now = new Date();
         return now >= getJoinWindowStart(session) && now < getJoinWindowEnd(session);
-    } catch {
-        return false;
-    }
+    } catch { return false; }
 };
 
-/** True once the Join window has permanently closed (now ≥ end + 15 min) */
 const isSessionEnded = (session: CoachingSession): boolean => {
-    try {
-        return new Date() >= getJoinWindowEnd(session);
-    } catch {
-        return false;
-    }
+    try { return new Date() >= getJoinWindowEnd(session); }
+    catch { return false; }
 };
 
-/** Dynamic card status: Ended / On-going / Upcoming */
 const getDisplayStatus = (session: CoachingSession): { label: string; cls: string } => {
-    if (session.status === 'cancelled') return { label: '✕ CANCELLED', cls: 'bg-red-100 text-red-600' };
-    if (isSessionEnded(session)) return { label: 'Ended', cls: 'bg-gray-100 text-gray-500' };
-    if (isJoinWindowOpen(session)) return { label: 'On-going', cls: 'bg-emerald-50 text-emerald-600' };
+    if (session.status === 'cancelled') return { label: '✕ Cancelled', cls: 'bg-red-100 text-red-600' };
+    if (isSessionEnded(session))        return { label: 'Ended',       cls: 'bg-gray-100 text-gray-500' };
+    if (isJoinWindowOpen(session))      return { label: 'On-going',    cls: 'bg-emerald-50 text-emerald-600' };
     return { label: 'Upcoming', cls: 'bg-blue-50 text-blue-600' };
 };
 
-/** Friendly display time for when the Join button opens */
-const formatJoinWindowStart = (session: CoachingSession): string => {
-    const d = getJoinWindowStart(session);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const formatJoinWindowStart = (session: CoachingSession): string =>
+    getJoinWindowStart(session).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const COACHING_TYPE_BADGE: Record<string, string> = {
+    individual_coaching: 'bg-blue-100 text-blue-700',
+    group_coaching:      'bg-green-100 text-green-700',
+    peer_circles:        'bg-purple-100 text-purple-700',
+    seminar:             'bg-orange-100 text-orange-700',
 };
 
-// ──────────────────────────────────────────────────────────────────────────────
+// Maps coaching_type → PointConfig key so we can show earned points
+const COACHING_POINT_KEY: Record<string, keyof PointConfig> = {
+    individual_coaching: 'coachingIndividual',
+    group_coaching:      'coachingGroup',
+    peer_circles:        'coachingPeerCircles',
+    seminar:             'coachingSeminar',
+};
+
+const getSessionPoints = (session: CoachingSession): number => {
+    const key = COACHING_POINT_KEY[session.coaching_type];
+    return key ? DEFAULT_POINT_CONFIG[key] : 10;
+};
+
+/** Format the join window as "8 May · 9:00 AM – 1:00 PM" */
+const formatJoinWindow = (session: CoachingSession): string => {
+    const start = getJoinWindowStart(session);
+    const end   = getJoinWindowEnd(session);
+    const fmt   = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateLabel = start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    if (start.toDateString() === end.toDateString()) {
+        return `${dateLabel} · ${fmt(start)} – ${fmt(end)}`;
+    }
+    const endLabel = end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    return `${dateLabel} ${fmt(start)} – ${endLabel} ${fmt(end)}`;
+};
+
+/** Format a millisecond duration as a human-readable countdown string */
+const formatCountdown = (ms: number): string => {
+    if (ms <= 0) return '0s';
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+    if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
+    return `${s}s`;
+};
+
+// ─── Attendance Modal ─────────────────────────────────────────────────────────
+
+const AttendanceModal: React.FC<{
+    session: CoachingSession;
+    onClose: () => void;
+    formatDate: (s: string) => string;
+    formatDateTime: (s: string) => string;
+}> = ({ session, onClose, formatDate, formatDateTime }) => {
+    const attended    = session.attendance.filter(a => a.status === 'joined');
+    const notAttended = session.attendance.filter(a => a.status !== 'joined');
+
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div className="p-5 border-b border-gray-100 bg-gray-50/60 flex items-start justify-between gap-4 flex-shrink-0">
+                    <div>
+                        <h3 className="font-bold text-gray-900 text-lg leading-snug">{session.title}</h3>
+                        <p className="text-sm text-gray-500 mt-0.5">
+                            {COACHING_TYPE_LABELS[session.coaching_type]} · {formatDate(session.start_date)}
+                            · {new Date(session.start_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                            –{session.end_date ? new Date(session.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
+                        </p>
+                        <p className="text-xs font-semibold text-gray-500 mt-1.5">
+                            {attended.length} of {session.attendance.length} attended
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 divide-y divide-gray-100">
+                    {session.attendance.length === 0 ? (
+                        <div className="p-10 text-center text-gray-400 text-sm">No agents assigned to this session.</div>
+                    ) : (
+                        <>
+                            {/* Attended */}
+                            <div className="p-5">
+                                <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> Attended ({attended.length})
+                                </h4>
+                                {attended.length === 0
+                                    ? <p className="text-sm text-gray-400 italic">No agents have logged attendance yet.</p>
+                                    : <div className="space-y-2">
+                                        {attended.map(rec => (
+                                            <div key={rec.id} className="flex items-center justify-between py-2 px-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                                                <div>
+                                                    <p className="text-sm font-semibold text-gray-900">{rec.agent_name}</p>
+                                                    <p className="text-xs text-gray-500">{rec.group_name || 'No Group'}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 mb-0.5">
+                                                        <CheckCircle2 className="w-3 h-3 mr-1" /> Attended
+                                                    </span>
+                                                    <p className="text-xs text-gray-400">{rec.joined_at ? formatDateTime(rec.joined_at) : '—'}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                }
+                            </div>
+
+                            {/* Not Attended */}
+                            <div className="p-5">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <Info className="w-3.5 h-3.5" /> Not Attended ({notAttended.length})
+                                </h4>
+                                {notAttended.length === 0
+                                    ? <p className="text-sm text-gray-400 italic">All invited agents attended.</p>
+                                    : <div className="space-y-2">
+                                        {notAttended.map(rec => (
+                                            <div key={rec.id} className={`flex items-center justify-between py-2 px-3 border rounded-xl ${rec.status === 'did_not_attend' ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-gray-900">{rec.agent_name}</p>
+                                                    <p className="text-xs text-gray-500">{rec.group_name || 'No Group'}</p>
+                                                </div>
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${rec.status === 'did_not_attend' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-gray-500'}`}>
+                                                    {rec.status === 'did_not_attend' ? 'Did Not Attend' : 'Invited'}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                }
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 const Coaching: React.FC = () => {
     const { currentUser } = useAuth();
     const { coachingSessions, updateCoachingSession, joinCoachingSession, markNonAttendees, refetchCoachingSessions, isLoadingCoaching, coachingError } = useData();
 
-    const [groups, setGroups] = useState<Group[]>([]);
-    const [users, setUsers] = useState<User[]>([]);
+    const [groups, setGroups]               = useState<Group[]>([]);
+    const [users, setUsers]                 = useState<User[]>([]);
     const [groupsLoadError, setGroupsLoadError] = useState(false);
-    const [usersLoadError, setUsersLoadError] = useState(false);
+    const [usersLoadError, setUsersLoadError]   = useState(false);
+
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [editingSession, setEditingSession]       = useState<CoachingSession | null>(null);
+    const [attendanceModal, setAttendanceModal]     = useState<CoachingSession | null>(null);
+
+    // Live clock — updates every second to drive countdown timers
+    const [now, setNow] = useState(() => new Date());
+    useEffect(() => {
+        const id = setInterval(() => setNow(new Date()), 1000);
+        return () => clearInterval(id);
+    }, []);
+
+    // Filters & view
+    const [filterStatus, setFilterStatus] = useState<'all' | 'upcoming' | 'past'>('all');
+    const [filterMonth, setFilterMonth]   = useState<string>('');   // '' = all, '0'–'11'
+    const [filterYear, setFilterYear]     = useState<number | null>(null); // null = all
+    const [viewMode, setViewMode]         = useState<'grid' | 'list'>('grid');
 
     useEffect(() => {
         refetchCoachingSessions();
@@ -72,101 +230,170 @@ const Coaching: React.FC = () => {
             .catch(() => setUsersLoadError(true));
     }, []);
 
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-    const [editingSession, setEditingSession] = useState<CoachingSession | null>(null);
-
     if (!currentUser) return null;
 
-    const sessions = coachingSessions;
-
-    // ─── Auto-mark non-attendees once per session, per page load ──────────────
+    // ─── Auto-mark non-attendees once per session per page load ──────────────
     const processedEndedSessions = useRef<Set<string>>(new Set());
     useEffect(() => {
-        sessions.forEach(session => {
-            if (
-                isSessionEnded(session) &&
-                session.status !== 'cancelled' &&
-                !processedEndedSessions.current.has(session.id)
-            ) {
+        coachingSessions.forEach(session => {
+            if (isSessionEnded(session) && session.status !== 'cancelled' && !processedEndedSessions.current.has(session.id)) {
                 processedEndedSessions.current.add(session.id);
                 markNonAttendees(session.id);
             }
         });
-    }, [sessions]);
+    }, [coachingSessions]);
 
-    // Handler for agents/group leaders to self-register attendance
     const handleJoinSession = async (sessionId: string) => {
-        const session = sessions.find(s => s.id === sessionId);
+        const session = coachingSessions.find(s => s.id === sessionId);
         await joinCoachingSession(sessionId);
-        if (session?.link) {
-            window.open(session.link, '_blank', 'noopener,noreferrer');
-        }
+        if (session?.link) window.open(session.link, '_blank', 'noopener,noreferrer');
     };
 
-    // Handler to cancel a session (management only)
     const handleCancelSession = async (sessionId: string) => {
-        if (!window.confirm('Are you sure you want to cancel this coaching session? Agents will be notified and the time slot will be freed.')) return;
+        if (!window.confirm('Cancel this coaching session? Agents will be notified and the time slot will be freed.')) return;
         await updateCoachingSession(sessionId, { status: 'cancelled' });
-        if (selectedSessionId === sessionId) setSelectedSessionId(null);
     };
 
-    // Only admin, master trainer, group trainers, and group leaders manage sessions.
-    const isManagement = currentUser.role === UserRole.TRAINER ||
-        currentUser.role === UserRole.MASTER_TRAINER ||
-        currentUser.role === UserRole.ADMIN ||
-        currentUser.role === UserRole.GROUP_LEADER;
+    // ─── Role helpers ─────────────────────────────────────────────────────────
+    const isManagement = [UserRole.TRAINER, UserRole.MASTER_TRAINER, UserRole.ADMIN, UserRole.GROUP_LEADER].includes(currentUser.role);
 
-    // Who can manage a given session:
-    // - Admin / Master Trainer: full control over ALL sessions
-    // - Group Trainer: only sessions THEY created
-    // - Group Leader: only sessions THEY created
-    const canManageSession = (sessionCreatorId: string) => {
-        if (currentUser.role === UserRole.ADMIN) return true;
-        if (currentUser.role === UserRole.MASTER_TRAINER) return true;
-        if (currentUser.role === UserRole.TRAINER) return sessionCreatorId === currentUser.id;
-        if (currentUser.role === UserRole.GROUP_LEADER) return sessionCreatorId === currentUser.id;
+    const canManageSession = (creatorId: string) => {
+        if ([UserRole.ADMIN, UserRole.MASTER_TRAINER].includes(currentUser.role)) return true;
+        if ([UserRole.TRAINER, UserRole.GROUP_LEADER].includes(currentUser.role)) return creatorId === currentUser.id;
         return false;
     };
 
-    // A session can be edited by its creator (or admin/master) up to 1 hour before it starts
     const canEditSession = (session: CoachingSession) => {
-        if (!canManageSession(session.created_by)) return false;
-        if (session.status === 'cancelled') return false;
-        try {
-            const start = new Date(session.start_date);
-            if (isNaN(start.getTime())) return false;
-            return Date.now() < start.getTime() - 60 * 60 * 1000;
-        } catch {
-            return false;
-        }
+        if (!canManageSession(session.created_by) || session.status === 'cancelled') return false;
+        try { return Date.now() < new Date(session.start_date).getTime() - 60 * 60 * 1000; }
+        catch { return false; }
     };
 
+    // ─── Format helpers ───────────────────────────────────────────────────────
     const formatDate = (ds: string) => {
-        const dateObj = new Date(ds);
-        if (isNaN(dateObj.getTime())) return 'Invalid Date';
-        return dateObj.toLocaleDateString([], { dateStyle: 'medium' });
+        const d = new Date(ds);
+        return isNaN(d.getTime()) ? '—' : d.toLocaleDateString([], { dateStyle: 'medium' });
     };
-
     const formatDateTime = (iso: string) => {
         const d = new Date(iso);
-        if (isNaN(d.getTime())) return '—';
-        return d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+        return isNaN(d.getTime()) ? '—' : d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+    };
+    const timeRange = (s: CoachingSession) =>
+        `${new Date(s.start_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}–${s.end_date ? new Date(s.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}`;
+
+    // ─── Filter & sort ────────────────────────────────────────────────────────
+    const availableYears = [...new Set(coachingSessions.map(s => new Date(s.start_date).getFullYear()))].sort((a, b) => b - a);
+
+    const filteredSessions = [...coachingSessions]
+        .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
+        .filter(s => {
+            const d = new Date(s.start_date);
+            const now = new Date();
+            if (filterStatus === 'upcoming' && d <= now) return false;
+            if (filterStatus === 'past'     && d > now)  return false;
+            if (filterMonth !== '' && d.getMonth() !== parseInt(filterMonth)) return false;
+            if (filterYear !== null && d.getFullYear() !== filterYear) return false;
+            return true;
+        });
+
+    // ─── Shared: participant action row (Join / countdown / Joined / Expired) ─
+    const ParticipantAction: React.FC<{ session: CoachingSession; compact?: boolean }> = ({ session, compact }) => {
+        const isParticipant = currentUser.role === UserRole.AGENT || currentUser.role === UserRole.GROUP_LEADER;
+        if (!isParticipant || session.status === 'cancelled') return null;
+
+        const myAttendance = session.attendance.find(a => a.agent_id === currentUser.id);
+        const hasJoined    = myAttendance?.status === 'joined';
+
+        const windowStart  = getJoinWindowStart(session);
+        const windowEnd    = getJoinWindowEnd(session);
+        const joinOpen     = now >= windowStart && now < windowEnd;
+        const ended        = now >= windowEnd;
+
+        const msToOpen     = windowStart.getTime() - now.getTime();   // positive = not yet open
+        const msToClose    = windowEnd.getTime()   - now.getTime();   // positive = still open
+        const pts          = getSessionPoints(session);
+
+        // ── Joined ──────────────────────────────────────────────────────────
+        if (hasJoined) return (
+            <span className={`flex items-center gap-1.5 text-xs font-bold text-emerald-700 ${compact ? '' : 'mt-3 pt-3 border-t border-emerald-200'}`}>
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                Joined · +{pts} pts
+            </span>
+        );
+
+        // ── Expired (window closed, not joined) ──────────────────────────────
+        if (ended) return (
+            <span className={`flex items-center gap-1.5 text-xs font-bold text-rose-600 ${compact ? '' : 'mt-3 pt-3 border-t border-rose-100'}`}>
+                <XCircle className="w-3.5 h-3.5 flex-shrink-0" /> Expired
+            </span>
+        );
+
+        // ── Join window is open — button + live "Closes in" timer ───────────
+        if (joinOpen) return (
+            <div className={`flex flex-col items-start gap-1 ${compact ? '' : 'mt-3 pt-3 border-t border-gray-100'}`}>
+                <button
+                    onClick={(e) => { e.stopPropagation(); handleJoinSession(session.id); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
+                >
+                    <LogIn className="w-3.5 h-3.5" /> Join Session
+                </button>
+                <span className="flex items-center gap-1 text-[10px] font-semibold text-rose-500">
+                    <Clock className="w-3 h-3" /> Closes in {formatCountdown(msToClose)}
+                </span>
+            </div>
+        );
+
+        // ── Upcoming — countdown to when join window opens ───────────────────
+        return (
+            <span className={`flex items-center gap-1.5 text-xs font-medium text-gray-400 ${compact ? '' : 'mt-3 pt-3 border-t border-gray-100'}`}>
+                <Clock className="w-4 h-4 flex-shrink-0" />
+                Opens in {formatCountdown(msToOpen)}
+            </span>
+        );
+    };
+
+    // ─── Shared: management action buttons ───────────────────────────────────
+    const ManagementActions: React.FC<{ session: CoachingSession; compact?: boolean }> = ({ session, compact }) => {
+        if (!canManageSession(session.created_by) || session.status === 'cancelled') return null;
+        return (
+            <div className={`flex items-center gap-2 ${compact ? '' : 'mt-3 pt-3 border-t border-gray-100'} flex-shrink-0`}>
+                <button
+                    onClick={(e) => { e.stopPropagation(); setAttendanceModal(session); }}
+                    className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors border border-indigo-200"
+                >
+                    <Users className="w-3.5 h-3.5" /> Attendance
+                </button>
+                {canEditSession(session) && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setEditingSession(session); setIsCreateModalOpen(true); }}
+                        className="flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors border border-gray-200"
+                    >
+                        <Edit2 className="w-3.5 h-3.5" /> Edit
+                    </button>
+                )}
+                <button
+                    onClick={(e) => { e.stopPropagation(); handleCancelSession(session.id); }}
+                    className="flex items-center gap-1.5 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors border border-red-200"
+                >
+                    <XCircle className="w-3.5 h-3.5" /> Cancel
+                </button>
+            </div>
+        );
     };
 
     return (
         <div className="space-y-6">
-            {/* Error Banner */}
+            {/* Error banners */}
             {coachingError && (
                 <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
                     <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                    <span>Failed to load coaching sessions. Check your connection and refresh the page.</span>
+                    Failed to load coaching sessions. Check your connection and refresh the page.
                 </div>
             )}
             {(groupsLoadError || usersLoadError) && isManagement && (
                 <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-4 py-3 text-sm">
                     <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                    <span>Could not load {groupsLoadError && usersLoadError ? 'groups and users' : groupsLoadError ? 'groups' : 'users'} for session creation. Refresh to try again.</span>
+                    Could not load {groupsLoadError && usersLoadError ? 'groups and users' : groupsLoadError ? 'groups' : 'users'} for session creation. Refresh to try again.
                 </div>
             )}
 
@@ -175,306 +402,333 @@ const Coaching: React.FC = () => {
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Coaching & Attendance</h1>
                     <p className="text-gray-500 mt-1">
-                        {isManagement
-                            ? 'Manage coaching sessions and track attendance.'
-                            : 'View your assigned coaching sessions below.'}
+                        {isManagement ? 'Manage coaching sessions and track attendance.' : 'View your assigned coaching sessions below.'}
                     </p>
                 </div>
-
                 {isManagement && (
                     <button
                         onClick={() => setIsCreateModalOpen(true)}
                         className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center shadow-sm text-sm font-medium"
                     >
-                        <MessageSquarePlus className="w-4 h-4 mr-2" />
-                        Create Session
+                        <MessageSquarePlus className="w-4 h-4 mr-2" /> Create Session
                     </button>
                 )}
             </div>
 
+            {/* ── Filter Bar ── */}
+            <div className="flex flex-wrap items-center gap-3">
+                {/* Status tabs */}
+                <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+                    {(['all', 'upcoming', 'past'] as const).map(f => (
+                        <button
+                            key={f}
+                            onClick={() => setFilterStatus(f)}
+                            className={`px-4 py-1.5 rounded-lg text-sm font-semibold capitalize transition-colors ${filterStatus === f ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            {f === 'all' ? 'All' : f === 'upcoming' ? 'Upcoming' : 'Past'}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Month picker */}
+                <div className="relative">
+                    <select
+                        value={filterMonth}
+                        onChange={e => setFilterMonth(e.target.value)}
+                        className="appearance-none pl-3 pr-8 py-2 text-sm font-medium bg-white border border-gray-200 rounded-xl text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                        <option value="">All Months</option>
+                        {MONTH_NAMES.map((m, i) => (
+                            <option key={i} value={String(i)}>{m}</option>
+                        ))}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+
+                {/* Year picker */}
+                {availableYears.length > 0 && (
+                    <div className="relative">
+                        <select
+                            value={filterYear ?? ''}
+                            onChange={e => setFilterYear(e.target.value === '' ? null : parseInt(e.target.value))}
+                            className="appearance-none pl-3 pr-8 py-2 text-sm font-medium bg-white border border-gray-200 rounded-xl text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        >
+                            <option value="">All Years</option>
+                            {availableYears.map(y => (
+                                <option key={y} value={y}>{y}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
+                )}
+
+                {/* View toggle */}
+                <div className="ml-auto flex gap-1 bg-gray-100 rounded-xl p-1">
+                    <button
+                        onClick={() => setViewMode('grid')}
+                        className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        title="Card view"
+                    >
+                        <LayoutGrid className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => setViewMode('list')}
+                        className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        title="List view"
+                    >
+                        <LayoutList className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+
+            {/* ── Loading ── */}
             {isLoadingCoaching ? (
                 <div className="flex items-center justify-center py-20 text-gray-400">
                     <Loader2 className="w-8 h-8 animate-spin mr-3" />
-                    <span className="text-sm font-medium">Loading sessions...</span>
+                    <span className="text-sm font-medium">Loading sessions…</span>
                 </div>
-            ) : sessions.length === 0 ? (
+            ) : filteredSessions.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm">
                     <div className="inline-flex items-center justify-center p-4 bg-indigo-50 text-indigo-500 rounded-full mb-4">
                         <MessageSquarePlus className="w-8 h-8" />
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900">No Coaching Sessions</h3>
+                    <h3 className="text-lg font-bold text-gray-900">No Sessions Found</h3>
                     <p className="text-gray-500 max-w-sm mx-auto mt-2">
-                        {isManagement
-                            ? "You haven't scheduled any coaching sessions yet. Click the button above to create one."
-                            : "You don't have any upcoming coaching sessions assigned right now."}
+                        {filterStatus !== 'all' || filterMonth !== '' || filterYear !== null
+                            ? 'No sessions match your current filters. Try adjusting the filters above.'
+                            : isManagement
+                                ? "You haven't scheduled any coaching sessions yet. Click the button above to create one."
+                                : "You don't have any coaching sessions assigned right now."}
                     </p>
                 </div>
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* List of Sessions */}
-                    <div className={`col-span-1 ${isManagement ? 'lg:col-span-1' : 'lg:col-span-3'} space-y-4`}>
-                        <h2 className="font-semibold text-gray-700 uppercase text-xs tracking-wider mb-2">Your Sessions</h2>
 
-                        {sessions.map(session => {
-                            const isCancelled = session.status === 'cancelled';
-                            const sessionEnded = isSessionEnded(session);
-                            const joinWindowOpen = isJoinWindowOpen(session);
+            ) : viewMode === 'list' ? (
+                /* ── LIST VIEW ───────────────────────────────────────────────── */
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="divide-y divide-gray-50">
+                        {filteredSessions.map(session => {
                             const displayStatus = getDisplayStatus(session);
-                            // isParticipant: agents always, group leaders when they didn't create the session
-                            const isParticipant = currentUser.role === UserRole.AGENT ||
-                                (currentUser.role === UserRole.GROUP_LEADER && session.created_by !== currentUser.id);
-                            const myAttendance = session.attendance.find(a => a.agent_id === currentUser.id);
-                            const hasJoined = isParticipant && myAttendance?.status === 'joined';
-                            const didNotAttend = isParticipant && myAttendance?.status === 'did_not_attend';
-
-                            let cardClass = 'bg-white border-gray-200 hover:border-indigo-300 hover:shadow-sm';
-                            if (isCancelled) {
-                                cardClass = 'bg-red-50 border-red-200 opacity-80';
-                            } else if (isParticipant) {
-                                if (hasJoined) {
-                                    cardClass = 'bg-emerald-50 border-emerald-500 shadow-sm';
-                                } else if (sessionEnded || didNotAttend) {
-                                    cardClass = 'bg-amber-50 border-amber-500 shadow-sm text-amber-900';
-                                } else if (selectedSessionId === session.id) {
-                                    cardClass = 'bg-white border-indigo-500 shadow-md ring-1 ring-indigo-500';
-                                }
-                            } else {
-                                if (selectedSessionId === session.id) {
-                                    cardClass = 'bg-white border-indigo-500 shadow-md ring-1 ring-indigo-500';
-                                }
-                            }
-
-                            const typeBadgeClass = {
-                                individual_coaching: 'bg-blue-100 text-blue-700',
-                                group_coaching: 'bg-green-100 text-green-700',
-                                peer_circles: 'bg-purple-100 text-purple-700',
-                                seminar: 'bg-orange-100 text-orange-700',
-                            }[session.coaching_type] || 'bg-gray-100 text-gray-600';
+                            const isCancelled   = session.status === 'cancelled';
+                            const isParticipant = currentUser.role === UserRole.AGENT || currentUser.role === UserRole.GROUP_LEADER;
+                            const myAttendance  = session.attendance.find(a => a.agent_id === currentUser.id);
+                            const hasJoined     = isParticipant && myAttendance?.status === 'joined';
+                            const windowStart   = getJoinWindowStart(session);
+                            const windowEnd     = getJoinWindowEnd(session);
+                            const joinOpen      = now >= windowStart && now < windowEnd;
+                            const ended         = now >= windowEnd;
+                            const msToOpen      = windowStart.getTime() - now.getTime();
+                            const msToClose     = windowEnd.getTime()   - now.getTime();
+                            const pts           = getSessionPoints(session);
 
                             return (
-                                <div
-                                    key={session.id}
-                                    className={`border rounded-xl p-4 transition-all cursor-pointer ${cardClass}`}
-                                    onClick={() => setSelectedSessionId(session.id)}
-                                >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h3 className={`font-bold ${isCancelled ? 'text-red-700 line-through' : 'text-gray-900'}`}>{session.title}</h3>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg ${typeBadgeClass}`}>
+                                <div key={session.id} className={`flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 hover:bg-gray-50 transition-colors ${isCancelled ? 'opacity-60' : ''}`}>
+                                    {/* Status dot */}
+                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 sm:mt-0 ${
+                                        isCancelled ? 'bg-red-400' :
+                                        joinOpen ? 'bg-emerald-500' :
+                                        ended ? 'bg-gray-300' : 'bg-blue-500'
+                                    }`} />
+
+                                    {/* Main info */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                                            <span className={`font-semibold text-sm ${isCancelled ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                                                {session.title}
+                                            </span>
+                                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${COACHING_TYPE_BADGE[session.coaching_type] || 'bg-gray-100 text-gray-600'}`}>
                                                 {COACHING_TYPE_LABELS[session.coaching_type]}
                                             </span>
-                                            <span className={`px-2 py-1 text-xs font-bold rounded-lg ${displayStatus.cls}`}>
+                                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${displayStatus.cls}`}>
                                                 {displayStatus.label}
                                             </span>
                                         </div>
-                                    </div>
-
-                                    <div className="space-y-2 mt-3 text-sm text-gray-600">
-                                        <div className="flex items-center gap-2">
-                                            <CalendarDays className="w-4 h-4 text-gray-400" />
-                                            <span>{formatDate(session.start_date)} ({new Date(session.start_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} - {session.end_date ? new Date(session.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''})</span>
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-gray-500">
+                                            <span className="flex items-center gap-1">
+                                                <CalendarDays className="w-3 h-3" />
+                                                {formatDate(session.start_date)} · {timeRange(session)}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <MapPin className="w-3 h-3" /> {TRAINING_MODE_LABELS[session.training_mode]}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <Users className="w-3 h-3" /> {session.created_by_name}
+                                            </span>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <MapPin className="w-4 h-4 text-gray-400" />
-                                            <span>{TRAINING_MODE_LABELS[session.training_mode]}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Users className="w-4 h-4 text-gray-400" />
-                                            <span>{COACHING_TYPE_LABELS[session.coaching_type]} | By: {session.created_by_name}</span>
-                                        </div>
-                                        {session.description && (
-                                            <div className="flex items-start gap-2 pt-1 border-t border-gray-100">
-                                                <AlignLeft className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />
-                                                <p className="text-sm font-medium text-gray-700 italic">{session.description}</p>
+                                        {isParticipant && !isCancelled && !ended && (
+                                            <div className="flex items-center gap-1 mt-1 text-xs text-indigo-500">
+                                                <Info className="w-3 h-3 flex-shrink-0" />
+                                                Join link available: <span className="font-semibold ml-0.5">{formatJoinWindow(session)}</span>
                                             </div>
                                         )}
                                     </div>
 
-                                    {/* Management: Edit and Cancel buttons */}
-                                    {isManagement && !isCancelled && canManageSession(session.created_by) && (
-                                        <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end gap-2">
-                                            {canEditSession(session) && (
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                                        {/* Management buttons */}
+                                        {canManageSession(session.created_by) && !isCancelled && (
+                                            <>
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); setEditingSession(session); setIsCreateModalOpen(true); }}
-                                                    className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors border border-indigo-200"
+                                                    onClick={() => setAttendanceModal(session)}
+                                                    className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors"
                                                 >
-                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                    Edit Session
+                                                    <Users className="w-3.5 h-3.5" /> Attendance
                                                 </button>
-                                            )}
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleCancelSession(session.id); }}
-                                                className="flex items-center gap-1.5 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors border border-red-200"
-                                            >
-                                                <XCircle className="w-3.5 h-3.5" />
-                                                Cancel Session
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {/* For Agents & participating Group Leaders: attendance status + Join button */}
-                                    {isParticipant && !isCancelled && (
-                                        <div className={`mt-3 pt-3 border-t flex items-center justify-between gap-2 ${
-                                            hasJoined
-                                                ? 'border-emerald-200'
-                                                : sessionEnded || didNotAttend
-                                                    ? 'border-amber-200'
-                                                    : 'border-gray-100'
-                                        }`}>
-                                            {hasJoined ? (
-                                                <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
-                                                    <CheckCircle2 className="w-4 h-4" />
-                                                    Attendance Logged — {myAttendance?.joined_at ? formatDateTime(myAttendance.joined_at) : ''}
-                                                </span>
-                                            ) : didNotAttend ? (
-                                                <span className="flex items-center gap-1.5 text-xs font-bold text-amber-700">
-                                                    <Info className="w-4 h-4" /> Did Not Attend
-                                                </span>
-                                            ) : joinWindowOpen ? (
+                                                {canEditSession(session) && (
+                                                    <button
+                                                        onClick={() => { setEditingSession(session); setIsCreateModalOpen(true); }}
+                                                        className="flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 transition-colors"
+                                                    >
+                                                        <Edit2 className="w-3.5 h-3.5" /> Edit
+                                                    </button>
+                                                )}
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); handleJoinSession(session.id); }}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
+                                                    onClick={() => handleCancelSession(session.id)}
+                                                    className="flex items-center gap-1.5 text-xs font-bold text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 transition-colors"
                                                 >
-                                                    <LogIn className="w-3.5 h-3.5" /> Join Session
+                                                    <XCircle className="w-3.5 h-3.5" /> Cancel
                                                 </button>
-                                            ) : sessionEnded ? (
-                                                <span className="flex items-center gap-1.5 text-xs font-bold text-amber-700">
-                                                    <Info className="w-4 h-4" /> Did Not Attend
+                                            </>
+                                        )}
+                                        {/* Participant join */}
+                                        {isParticipant && !isCancelled && (
+                                            hasJoined ? (
+                                                <span className="flex items-center gap-1 text-xs font-bold text-emerald-700">
+                                                    <CheckCircle2 className="w-3.5 h-3.5" /> Joined · +{pts} pts
                                                 </span>
+                                            ) : ended ? (
+                                                <span className="flex items-center gap-1 text-xs font-bold text-rose-600">
+                                                    <XCircle className="w-3.5 h-3.5" /> Expired
+                                                </span>
+                                            ) : joinOpen ? (
+                                                <div className="flex flex-col items-end gap-0.5">
+                                                    <button
+                                                        onClick={() => handleJoinSession(session.id)}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
+                                                    >
+                                                        <LogIn className="w-3.5 h-3.5" /> Join Session
+                                                    </button>
+                                                    <span className="text-[10px] font-semibold text-rose-500 flex items-center gap-1">
+                                                        <Clock className="w-3 h-3" /> Closes in {formatCountdown(msToClose)}
+                                                    </span>
+                                                </div>
                                             ) : (
-                                                <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400">
-                                                    <Clock className="w-4 h-4" /> Join button available at {formatJoinWindowStart(session)}
+                                                <span className="text-xs text-gray-400 flex items-center gap-1">
+                                                    <Clock className="w-3.5 h-3.5" /> Opens in {formatCountdown(msToOpen)}
                                                 </span>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Cancelled notice for participants */}
-                                    {isParticipant && isCancelled && (
-                                        <div className="mt-3 pt-3 border-t border-red-100">
-                                            <p className="text-xs text-red-500 font-medium flex items-center gap-1.5">
-                                                <XCircle className="w-3.5 h-3.5" />
-                                                This session has been cancelled.
-                                            </p>
-                                        </div>
-                                    )}
+                                            )
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })}
                     </div>
+                </div>
 
-                    {/* Attendance Log (For Management Only) */}
-                    {isManagement && (
-                        <div className="col-span-1 lg:col-span-2">
-                            <h2 className="font-semibold text-gray-700 uppercase text-xs tracking-wider mb-2">Attendance Log</h2>
+            ) : (
+                /* ── GRID / CARD VIEW ────────────────────────────────────────── */
+                <div className="space-y-4">
+                    {filteredSessions.map(session => {
+                        const isCancelled   = session.status === 'cancelled';
+                        const displayStatus = getDisplayStatus(session);
+                        const isParticipant = currentUser.role === UserRole.AGENT || currentUser.role === UserRole.GROUP_LEADER;
+                        const myAttendance  = session.attendance.find(a => a.agent_id === currentUser.id);
+                        const hasJoined     = isParticipant && myAttendance?.status === 'joined';
+                        const sessionEnded  = now >= getJoinWindowEnd(session);
+                        const didNotAttend  = isParticipant && (myAttendance?.status === 'did_not_attend' || (sessionEnded && !hasJoined));
 
-                            {selectedSessionId ? (() => {
-                                const sel = sessions.find(s => s.id === selectedSessionId);
-                                if (!sel) return null;
+                        let cardBorder = 'border-gray-200 bg-white hover:border-indigo-200 hover:shadow-sm';
+                        if (isCancelled)   cardBorder = 'border-red-200 bg-red-50 opacity-80';
+                        else if (hasJoined)     cardBorder = 'border-emerald-400 bg-emerald-50 shadow-sm';
+                        else if (didNotAttend)  cardBorder = 'border-amber-400 bg-amber-50 shadow-sm';
 
-                                if (!canManageSession(sel.created_by)) {
-                                    return (
-                                        <div className="bg-gray-50 rounded-2xl border border-gray-200 border-dashed p-10 text-center text-gray-500">
-                                            <Info className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                                            <p className="font-medium">Attendance managed by the session creator.</p>
-                                            <p className="text-xs mt-1">Only admins and the trainer who created this session can view the attendance log.</p>
+                        return (
+                            <div key={session.id} className={`border rounded-xl p-5 transition-all ${cardBorder}`}>
+                                {/* Card header */}
+                                <div className="flex justify-between items-start gap-3 mb-4">
+                                    <h3 className={`font-bold text-base leading-snug ${isCancelled ? 'text-red-700 line-through' : 'text-gray-900'}`}>
+                                        {session.title}
+                                    </h3>
+                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${COACHING_TYPE_BADGE[session.coaching_type] || 'bg-gray-100 text-gray-600'}`}>
+                                            {COACHING_TYPE_LABELS[session.coaching_type]}
+                                        </span>
+                                        <span className={`px-2.5 py-1 text-xs font-bold rounded-lg ${displayStatus.cls}`}>
+                                            {displayStatus.label}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Details */}
+                                <div className="space-y-2 text-sm text-gray-600">
+                                    <div className="flex items-center gap-2">
+                                        <CalendarDays className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                        <span>{formatDate(session.start_date)} · {timeRange(session)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                        <span>{TRAINING_MODE_LABELS[session.training_mode]}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Users className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                        <span>{COACHING_TYPE_LABELS[session.coaching_type]} · By {session.created_by_name}</span>
+                                    </div>
+                                    {isParticipant && !isCancelled && !sessionEnded && (
+                                        <div className="flex items-center gap-2 pt-1 border-t border-gray-100 mt-1">
+                                            <Info className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+                                            <span className="text-xs text-indigo-500">
+                                                Join link available: <span className="font-semibold">{formatJoinWindow(session)}</span>
+                                            </span>
                                         </div>
-                                    );
-                                }
-
-                                const attendedRecords = sel.attendance.filter(a => a.status === 'joined');
-                                const notAttendedRecords = sel.attendance.filter(a => a.status !== 'joined');
-                                const selEnded = isSessionEnded(sel);
-
-                                return (
-                                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                                        {/* Panel Header */}
-                                        <div className="p-5 border-b border-gray-100 bg-gray-50/50">
-                                            <h3 className="font-bold text-gray-900 text-lg">{sel.title}</h3>
-                                            <p className="text-sm text-gray-500 mt-0.5">{COACHING_TYPE_LABELS[sel.coaching_type]} · {formatDate(sel.start_date)} · {new Date(sel.start_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}–{sel.end_date ? new Date(sel.end_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}</p>
-                                            <p className="text-xs font-semibold text-gray-500 mt-2">
-                                                {attendedRecords.length} of {sel.attendance.length} attended
-                                            </p>
+                                    )}
+                                    {session.description && (
+                                        <div className="flex items-start gap-2 pt-2 border-t border-gray-100 mt-2">
+                                            <AlignLeft className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                                            <p className="text-sm text-gray-600 italic">{session.description}</p>
                                         </div>
+                                    )}
+                                </div>
 
-                                        <div className="divide-y divide-slate-100">
-                                            {sel.attendance.length === 0 ? (
-                                                <div className="p-10 text-center text-gray-500">
-                                                    No agents are assigned to this session.
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    {/* Attended Section */}
-                                                    <div className="p-5">
-                                                        <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                                                            <CheckCircle2 className="w-3.5 h-3.5" />
-                                                            Attended ({attendedRecords.length})
-                                                        </h4>
-                                                        {attendedRecords.length === 0 ? (
-                                                            <p className="text-sm text-gray-400 italic">No agents have logged attendance yet.</p>
-                                                        ) : (
-                                                            <div className="space-y-2">
-                                                                {attendedRecords.map(rec => (
-                                                                    <div key={rec.id} className="flex items-center justify-between py-2 px-3 bg-emerald-50 border border-emerald-100 rounded-xl">
-                                                                        <div>
-                                                                            <p className="text-sm font-semibold text-gray-900">{rec.agent_name}</p>
-                                                                            <p className="text-xs text-gray-500">{rec.group_name || 'No Group'}</p>
-                                                                        </div>
-                                                                        <div className="text-right">
-                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 mb-0.5">
-                                                                                <CheckCircle2 className="w-3 h-3 mr-1" /> Attended
-                                                                            </span>
-                                                                            <p className="text-xs text-gray-400">{rec.joined_at ? formatDateTime(rec.joined_at) : '—'}</p>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Did Not Attend / Pending Section */}
-                                                    <div className="p-5">
-                                                        <h4 className="text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 text-gray-400">
-                                                            <Info className="w-3.5 h-3.5" />
-                                                            {`Not Attended (${notAttendedRecords.length})`}
-                                                        </h4>
-                                                        {notAttendedRecords.length === 0 ? (
-                                                            <p className="text-sm text-gray-400 italic">All invited agents attended.</p>
-                                                        ) : (
-                                                            <div className="space-y-2">
-                                                                {notAttendedRecords.map(rec => {
-                                                                    const didNotAttend = rec.status === 'did_not_attend';
-                                                                    return (
-                                                                        <div key={rec.id} className={`flex items-center justify-between py-2 px-3 border rounded-xl ${didNotAttend ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
-                                                                            <div>
-                                                                                <p className="text-sm font-semibold text-gray-900">{rec.agent_name}</p>
-                                                                                <p className="text-xs text-gray-500">{rec.group_name || 'No Group'}</p>
-                                                                            </div>
-                                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${didNotAttend ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-gray-500'}`}>
-                                                                                {didNotAttend ? 'Did Not Attend' : 'Invited'}
-                                                                            </span>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </>
-                                            )}
+                                {/* Footer: management + participant actions */}
+                                {(canManageSession(session.created_by) || isParticipant) && !isCancelled && (
+                                    <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                                        <ManagementActions session={session} compact />
+                                        <div className="ml-auto">
+                                            <ParticipantAction session={session} compact />
                                         </div>
                                     </div>
-                                );
-                            })() : (
-                                <div className="bg-gray-50 rounded-2xl border border-gray-200 border-dashed p-12 text-center text-gray-500 flex flex-col items-center justify-center">
-                                    <ChevronRight className="w-8 h-8 text-gray-300 mb-2" />
-                                    <p>Select a session from the list to view the attendance log.</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                                )}
+
+                                {isCancelled && isParticipant && (
+                                    <div className="mt-4 pt-4 border-t border-red-100">
+                                        <p className="text-xs text-red-500 font-medium flex items-center gap-1.5">
+                                            <XCircle className="w-3.5 h-3.5" /> This session has been cancelled.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 
+            {/* Session count */}
+            {!isLoadingCoaching && filteredSessions.length > 0 && (
+                <p className="text-xs text-gray-400 text-center">
+                    Showing {filteredSessions.length} of {coachingSessions.length} session{coachingSessions.length !== 1 ? 's' : ''}
+                </p>
+            )}
+
+            {/* Attendance Modal */}
+            {attendanceModal && (
+                <AttendanceModal
+                    session={attendanceModal}
+                    onClose={() => setAttendanceModal(null)}
+                    formatDate={formatDate}
+                    formatDateTime={formatDateTime}
+                />
+            )}
+
+            {/* Create / Edit Modal */}
             {isCreateModalOpen && (
                 <CreateCoachingModal
                     onClose={() => { setIsCreateModalOpen(false); setEditingSession(null); }}

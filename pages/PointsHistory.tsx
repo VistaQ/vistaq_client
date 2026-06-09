@@ -2,28 +2,75 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { Award, Star, Lock, CheckCircle, Users, Target, DollarSign, X, TrendingUp, Loader2 } from 'lucide-react';
+import {
+  Award, Star, Lock, CheckCircle, Users, Target, TrendingUp, X, Loader2,
+  Zap, Calendar, BookOpen, CheckSquare, ArrowRight, MapPin,
+} from 'lucide-react';
 import { Player } from '@lottiefiles/react-lottie-player';
 import { apiCall } from '../services/apiClient';
 import type { components } from '../types.generated';
 
 type AgentPointsData = components['schemas']['AgentPointsObject'];
 type AgentPointsResponse = { success: boolean; data: AgentPointsData };
+type HistoryCategory = 'prospect' | 'coaching' | 'sales' | null;
 
-type HistoryCategory = 'prospect' | 'coaching' | null;
+// Minimal type needed for leaderboard rank fetch
+type LBEntry = { user_id: string; total_points: number };
+type LBResponse = { success: boolean; data: { individual: LBEntry[] } };
+
+const TIPS = [
+  {
+    icon: <Target className="w-5 h-5 text-blue-600" />,
+    bg: 'bg-blue-50',
+    title: 'Add Prospects Regularly',
+    desc: 'Every new prospect added earns you points. Aim to add at least 3–5 new prospects each week.',
+  },
+  {
+    icon: <Calendar className="w-5 h-5 text-purple-600" />,
+    bg: 'bg-purple-50',
+    title: 'Complete Appointments',
+    desc: 'Scheduling and completing appointments with prospects earns additional bonus points.',
+  },
+  {
+    icon: <CheckSquare className="w-5 h-5 text-green-600" />,
+    bg: 'bg-green-50',
+    title: 'Close More Sales',
+    desc: 'Each successful sale earns sales completion points on top of your prospect management points.',
+  },
+  {
+    icon: <BookOpen className="w-5 h-5 text-amber-600" />,
+    bg: 'bg-amber-50',
+    title: 'Attend Coaching Sessions',
+    desc: 'Personal development sessions confirmed by your trainer earn you personal development points.',
+  },
+  {
+    icon: <TrendingUp className="w-5 h-5 text-indigo-600" />,
+    bg: 'bg-indigo-50',
+    title: 'Progress Prospect Stages',
+    desc: 'Moving prospects through stages (prospect → appointment → meeting → sale) rewards consistency.',
+  },
+  {
+    icon: <Zap className="w-5 h-5 text-rose-600" />,
+    bg: 'bg-rose-50',
+    title: 'Stay Consistent',
+    desc: 'Points accumulate over time. Consistent daily activity beats sporadic bursts.',
+  },
+];
 
 const PointsHistory: React.FC = () => {
-  const { currentUser } = useAuth();
-  const { badgeTiers } = useData();
+  const { currentUser }    = useAuth();
+  const { badgeTiers }     = useData();
   const [historyCategory, setHistoryCategory] = useState<HistoryCategory>(null);
-  const [pointsData, setPointsData] = useState<AgentPointsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [pointsData,  setPointsData]  = useState<AgentPointsData | null>(null);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState<string | null>(null);
+  const [lbRank,      setLbRank]      = useState<number | null>(null);
 
-  useEffect(() => {
+  const loadPoints = () => {
     if (!currentUser) return;
     setLoading(true);
     setError(null);
+    // Keep limit at 100 — the backend enforces a page-size cap
     const params = new URLSearchParams({ userId: currentUser.id, limit: '100' });
     apiCall<AgentPointsResponse>(`/agent-points?${params.toString()}`)
       .then(res => {
@@ -32,6 +79,26 @@ const PointsHistory: React.FC = () => {
       })
       .catch(err => setError(err.message || 'Failed to load points data.'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadPoints(); }, [currentUser?.id]);
+
+  // Fetch leaderboard rank (YTD / total points) — non-critical, silently ignored on error
+  useEffect(() => {
+    if (!currentUser) return;
+    apiCall<LBResponse>('/leaderboard/stats?period=ytd')
+      .then(res => {
+        try {
+          const individuals: LBEntry[] = res?.data?.individual ?? [];
+          if (!Array.isArray(individuals)) return;
+          const sorted = [...individuals].sort((a, b) => b.total_points - a.total_points);
+          const idx = sorted.findIndex(e => e.user_id === currentUser.id);
+          setLbRank(idx >= 0 ? idx + 1 : null);
+        } catch {
+          // malformed response — just don't show rank
+        }
+      })
+      .catch(() => {}); // 4xx/5xx — rank chip simply won't appear
   }, [currentUser?.id]);
 
   if (!currentUser) return null;
@@ -49,18 +116,7 @@ const PointsHistory: React.FC = () => {
       <div className="flex flex-col items-center justify-center py-32 text-gray-500">
         <TrendingUp className="w-8 h-8 mb-3 text-gray-400" />
         <p className="font-medium">{error ?? 'No data available.'}</p>
-        <button
-          onClick={() => {
-            setError(null);
-            setLoading(true);
-            const params = new URLSearchParams({ userId: currentUser.id, limit: '100' });
-            apiCall<AgentPointsResponse>(`/agent-points?${params.toString()}`)
-              .then(res => { if (res.success) setPointsData(res.data); else setError('Failed to load points data.'); })
-              .catch(err => setError(err.message || 'Failed to load points data.'))
-              .finally(() => setLoading(false));
-          }}
-          className="mt-3 text-sm text-blue-600 font-medium hover:underline"
-        >
+        <button onClick={loadPoints} className="mt-3 text-sm text-blue-600 font-medium hover:underline">
           Retry
         </button>
       </div>
@@ -70,64 +126,93 @@ const PointsHistory: React.FC = () => {
   const totalPoints = pointsData.total;
   const sortedBadges = [...badgeTiers].sort((a, b) => a.threshold - b.threshold);
 
-  // Determine current badge (highest tier the user qualifies for) and next milestone
-  const currentBadgeIndex = sortedBadges.reduce((best, tier, i) =>
-    totalPoints >= tier.threshold ? i : best, 0);
+  const currentBadgeIndex = sortedBadges.reduce(
+    (best, tier, i) => (totalPoints >= tier.threshold ? i : best), 0
+  );
   const currentBadge = sortedBadges[currentBadgeIndex];
-  const nextBadge = sortedBadges[currentBadgeIndex + 1] ?? null;
+  const nextBadge    = sortedBadges[currentBadgeIndex + 1] ?? null;
 
   const progressToNext = nextBadge
-    ? Math.min(100, Math.max(0, ((totalPoints - currentBadge.threshold) / (nextBadge.threshold - currentBadge.threshold)) * 100))
+    ? Math.min(100, Math.max(0,
+        ((totalPoints - currentBadge.threshold) / (nextBadge.threshold - currentBadge.threshold)) * 100
+      ))
     : 100;
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
-    return !isNaN(d.getTime()) ? d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+    return !isNaN(d.getTime())
+      ? d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+      : 'N/A';
   };
 
-  const prospectEntries = pointsData.breakdown.filter(e => e.category === 'prospect');
-  const coachingEntries = pointsData.breakdown.filter(e => e.category === 'coaching');
+  // Filter out entries tied to deleted prospects (subject is null) so they never surface in any category.
+  const validBreakdown = pointsData.breakdown.filter(e => e.subject != null);
 
-  const historyEntries = historyCategory === 'prospect' ? prospectEntries : coachingEntries;
-  const historyTitle = historyCategory === 'prospect' ? 'Prospect Management History' : 'Personal Development History';
+  const prospectEntries = validBreakdown.filter(e => e.category === 'prospect');
+  const salesEntries    = validBreakdown.filter(e => e.category === 'sales');
+  const coachingEntries = validBreakdown.filter(e => e.category === 'coaching');
+
+  const historyEntries = historyCategory === 'prospect' ? prospectEntries
+    : historyCategory === 'sales'    ? salesEntries
+    : coachingEntries;
+  const historyTitle   = historyCategory === 'prospect' ? 'Prospect Management History'
+    : historyCategory === 'sales'    ? 'Sales Completion History'
+    : 'Personal Development History';
 
   return (
     <div className="space-y-8">
+
+      {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">My Points</h1>
           {currentBadge && (
             <span className={`inline-flex items-center mt-1 px-3 py-1 rounded-full text-xs font-bold ${currentBadge.bg} ${currentBadge.color}`}>
-              Level {currentBadge.level ?? originalIndex + 1} — {currentBadge.name}
+              Level {currentBadge.level ?? (currentBadgeIndex + 1)} — {currentBadge.name}
             </span>
           )}
         </div>
+        {lbRank !== null && (
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl text-sm">
+            <MapPin className="w-4 h-4 text-blue-500" />
+            <span className="font-bold text-blue-700">#{lbRank}</span>
+            <span className="text-blue-400 text-xs">on Leaderboard</span>
+          </div>
+        )}
       </div>
 
-      {/* Progress Card */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 relative overflow-hidden">
+      {/* ── Progress Card ─────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sm:p-8 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-4 opacity-10">
-          <Award className="w-64 h-64 text-blue-900" />
+          <Award className="w-48 h-48 sm:w-64 sm:h-64 text-blue-900" />
         </div>
 
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center">
-            <div className={`w-24 h-24 rounded-full flex items-center justify-center ${currentBadge.bg} mr-6 shadow-inner overflow-hidden`}>
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          {/* Current badge */}
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center ${currentBadge.bg} shadow-inner overflow-hidden flex-shrink-0`}>
               {currentBadge.lottieUrl ? (
-                <Player src={currentBadge.lottieUrl} loop autoplay style={{ width: 80, height: 80 }} />
+                <Player src={currentBadge.lottieUrl} loop autoplay style={{ width: 72, height: 72 }} />
               ) : (
-                <Award className={`w-12 h-12 ${currentBadge.color}`} />
+                <Award className={`w-10 h-10 sm:w-12 sm:h-12 ${currentBadge.color}`} />
               )}
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Current Rank</h2>
-              <h1 className="text-3xl font-bold text-gray-900">{currentBadge.name}</h1>
-              <p className="text-blue-600 font-bold text-xl mt-1">{Math.floor(totalPoints).toLocaleString()} Points</p>
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Current Rank</h2>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{currentBadge.name}</h1>
+              <p className="text-blue-600 font-bold text-lg sm:text-xl mt-0.5">{Math.floor(totalPoints).toLocaleString()} Points</p>
+              {lbRank !== null && (
+                <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  Ranked <span className="font-bold text-gray-600">#{lbRank}</span> on the Leaderboard
+                </p>
+              )}
             </div>
           </div>
 
+          {/* Progress to next */}
           {nextBadge ? (
-            <div className="w-full md:w-1/2 bg-gray-50 p-6 rounded-xl border border-gray-100">
+            <div className="w-full md:w-1/2 bg-gray-50 p-5 rounded-xl border border-gray-100">
               <div className="flex justify-between text-sm font-bold text-gray-700 mb-2">
                 <span>Next: {nextBadge.name}</span>
                 <span>{Math.floor(progressToNext)}%</span>
@@ -140,7 +225,9 @@ const PointsHistory: React.FC = () => {
               </div>
               <div className="flex justify-between text-xs text-gray-500">
                 <span>{currentBadge.threshold.toLocaleString()} pts</span>
-                <span className="font-medium text-blue-600">{Math.floor(nextBadge.threshold - totalPoints).toLocaleString()} pts to go!</span>
+                <span className="font-medium text-blue-600">
+                  {Math.floor(nextBadge.threshold - totalPoints).toLocaleString()} pts to go!
+                </span>
                 <span>{nextBadge.threshold.toLocaleString()} pts</span>
               </div>
             </div>
@@ -151,133 +238,187 @@ const PointsHistory: React.FC = () => {
                   <Star className="w-6 h-6 fill-current" />
                 </div>
                 <h3 className="text-green-800 font-bold">Max Rank Achieved!</h3>
-                <p className="text-green-600 text-sm">You've reached Achiever status!</p>
+                <p className="text-green-600 text-sm">You've reached the highest tier!</p>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* 3 Category Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* ── Points Category Cards ──────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
         {/* Prospect Management */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
           <div className="flex items-center mb-3">
-            <div className="p-2 bg-blue-50 rounded-lg mr-3">
+            <div className="p-2 bg-blue-50 rounded-lg mr-3 flex-shrink-0">
               <Target className="w-5 h-5 text-blue-600" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold text-gray-500 uppercase">Prospect Management</p>
-              <p className="text-2xl font-bold text-gray-900">{pointsData.categories.prospect.toLocaleString()} pts</p>
+              <p className="text-2xl font-bold text-gray-900">{pointsData.categories.prospect.toLocaleString()} <span className="text-sm font-normal text-gray-400">pts</span></p>
             </div>
           </div>
           <p className="text-xs text-gray-400 mb-4">{prospectEntries.length} activities recorded</p>
           <button
             onClick={() => setHistoryCategory('prospect')}
-            className="mt-auto text-xs text-blue-600 font-bold hover:underline text-left"
+            className="mt-auto text-xs text-blue-600 font-bold hover:underline text-left flex items-center gap-1"
           >
-            See Points History →
+            See History <ArrowRight className="w-3 h-3" />
           </button>
         </div>
 
-        {/* Sales Completion — placeholder */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col opacity-60">
+        {/* Sales Completion — live data */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
           <div className="flex items-center mb-3">
-            <div className="p-2 bg-green-50 rounded-lg mr-3">
-              <DollarSign className="w-5 h-5 text-green-600" />
+            <div className="p-2 bg-green-50 rounded-lg mr-3 flex-shrink-0">
+              <TrendingUp className="w-5 h-5 text-green-600" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold text-gray-500 uppercase">Sales Completion</p>
-              <p className="text-2xl font-bold text-gray-900">{pointsData.categories.sales.toLocaleString()} pts</p>
+              <p className="text-2xl font-bold text-gray-900">{pointsData.categories.sales.toLocaleString()} <span className="text-sm font-normal text-gray-400">pts</span></p>
             </div>
           </div>
-          <p className="text-xs text-gray-400 mb-4 flex items-center gap-1">
-            <Lock className="w-3 h-3" /> Coming soon — backend integration pending
-          </p>
+          <p className="text-xs text-gray-400 mb-4">{salesEntries.length} sale{salesEntries.length !== 1 ? 's' : ''} completed</p>
           <button
-            disabled
-            className="mt-auto text-xs text-gray-400 font-bold text-left cursor-not-allowed"
+            onClick={() => setHistoryCategory('sales')}
+            className="mt-auto text-xs text-green-600 font-bold hover:underline text-left flex items-center gap-1"
           >
-            See Points History →
+            See History <ArrowRight className="w-3 h-3" />
           </button>
         </div>
 
         {/* Personal Development */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
           <div className="flex items-center mb-3">
-            <div className="p-2 bg-purple-50 rounded-lg mr-3">
+            <div className="p-2 bg-purple-50 rounded-lg mr-3 flex-shrink-0">
               <Users className="w-5 h-5 text-purple-600" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold text-gray-500 uppercase">Personal Development</p>
-              <p className="text-2xl font-bold text-gray-900">{pointsData.categories.coaching.toLocaleString()} pts</p>
+              <p className="text-2xl font-bold text-gray-900">{pointsData.categories.coaching.toLocaleString()} <span className="text-sm font-normal text-gray-400">pts</span></p>
             </div>
           </div>
           <p className="text-xs text-gray-400 mb-4">{coachingEntries.length} confirmed sessions</p>
           <button
             onClick={() => setHistoryCategory('coaching')}
-            className="mt-auto text-xs text-purple-600 font-bold hover:underline text-left"
+            className="mt-auto text-xs text-purple-600 font-bold hover:underline text-left flex items-center gap-1"
           >
-            See Points History →
+            See History <ArrowRight className="w-3 h-3" />
           </button>
         </div>
       </div>
 
-      {/* Milestone Badges */}
+      {/* ── Milestone Journey ──────────────────────────────────────────────────── */}
       <div>
-        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-          <Award className="w-5 h-5 mr-2 text-gray-500" />
-          Milestone Badges
+        <h3 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
+          <Award className="w-5 h-5 text-gray-500" />
+          Milestone Journey
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-          {sortedBadges.map((m, idx) => {
-            const isEarned = totalPoints >= m.threshold;
-            const isCurrent = m.id === currentBadge.id;
-            return (
-              <div
-                key={m.id}
-                className={`relative p-3 rounded-xl border flex flex-col items-center text-center transition-all ${
-                  isCurrent
-                    ? 'bg-white border-blue-300 shadow-md ring-2 ring-blue-400 ring-offset-2'
-                    : isEarned
-                    ? 'bg-white border-blue-100 shadow-sm'
-                    : 'bg-gray-50 border-gray-100'
-                }`}
-              >
-                {isEarned && !isCurrent && (
-                  <div className="absolute top-1.5 right-1.5 text-green-500 bg-white rounded-full shadow-sm">
-                    <CheckCircle className="w-4 h-4" />
-                  </div>
-                )}
-                {isCurrent && (
-                  <div className="absolute top-1.5 right-1.5">
-                    <Star className="w-4 h-4 text-blue-500 fill-current" />
-                  </div>
-                )}
+        <p className="text-sm text-gray-400 mb-5">All levels from starter to top achiever — track where you are and what's next.</p>
+
+        {/* Journey track */}
+        <div className="relative">
+          {/* Connecting line */}
+          <div className="absolute top-[22px] left-0 right-0 h-0.5 bg-gray-200 hidden sm:block" />
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+            {sortedBadges.map((m, idx) => {
+              const isEarned  = totalPoints >= m.threshold;
+              const isCurrent = m.id === currentBadge?.id;
+              const isNext    = nextBadge?.id === m.id;
+              return (
                 <div
-                  className={`rounded-full ${isEarned ? m.bg : 'bg-gray-200'} mb-2 transition-colors overflow-hidden flex items-center justify-center`}
-                  style={{ width: 44, height: 44 }}
+                  key={m.id}
+                  className={`relative flex flex-col items-center text-center transition-all ${
+                    isCurrent
+                      ? 'z-10'
+                      : ''
+                  }`}
                 >
-                  {isEarned && m.lottieUrl ? (
-                    <Player src={m.lottieUrl} loop autoplay style={{ width: 32, height: 32 }} />
-                  ) : isEarned ? (
-                    <Award className={`w-5 h-5 ${m.color}`} />
-                  ) : (
-                    <Lock className="w-5 h-5 text-gray-400" />
+                  {/* Badge circle */}
+                  <div
+                    className={`relative w-11 h-11 rounded-full flex items-center justify-center mb-2 transition-all border-2 ${
+                      isCurrent
+                        ? 'ring-4 ring-blue-400 ring-offset-2 border-blue-300 bg-blue-50 shadow-lg'
+                        : isEarned
+                        ? `border-transparent ${m.bg} shadow-sm`
+                        : isNext
+                        ? 'border-dashed border-gray-300 bg-white'
+                        : 'border-transparent bg-gray-100'
+                    }`}
+                  >
+                    {isEarned && m.lottieUrl ? (
+                      <Player src={m.lottieUrl} loop autoplay style={{ width: 28, height: 28 }} />
+                    ) : isEarned ? (
+                      <Award className={`w-5 h-5 ${m.color}`} />
+                    ) : isNext ? (
+                      <Lock className="w-4 h-4 text-gray-300" />
+                    ) : (
+                      <Lock className="w-4 h-4 text-gray-300" />
+                    )}
+
+                    {/* Earned checkmark */}
+                    {isEarned && !isCurrent && (
+                      <div className="absolute -top-1 -right-1 bg-white rounded-full shadow">
+                        <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                      </div>
+                    )}
+                    {/* Current star */}
+                    {isCurrent && (
+                      <div className="absolute -top-1 -right-1 bg-white rounded-full shadow">
+                        <Star className="w-3.5 h-3.5 text-blue-500 fill-current" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Label */}
+                  <p className="text-[10px] font-bold text-gray-400 mb-0.5">Lv.{m.level ?? idx + 1}</p>
+                  <h4 className={`font-bold text-[11px] leading-tight ${isCurrent ? 'text-blue-700' : isEarned ? 'text-gray-900' : 'text-gray-400'}`}>
+                    {m.name}
+                  </h4>
+                  <span className="text-[10px] text-gray-400 mt-0.5">{m.threshold.toLocaleString()} pts</span>
+
+                  {/* Current / Next labels */}
+                  {isCurrent && (
+                    <span className="mt-1 text-[9px] font-bold uppercase tracking-wide text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">You</span>
+                  )}
+                  {isNext && !isCurrent && (
+                    <span className="mt-1 text-[9px] font-bold uppercase tracking-wide text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">Next</span>
                   )}
                 </div>
-                <p className="text-xs font-bold text-gray-400 mb-0.5">Lv.{m.level ?? idx + 1}</p>
-                <h4 className={`font-bold text-xs ${isEarned ? 'text-gray-900' : 'text-gray-400'}`}>{m.name}</h4>
-                <span className="text-[10px] text-gray-400 mt-0.5">{m.threshold.toLocaleString()} pts</span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* History Modal */}
+      {/* ── Suggestions: How to earn more ─────────────────────────────────────── */}
+      <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl border border-blue-100 p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Zap className="w-5 h-5 text-blue-500" />
+          <h3 className="text-lg font-bold text-gray-800">How to Earn More Points</h3>
+        </div>
+        <p className="text-sm text-gray-500 mb-5">Follow these habits to climb the leaderboard faster.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {TIPS.map((tip, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 flex items-start gap-3 shadow-sm">
+              <div className={`p-2 rounded-lg flex-shrink-0 ${tip.bg}`}>{tip.icon}</div>
+              <div>
+                <p className="text-sm font-bold text-gray-800">{tip.title}</p>
+                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{tip.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── History Modal ──────────────────────────────────────────────────────── */}
       {historyCategory && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40" onClick={() => setHistoryCategory(null)}>
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40"
+          onClick={() => setHistoryCategory(null)}
+        >
           <div
             className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
             onClick={e => e.stopPropagation()}
@@ -287,7 +428,9 @@ const PointsHistory: React.FC = () => {
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-gray-500" />
                 <h3 className="font-bold text-gray-800">{historyTitle}</h3>
-                <span className="text-xs font-medium text-gray-500 bg-white px-2 py-0.5 rounded border">{historyEntries.length} entries</span>
+                <span className="text-xs font-medium text-gray-500 bg-white px-2 py-0.5 rounded border">
+                  {historyEntries.length} entries
+                </span>
               </div>
               <button onClick={() => setHistoryCategory(null)} className="text-gray-400 hover:text-gray-700 p-1 rounded">
                 <X className="w-5 h-5" />
@@ -295,48 +438,36 @@ const PointsHistory: React.FC = () => {
             </div>
 
             {/* Modal body */}
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto flex-1 px-4 py-3 space-y-2">
               {historyEntries.length === 0 ? (
                 <div className="flex flex-col items-center py-16 text-gray-400">
                   <TrendingUp className="w-8 h-8 mb-3" />
                   <p className="font-medium">No entries yet</p>
-                  <p className="text-sm mt-1">
+                  <p className="text-sm mt-1 text-center px-8">
                     {historyCategory === 'prospect'
                       ? 'Add prospects and complete appointments to earn points.'
+                      : historyCategory === 'sales'
+                      ? 'Close sales deals to earn sales completion points.'
                       : 'Attend coaching sessions to earn points.'}
                   </p>
                 </div>
               ) : (
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
-                    <tr>
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Action</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Subject</th>
-                      <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase text-right">Points</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {historyEntries.map((entry) => (
-                      <tr key={entry.id} className="hover:bg-blue-50 transition-colors">
-                        <td className="px-6 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDate(entry.date)}</td>
-                        <td className="px-6 py-3 text-sm text-gray-700 font-medium">{entry.action}</td>
-                        <td className="px-6 py-3 text-sm text-gray-600 truncate max-w-[160px]">
-                          {entry.subject ?? <span className="italic text-gray-400">(deleted prospect)</span>}
-                        </td>
-                        <td className="px-6 py-3 text-right">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                              entry.points < 0 ? 'bg-rose-100 text-rose-700' : 'bg-green-100 text-green-700'
-                            }`}
-                          >
-                            {entry.points >= 0 ? `+${entry.points}` : entry.points} pts
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                historyEntries.map(entry => (
+                  <div key={entry.id} className="flex items-center justify-between gap-3 bg-gray-50 hover:bg-blue-50 transition-colors rounded-xl px-4 py-3 border border-gray-100">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{entry.subject}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{entry.action}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                        entry.points < 0 ? 'bg-rose-100 text-rose-700' : 'bg-green-100 text-green-700'
+                      }`}>
+                        {entry.points >= 0 ? `+${entry.points}` : entry.points} pts
+                      </span>
+                      <span className="text-[11px] text-gray-400">{formatDate(entry.date)}</span>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>
