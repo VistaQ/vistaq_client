@@ -643,8 +643,8 @@ const Dashboard: React.FC = () => {
                      <p className="text-sm text-gray-400 italic">No ETL data for this year yet. Contact your admin.</p>
                   ) : (
                      <div className="space-y-3">
-                        {[{ label: 'FYCt', ytd: dashYtdFyct, target: salesTarget, shortage: Math.max(salesTarget - dashYtdFyct, 0), pct: fyctPct },
-                          { label: 'FYC',  ytd: dashYtdFyc,  target: fycTarget,   shortage: Math.max(fycTarget  - dashYtdFyc,  0), pct: fycPct  }].map(item => (
+                        {[{ label: 'FYC',  ytd: dashYtdFyc,  target: fycTarget,   shortage: Math.max(fycTarget  - dashYtdFyc,  0), pct: fycPct  },
+                          { label: 'FYCt', ytd: dashYtdFyct, target: salesTarget, shortage: Math.max(salesTarget - dashYtdFyct, 0), pct: fyctPct }].map(item => (
                            <div key={item.label}>
                               <div className="flex justify-between text-sm mb-1">
                                  <span className="font-semibold text-gray-700">{item.label}</span>
