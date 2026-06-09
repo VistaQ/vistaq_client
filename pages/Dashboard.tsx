@@ -450,6 +450,12 @@ const Dashboard: React.FC = () => {
    const etlACE = myReport?.ace_ytd ?? 0;
    const etlACS = etlNOC > 0 ? etlACE / etlNOC : 0;
 
+   // Compute YTD FYCt/FYC the same way SalesReport does — sum monthly arrays up to current month.
+   // This ensures Dashboard and Sales Report always show identical figures.
+   const dashCurrentMonth = now.getMonth() + 1; // 1-based (matches SalesReport's selectedMonth default)
+   const dashYtdFyct = (myReport?.month_fyct ?? []).slice(0, dashCurrentMonth).reduce((s, v) => s + v, 0);
+   const dashYtdFyc  = (myReport?.month_fyc  ?? []).slice(0, dashCurrentMonth).reduce((s, v) => s + v, 0);
+
    const mtdSalesNOC = personalMtd?.sales_noc ?? 0;
    const mtdSalesACE = personalMtd?.sales_ace ?? 0;
 
@@ -608,8 +614,8 @@ const Dashboard: React.FC = () => {
          {/* MDRT Progress Widget */}
          {(() => {
             const monthsLeft = Math.max(12 - (new Date().getMonth() + 1), 0);
-            const fyctPct = myReport ? Math.min((myReport.fyct_ytd / salesTarget) * 100, 100) : 0;
-            const fycPct  = myReport ? Math.min((myReport.fyc_ytd  / fycTarget)   * 100, 100) : 0;
+            const fyctPct = myReport ? Math.min((dashYtdFyct / salesTarget) * 100, 100) : 0;
+            const fycPct  = myReport ? Math.min((dashYtdFyc  / fycTarget)  * 100, 100) : 0;
             const barColors: Record<string, string> = {
                FYCt: 'from-blue-500 to-blue-400',
                FYC:  'from-green-500 to-green-400',
@@ -637,8 +643,8 @@ const Dashboard: React.FC = () => {
                      <p className="text-sm text-gray-400 italic">No ETL data for this year yet. Contact your admin.</p>
                   ) : (
                      <div className="space-y-3">
-                        {[{ label: 'FYCt', ytd: myReport.fyct_ytd, target: salesTarget, shortage: Math.max(salesTarget - myReport.fyct_ytd, 0), pct: fyctPct },
-                          { label: 'FYC',  ytd: myReport.fyc_ytd,  target: fycTarget,   shortage: Math.max(fycTarget  - myReport.fyc_ytd,  0), pct: fycPct  }].map(item => (
+                        {[{ label: 'FYCt', ytd: dashYtdFyct, target: salesTarget, shortage: Math.max(salesTarget - dashYtdFyct, 0), pct: fyctPct },
+                          { label: 'FYC',  ytd: dashYtdFyc,  target: fycTarget,   shortage: Math.max(fycTarget  - dashYtdFyc,  0), pct: fycPct  }].map(item => (
                            <div key={item.label}>
                               <div className="flex justify-between text-sm mb-1">
                                  <span className="font-semibold text-gray-700">{item.label}</span>
