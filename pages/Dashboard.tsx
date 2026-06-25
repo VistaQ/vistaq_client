@@ -47,8 +47,13 @@ const Dashboard: React.FC = () => {
       refetchGroupStats();
       refetchEvents();
       refetchCoachingSessions();
-      refetchSalesReports();
       refetchMySalesReport();
+      // Bulk /sales-reports is only used by the management dashboard and is 403 for
+      // agents — only fetch it for roles that can read it and actually render it.
+      const role = currentUser?.role;
+      if (role === UserRole.ADMIN || role === UserRole.MASTER_TRAINER || role === UserRole.TRAINER) {
+         refetchSalesReports();
+      }
       apiCall('/users').then(res => setUsers(Array.isArray(res.data) ? res.data : [])).catch(() => {});
    }, []);
 

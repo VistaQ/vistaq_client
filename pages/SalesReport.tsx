@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { SalesReport as SalesReportType, MONTH_LABELS } from '../types';
+import { SalesReport as SalesReportType, MONTH_LABELS, UserRole } from '../types';
 import { CHART_COLORS } from '../constants/tokens';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -17,6 +17,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
+
+const DEFAULT_TARGET = 400_000; // per-agent MDRT default — scaled by agent count for team views
 
 const rm = (v: number) => 'RM ' + Math.round(v).toLocaleString('en-MY');
 const pct = (v: number) => (v * 100).toFixed(1) + '%';
@@ -87,7 +89,11 @@ const SectionCard: React.FC<{ id: string; title: string; subtitle?: string; chil
 const SalesReportPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const { mySalesReport, isLoadingMySalesReport, refetchMySalesReport, getProspectsByScope } = useData();
+  const {
+    mySalesReport, isLoadingMySalesReport, refetchMySalesReport,
+    salesReports, isLoadingSalesReports, refetchSalesReports,
+    getProspectsByScope,
+  } = useData();
 
   const now          = new Date();
   const currentYear  = now.getFullYear();
@@ -101,7 +107,17 @@ const SalesReportPage: React.FC = () => {
 
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  useEffect(() => { refetchMySalesReport(selectedYear); }, [selectedYear]);
+  // Management roles (admin/master trainer/trainer) have no personal ETL row, so they
+  // pull the scoped bulk reports and view a consolidated aggregate instead.
+  useEffect(() => {
+    const role = currentUser?.role;
+    const aggregate =
+      role === UserRole.ADMIN ||
+      role === UserRole.MASTER_TRAINER ||
+      role === UserRole.TRAINER;
+    if (aggregate) refetchSalesReports(selectedYear);
+    else refetchMySalesReport(selectedYear);
+  }, [selectedYear, currentUser?.role]);
 
   const toggleTrendLine = (key: string) =>
     setTrendLines(prev => {
@@ -112,16 +128,59 @@ const SalesReportPage: React.FC = () => {
 
   if (!currentUser) return null;
 
-  // ─── Sales target ─────────────────────────────────────────────────────────
-  const salesTarget   = parseFloat(localStorage.getItem(`salesTarget_${currentUser.id}`) ?? '0') || 400_000; // FYCt target
-  const fycTargetRaw  = parseFloat(localStorage.getItem(`fycTarget_${currentUser.id}`)   ?? '0');
-  const fycTarget     = fycTargetRaw > 0 ? fycTargetRaw : salesTarget; // falls back to FYCt target if FYC target not set
-  const monthlyTarget = salesTarget / 12;
+  const isAggregateRole =
+    currentUser.role === UserRole.ADMIN ||
+    currentUser.role === UserRole.MASTER_TRAINER ||
+    currentUser.role === UserRole.TRAINER;
 
   // ─── ETL data ─────────────────────────────────────────────────────────────
-  const myReport: SalesReportType | undefined = mySalesReport ?? undefined;
+  // Personal roles (agent / group leader) read their own /sales-reports/me row.
+  // Management roles have no personal row, so we consolidate every agent report
+  // in their server-scoped bulk response into a single aggregate report.
+  const aggregateReport: SalesReportType | undefined = (() => {
+    if (!isAggregateRole || salesReports.length === 0) return undefined;
+    const sumMonths = (key: 'month_fyct' | 'month_fyc' | 'month_ace' | 'month_noc') =>
+      MONTH_LABELS.map((_, idx) => salesReports.reduce((s, r) => s + (r[key]?.[idx] ?? 0), 0));
+    const sumYtd = (key: 'fyct_ytd' | 'fyc_ytd' | 'ace_ytd' | 'noc_ytd') =>
+      salesReports.reduce((s, r) => s + (r[key] ?? 0), 0);
+    const scopeLabel = currentUser.role === UserRole.TRAINER ? 'My Agents' : 'All Agents';
+    return {
+      id: 'aggregate',
+      agent_id: 'aggregate',
+      agent_code: `${salesReports.length} agent${salesReports.length !== 1 ? 's' : ''}`,
+      agent_name: `Consolidated — ${scopeLabel}`,
+      year: selectedYear,
+      imported_at: new Date().toISOString(),
+      ace_ytd:  sumYtd('ace_ytd'),
+      noc_ytd:  sumYtd('noc_ytd'),
+      fyct_ytd: sumYtd('fyct_ytd'),
+      fyct_pct: 0,
+      mdrt_shortage_fyct: 0,
+      fyc_ytd:  sumYtd('fyc_ytd'),
+      fyc_pct:  0,
+      mdrt_shortage_fyc: 0,
+      month_ace:  sumMonths('month_ace'),
+      month_noc:  sumMonths('month_noc'),
+      month_fyct: sumMonths('month_fyct'),
+      month_fyc:  sumMonths('month_fyc'),
+    } as SalesReportType;
+  })();
+
+  const myReport: SalesReportType | undefined = isAggregateRole ? aggregateReport : (mySalesReport ?? undefined);
   const hasEtlData = myReport !== undefined;
+  const isLoadingEtl = isAggregateRole ? isLoadingSalesReports : isLoadingMySalesReport;
   const n = selectedMonth; // effective period index (1-based)
+
+  // ─── Sales target ─────────────────────────────────────────────────────────
+  // Personal roles compare against the agent's own profile target; management
+  // roles compare the consolidated figures against a scaled team target.
+  const reportCount   = isAggregateRole ? Math.max(salesReports.length, 1) : 1;
+  const profileTarget = parseFloat(localStorage.getItem(`salesTarget_${currentUser.id}`) ?? '0') || DEFAULT_TARGET;
+  const fycTargetRaw  = parseFloat(localStorage.getItem(`fycTarget_${currentUser.id}`)   ?? '0');
+  const salesTarget   = isAggregateRole ? DEFAULT_TARGET * reportCount : profileTarget; // FYCt target
+  const fycTarget     = isAggregateRole ? DEFAULT_TARGET * reportCount : (fycTargetRaw > 0 ? fycTargetRaw : profileTarget);
+  const monthlyTarget = salesTarget / 12;
+  const targetNoun    = isAggregateRole ? 'team target' : 'profile target';
 
   // Computed-from-arrays period values
   const ytdFyct = (myReport?.month_fyct ?? []).slice(0, n).reduce((s, v) => s + v, 0);
@@ -684,7 +743,11 @@ const SalesReportPage: React.FC = () => {
       <div className="flex flex-col gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sales Report</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Sales data from company records · Progress calculated against your profile target</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {isAggregateRole
+              ? `Consolidated sales data across ${reportCount} agent${reportCount !== 1 ? 's' : ''} in your scope`
+              : 'Sales data from company records · Progress calculated against your profile target'}
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Month / Year selectors */}
@@ -746,7 +809,7 @@ const SalesReportPage: React.FC = () => {
       </div>
 
       {/* ── Loading ── */}
-      {isLoadingMySalesReport && (
+      {isLoadingEtl && (
         <div className="flex items-center justify-center gap-2 py-8 text-gray-400">
           <Loader2 className="w-5 h-5 animate-spin" />
           <span className="text-sm">Loading sales data…</span>
@@ -765,7 +828,11 @@ const SalesReportPage: React.FC = () => {
           {noEtlData ? (
             <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-xl text-amber-700 text-sm">
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              <span>No sales data for {selectedYear} yet. Contact your admin to upload the monthly ETL file.</span>
+              <span>
+                {isAggregateRole
+                  ? `No agent sales data for ${selectedYear} in your scope yet. Upload the monthly ETL file from the Import page to populate this report.`
+                  : `No sales data for ${selectedYear} yet. Contact your admin to upload the monthly ETL file.`}
+              </span>
             </div>
           ) : (
             <>
@@ -773,21 +840,42 @@ const SalesReportPage: React.FC = () => {
               <div className="p-4 mb-6 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
                 <div className="flex items-start gap-3">
                   <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
-                  <span>
-                    Sales figures (FYCt, FYC, ACE, NOC) are sourced from your <strong>company's sales report</strong>.
-                    All progress bars and percentage calculations compare these figures against the{' '}
-                    <strong>annual target you have set in your Profile</strong>.
-                    You can update your target anytime from the Profile page.
-                  </span>
+                  {isAggregateRole ? (
+                    <span>
+                      These figures (FYCt, FYC, ACE, NOC) are <strong>consolidated across all {reportCount} agent{reportCount !== 1 ? 's' : ''}</strong> in your scope,
+                      sourced from the <strong>company's sales report</strong>. Progress bars compare the team totals against a
+                      scaled team target ({rm(DEFAULT_TARGET)} × {reportCount} agent{reportCount !== 1 ? 's' : ''}).
+                      For a per-agent breakdown, see the <strong>Group Sales Report</strong>.
+                    </span>
+                  ) : (
+                    <span>
+                      Sales figures (FYCt, FYC, ACE, NOC) are sourced from your <strong>company's sales report</strong>.
+                      All progress bars and percentage calculations compare these figures against the{' '}
+                      <strong>annual target you have set in your Profile</strong>.
+                      You can update your target anytime from the Profile page.
+                    </span>
+                  )}
                 </div>
-                <div className="mt-3 ml-7">
-                  <button
-                    onClick={() => navigate('/profile')}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                  >
-                    Update my annual target
-                  </button>
-                </div>
+                {!isAggregateRole && (
+                  <div className="mt-3 ml-7">
+                    <button
+                      onClick={() => navigate('/profile')}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                      Update my annual target
+                    </button>
+                  </div>
+                )}
+                {isAggregateRole && (
+                  <div className="mt-3 ml-7">
+                    <button
+                      onClick={() => navigate('/group-sales-report')}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                      View Group Sales Report
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Period toggle — YTD first */}
@@ -813,16 +901,16 @@ const SalesReportPage: React.FC = () => {
                       label: `FYCt ${milestoneTab.toUpperCase()}`,
                       value: isMilYtd ? rm(ytdFyct) : rm(mtdFyct),
                       sub:   isMilYtd
-                        ? `${((ytdFyct / salesTarget) * 100).toFixed(1)}% of your profile target`
-                        : `${((mtdFyct / monthlyTarget) * 100).toFixed(1)}% of monthly profile target`,
+                        ? `${((ytdFyct / salesTarget) * 100).toFixed(1)}% of ${targetNoun}`
+                        : `${((mtdFyct / monthlyTarget) * 100).toFixed(1)}% of monthly ${targetNoun}`,
                       bg: 'bg-blue-50', icon: <TrendingUp className="w-5 h-5 text-blue-600" />,
                     },
                     {
                       label: `FYC ${milestoneTab.toUpperCase()}`,
                       value: isMilYtd ? rm(ytdFyc) : rm(mtdFyc),
                       sub:   isMilYtd
-                        ? `${(fycTarget > 0 ? (ytdFyc / fycTarget) * 100 : 0).toFixed(1)}% of your FYC target`
-                        : `${((mtdFyc / monthlyTarget) * 100).toFixed(1)}% of monthly profile target`,
+                        ? `${(fycTarget > 0 ? (ytdFyc / fycTarget) * 100 : 0).toFixed(1)}% of FYC ${targetNoun}`
+                        : `${((mtdFyc / monthlyTarget) * 100).toFixed(1)}% of monthly ${targetNoun}`,
                       bg: 'bg-green-50', icon: <Award className="w-5 h-5 text-green-600" />,
                     },
                     {

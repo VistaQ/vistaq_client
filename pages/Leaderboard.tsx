@@ -5,6 +5,7 @@ import { useData } from '../context/DataContext';
 import { Trophy, Medal, Award, Crown, AlertCircle, Users, ChevronDown, Loader2, Star, MapPin } from 'lucide-react';
 import { apiCall } from '../services/apiClient';
 import type { components } from '../types.generated';
+import { UserRole } from '../types';
 
 type Tab = 'individual' | 'group';
 type Metric = 'points' | 'prospects' | 'noc' | 'ace' | 'fyct' | 'fyc' | 'acs';
@@ -22,19 +23,36 @@ type StatsResponse   = {
   };
 };
 
-const METRIC_OPTIONS: { value: Metric; label: string }[] = [
+// Metrics computed from /leaderboard/stats — accurate, tenant-wide, for every role.
+const BASE_METRIC_OPTIONS: { value: Metric; label: string }[] = [
   { value: 'points',    label: 'Total Points'    },
   { value: 'prospects', label: 'Total Prospects' },
   { value: 'noc',       label: 'NOC (Sales)'     },
-  { value: 'ace',       label: 'ACE (RM)'        },
-  { value: 'fyct',      label: 'FYCt (RM)'       },
-  { value: 'fyc',       label: 'FYC (RM)'        },
-  { value: 'acs',       label: 'ACS (Avg Case)'  },
+];
+// Metrics derived from the bulk /sales-reports response. That endpoint is scoped
+// server-side (agents are 403; trainers/group leaders see only their slice), so a
+// tenant-wide ranking is only correct for roles with full visibility (admin/master
+// trainer). Other roles would rank most agents at 0 — so we hide these for them.
+const SALES_METRIC_OPTIONS: { value: Metric; label: string }[] = [
+  { value: 'ace',  label: 'ACE (RM)'       },
+  { value: 'fyct', label: 'FYCt (RM)'      },
+  { value: 'fyc',  label: 'FYC (RM)'       },
+  { value: 'acs',  label: 'ACS (Avg Case)' },
 ];
 
 const Leaderboard: React.FC = () => {
   const { currentUser }   = useAuth();
-  const { badgeTiers, salesReports } = useData();
+  const { badgeTiers, salesReports, refetchSalesReports } = useData();
+
+  // Only admin & master trainer have full-tenant sales data, so only they can see an
+  // accurate ranking on the sales-derived metrics (ACE/FYCt/FYC/ACS).
+  const canSeeSalesMetrics =
+    currentUser?.role === UserRole.ADMIN ||
+    currentUser?.role === UserRole.MASTER_TRAINER;
+
+  const METRIC_OPTIONS = canSeeSalesMetrics
+    ? [...BASE_METRIC_OPTIONS, ...SALES_METRIC_OPTIONS]
+    : BASE_METRIC_OPTIONS;
 
   const [tab,       setTab]       = useState<Tab>('individual');
   const [metric,    setMetric]    = useState<Metric>('points');
@@ -59,6 +77,19 @@ const Leaderboard: React.FC = () => {
   };
 
   useEffect(() => { fetchStats(period); }, [period]);
+
+  // Ensure the sales-derived metrics have their data, independent of which page was
+  // visited first. Only roles with full-tenant visibility need (and can fetch) it.
+  useEffect(() => {
+    if (canSeeSalesMetrics) refetchSalesReports(new Date().getFullYear());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSeeSalesMetrics]);
+
+  // If the selected metric isn't available to this role (e.g. role changed), fall back.
+  useEffect(() => {
+    if (!METRIC_OPTIONS.some(o => o.value === metric)) setMetric('points');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [METRIC_OPTIONS, metric]);
 
   if (!currentUser) return null;
 
