@@ -65,6 +65,7 @@ const DEFAULT_MILESTONES: BadgeTier[] = DEFAULT_BADGE_TIERS;
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [users, setUsers] = useState<User[]>([]); // tenant users — used to map prospect.agent_id → group_id for scoping
   const [badgeTiers, setBadgeTiers] = useState<BadgeTier[]>(DEFAULT_MILESTONES);
   const [events, setEvents] = useState<Event[]>([]);
   const [coachingSessions, setCoachingSessions] = useState<CoachingSession[]>([]);
@@ -106,6 +107,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (e) { console.error('[DataContext] fetchProspects:', e); } finally {
       setIsLoadingProspects(false);
     }
+  };
+
+  // Tenant user list — needed to resolve each prospect's group via its agent_id,
+  // since prospects carry no group_id. Tenant-scoped server-side, available to all roles.
+  const fetchUsers = async () => {
+    if (!localStorage.getItem('authToken')) return;
+    try {
+      const res = await apiCall('/users');
+      setUsers(Array.isArray(res.data) ? res.data as User[] : []);
+    } catch (e) { console.error('[DataContext] fetchUsers:', e); }
   };
 
   const fetchEvents = async () => {
@@ -242,12 +253,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [authToken, userRole]);
 
-  // 1. Sync Prospects when authenticated or user role changes, clear on logout
+  // 1. Sync Prospects + tenant users when authenticated, clear on logout
   useEffect(() => {
     if (authToken) {
       fetchProspects();
+      fetchUsers();
     } else {
       setProspects([]);
+      setUsers([]);
     }
   }, [authToken]);
 
@@ -347,8 +360,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   // --- SCOPING HELPER ---
+  // Prospects carry no group_id, so we resolve group membership through the
+  // prospect's agent (agent_id → that user's group_id).
   const getGroupProspects = (groupId: string): Prospect[] => {
-    return prospects.filter(p => p.group_id === groupId);
+    const groupByAgent = new Map(users.map(u => [u.id, u.group_id]));
+    return prospects.filter(p => groupByAgent.get(p.agent_id) === groupId);
   };
 
   // --- MAIN SCOPE FUNCTION ---
@@ -358,9 +374,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return prospects;
     }
 
-    // 2. Trainer (View All — managed groups handled server-side)
+    // 2. Trainer — only prospects whose agent belongs to a group the trainer manages.
+    //    This keeps the prospect funnel aligned with the trainer's managed-group ETL
+    //    scope. Defensive: if the tenant user list hasn't loaded yet we return the
+    //    server-provided set rather than briefly filtering everything out.
     if (user.role === UserRole.TRAINER) {
-      return prospects;
+      if (users.length === 0) return prospects;
+      const groupByAgent = new Map(users.map(u => [u.id, u.group_id]));
+      const managed = new Set(user.managedGroupIds ?? []);
+      return prospects.filter(p => {
+        const gid = groupByAgent.get(p.agent_id);
+        return gid != null && managed.has(gid);
+      });
     }
 
     // 3. Group Leader & Agent (Own Only)
