@@ -23,11 +23,12 @@ const Reports: React.FC = () => {
   // 1. Get Base Data (based on user role, handles scoped access)
   let allProspects = currentUser ? getProspectsByScope(currentUser) : [];
   
-  // 2. Apply Group Filter (Trainer Only)
+  // 2. Apply Group Filter (Trainer / Admin only)
   if (selectedGroupId !== 'all' && (currentUser?.role === UserRole.TRAINER || currentUser?.role === UserRole.ADMIN)) {
-      // If a specific group is selected, fetch that group's prospects specifically
-      // or filter the 'allProspects' if it already contains everything.
-      allProspects = allProspects.filter(p => p.group_id === selectedGroupId);
+      // Prospects carry no group_id — resolve the group's prospects via getGroupProspects
+      // (agent_id → group_id) and intersect with the already role-scoped set.
+      const groupProspectIds = new Set(getGroupProspects(selectedGroupId).map(p => p.id));
+      allProspects = allProspects.filter(p => groupProspectIds.has(p.id));
   }
 
   // 3. Filter for Closed Sales (Success or Unsuccessful or KIV) for report basis
