@@ -145,8 +145,13 @@ const PointsHistory: React.FC = () => {
       : 'N/A';
   };
 
-  // Filter out entries tied to deleted prospects (subject is null) so they never surface in any category.
-  const validBreakdown = pointsData.breakdown.filter(e => e.subject != null);
+  // Hide only deleted-prospect rows: a prospect-category entry whose subject is null
+  // means its prospect was deleted. Other categories (sales, coaching) legitimately
+  // have null subjects, so they must NOT be filtered out — they fall back to the
+  // action label when displayed.
+  const isDeletedProspect = (e: typeof pointsData.breakdown[number]) =>
+    e.category === 'prospect' && e.subject == null;
+  const validBreakdown = pointsData.breakdown.filter(e => !isDeletedProspect(e));
 
   const prospectEntries = validBreakdown.filter(e => e.category === 'prospect');
   const salesEntries    = validBreakdown.filter(e => e.category === 'sales');
@@ -455,8 +460,8 @@ const PointsHistory: React.FC = () => {
                 historyEntries.map(entry => (
                   <div key={entry.id} className="flex items-center justify-between gap-3 bg-gray-50 hover:bg-blue-50 transition-colors rounded-xl px-4 py-3 border border-gray-100">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{entry.subject}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{entry.action}</p>
+                      <p className="text-sm font-semibold text-gray-800 truncate">{entry.subject ?? entry.action}</p>
+                      {entry.subject != null && <p className="text-xs text-gray-500 mt-0.5">{entry.action}</p>}
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
