@@ -11,8 +11,13 @@ type Tab = 'individual' | 'group';
 type Metric = 'points' | 'prospects' | 'noc' | 'ace' | 'fyct' | 'fyc' | 'acs';
 type Period = 'mtd' | 'ytd';
 
-type IndividualEntry = components['schemas']['LeaderboardStatsIndividualObject'];
-type GroupEntry      = components['schemas']['LeaderboardStatsGroupObject'];
+// Optional, period-aware sales fields. Once the backend enriches /leaderboard/stats
+// with these (already sliced to the requested ?period=, like prospects_added), the
+// leaderboard populates ACE/FYCt/FYC/ACS for ALL roles — agents included — and the
+// bulk /sales-reports fallback below is no longer needed.
+type SalesFields = { ace?: number; fyct?: number; fyc?: number };
+type IndividualEntry = components['schemas']['LeaderboardStatsIndividualObject'] & SalesFields;
+type GroupEntry      = components['schemas']['LeaderboardStatsGroupObject'] & SalesFields;
 type StatsResponse   = {
   success: boolean;
   data: {
@@ -93,19 +98,32 @@ const Leaderboard: React.FC = () => {
     return map;
   }, [salesReports]);
 
+  // Per-entry sales values: prefer the period-aware fields the backend returns on the
+  // leaderboard entry; fall back to the bulk /sales-reports map until that ships.
+  const entryAce = (e: IndividualEntry): number => {
+    const r = salesReportByAgent[e.user_id];
+    return e.ace ?? (period === 'mtd' ? (r?.month_ace?.[currentMonthIdx] ?? 0) : (r?.ace_ytd ?? 0));
+  };
+  const entryFyct = (e: IndividualEntry): number => {
+    const r = salesReportByAgent[e.user_id];
+    return e.fyct ?? (period === 'mtd' ? (r?.month_fyct?.[currentMonthIdx] ?? 0) : (r?.fyct_ytd ?? 0));
+  };
+  const entryFyc = (e: IndividualEntry): number => {
+    const r = salesReportByAgent[e.user_id];
+    return e.fyc ?? (period === 'mtd' ? (r?.month_fyc?.[currentMonthIdx] ?? 0) : (r?.fyc_ytd ?? 0));
+  };
+
   // Score for a given entry — sales metrics split by MTD/YTD
   const getIndividualScore = (entry: IndividualEntry): number => {
-    const r    = salesReportByAgent[entry.user_id];
-    const isMtd = period === 'mtd';
     switch (metric) {
       case 'prospects': return entry.prospects_added;  // API is period-aware
       case 'noc':       return entry.sales_successful; // API is period-aware
-      case 'ace':       return isMtd ? (r?.month_ace?.[currentMonthIdx]  ?? 0) : (r?.ace_ytd  ?? 0);
-      case 'fyct':      return isMtd ? (r?.month_fyct?.[currentMonthIdx] ?? 0) : (r?.fyct_ytd ?? 0);
-      case 'fyc':       return isMtd ? (r?.month_fyc?.[currentMonthIdx]  ?? 0) : (r?.fyc_ytd  ?? 0);
+      case 'ace':       return entryAce(entry);
+      case 'fyct':      return entryFyct(entry);
+      case 'fyc':       return entryFyc(entry);
       case 'acs': {
         const noc = entry.sales_successful; // period-aware via API
-        const ace = isMtd ? (r?.month_ace?.[currentMonthIdx] ?? 0) : (r?.ace_ytd ?? 0);
+        const ace = entryAce(entry);
         return noc > 0 ? ace / noc : 0;
       }
       default: return entry.total_points;
@@ -116,20 +134,12 @@ const Leaderboard: React.FC = () => {
     if (metric === 'points')    return group.total_points;
     if (metric === 'prospects') return group.prospects_added;
     if (metric === 'noc')       return group.sales_successful;
-    const isMtd  = period === 'mtd';
     const members = statsData?.individual.filter(i => i.group_id === group.group_id) ?? [];
-    const aceSum  = members.reduce((s, m) => {
-      const r = salesReportByAgent[m.user_id];
-      return s + (isMtd ? (r?.month_ace?.[currentMonthIdx]  ?? 0) : (r?.ace_ytd  ?? 0));
-    }, 0);
-    const fyctSum = members.reduce((s, m) => {
-      const r = salesReportByAgent[m.user_id];
-      return s + (isMtd ? (r?.month_fyct?.[currentMonthIdx] ?? 0) : (r?.fyct_ytd ?? 0));
-    }, 0);
-    const fycSum  = members.reduce((s, m) => {
-      const r = salesReportByAgent[m.user_id];
-      return s + (isMtd ? (r?.month_fyc?.[currentMonthIdx]  ?? 0) : (r?.fyc_ytd  ?? 0));
-    }, 0);
+    // Prefer group-level sales fields if the backend supplies them; otherwise sum the
+    // members' (also backend-preferred, map-fallback) values.
+    const aceSum  = group.ace  ?? members.reduce((s, m) => s + entryAce(m),  0);
+    const fyctSum = group.fyct ?? members.reduce((s, m) => s + entryFyct(m), 0);
+    const fycSum  = group.fyc  ?? members.reduce((s, m) => s + entryFyc(m),  0);
     const nocSum  = members.reduce((s, m) => s + m.sales_successful, 0);
     switch (metric) {
       case 'ace':  return aceSum;
