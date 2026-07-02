@@ -109,6 +109,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const canSeeProspects = currentUser?.role === UserRole.ADMIN ||
     currentUser?.role === UserRole.AGENT ||
     currentUser?.role === UserRole.GROUP_LEADER;
+  // Personal Sales Report is only for roles with their own production.
+  // Trainers/master trainers/admins use the Group Sales Report instead.
+  const canSeePersonalSalesReport = currentUser?.role === UserRole.AGENT ||
+    currentUser?.role === UserRole.GROUP_LEADER;
 
   // ── Build nav item list for mobile grid ───────────────────────────────────
   const mobileNavItems: NavItemDef[] = [
@@ -120,7 +124,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     ...(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER
       ? [{ id: 'points', label: 'My Points', icon: Star }]
       : []),
-    { id: 'sales-report', label: 'Sales Report', icon: BarChart2 },
+    ...(canSeePersonalSalesReport ? [{ id: 'sales-report', label: 'Sales Report', icon: BarChart2 }] : []),
     ...(isManagement
       ? [
           { id: 'group',             label: 'Group',       icon: TrendingUp },
@@ -164,7 +168,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           {(currentUser?.role === UserRole.AGENT || currentUser?.role === UserRole.GROUP_LEADER) && (
             <SidebarNavItem id="points" label="My Points" icon={Star} />
           )}
-          <SidebarNavItem id="sales-report" label="Sales Report" icon={BarChart2} />
+          {canSeePersonalSalesReport && <SidebarNavItem id="sales-report" label="Sales Report" icon={BarChart2} />}
           {isManagement && (
             <>
               <div className="px-6 py-2 mt-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Group</div>

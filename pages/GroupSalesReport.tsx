@@ -20,6 +20,13 @@ const rm = (v: number) => 'RM ' + Math.round(v).toLocaleString('en-MY');
 
 const DEFAULT_TARGET = 400_000;
 
+// Per-agent profile targets. Optional until the backend persists & returns them —
+// today they live only in each user's own browser localStorage, so a manager can't
+// read them. Falls back to DEFAULT_TARGET so the UI stays correct until then.
+type AgentReport = SalesReportType & { fyct_target?: number; fyc_target?: number };
+const fyctTargetOf = (r: AgentReport) => r.fyct_target ?? DEFAULT_TARGET;
+const fycTargetOf  = (r: AgentReport) => r.fyc_target  ?? DEFAULT_TARGET;
+
 // ─── Trend line config ───────────────────────────────────────────────────────
 
 const TREND_LINES = [
@@ -99,7 +106,7 @@ const GroupSalesReport: React.FC = () => {
     );
   }
 
-  const reports: SalesReportType[] = salesReports;
+  const reports: AgentReport[] = salesReports as AgentReport[];
   const hasData = reports.length > 0;
   const n = selectedMonth;
   const periodLabel = `Jan–${MONTH_LABELS[n - 1]} ${selectedYear}`;
@@ -114,10 +121,12 @@ const GroupSalesReport: React.FC = () => {
   const totalAce  = reports.reduce((s, r) => s + sum(r, 'month_ace'),  0);
   const totalNoc  = reports.reduce((s, r) => s + sum(r, 'month_noc'),  0);
 
-  const groupTarget          = DEFAULT_TARGET * Math.max(reports.length, 1);
-  const groupFycPct          = (totalFyc  / groupTarget) * 100;
-  const groupFyctPct         = (totalFyct / groupTarget) * 100;
-  const agentsTargetAchieved = reports.filter(r => sum(r, 'month_fyc') >= DEFAULT_TARGET).length;
+  // Group targets are the sum of each agent's personal target (falls back to default).
+  const groupFyctTarget      = reports.reduce((s, r) => s + fyctTargetOf(r), 0) || DEFAULT_TARGET;
+  const groupFycTarget       = reports.reduce((s, r) => s + fycTargetOf(r),  0) || DEFAULT_TARGET;
+  const groupFycPct          = (totalFyc  / groupFycTarget)  * 100;
+  const groupFyctPct         = (totalFyct / groupFyctTarget) * 100;
+  const agentsTargetAchieved = reports.filter(r => sum(r, 'month_fyc') >= fycTargetOf(r)).length;
 
   // ── Sorted agents ────────────────────────────────────────────────────────
 
@@ -136,22 +145,26 @@ const GroupSalesReport: React.FC = () => {
   // ── Downloads (ETL-standard format) ─────────────────────────────────────
 
   const buildRows = () => reports.map(r => {
-    const agentFyc  = sum(r, 'month_fyc');
-    const agentFyct = sum(r, 'month_fyct');
-    const agentAce  = sum(r, 'month_ace');
-    const agentNoc  = sum(r, 'month_noc');
-    const fycPct    = (agentFyc  / DEFAULT_TARGET) * 100;
-    const fyctPct   = (agentFyct / DEFAULT_TARGET) * 100;
+    const agentFyc     = sum(r, 'month_fyc');
+    const agentFyct    = sum(r, 'month_fyct');
+    const agentAce     = sum(r, 'month_ace');
+    const agentNoc     = sum(r, 'month_noc');
+    const fyctTarget   = fyctTargetOf(r);
+    const fycTarget    = fycTargetOf(r);
+    const fycPct       = (agentFyc  / fycTarget)  * 100;
+    const fyctPct      = (agentFyct / fyctTarget) * 100;
     const row: Record<string, unknown> = {
-      'Agent Code':     r.agent_code,
-      'Agent Name':     r.agent_name,
-      'FYCt (YTD)':    agentFyct,
-      '% FYCt':         `${fyctPct.toFixed(2)}%`,
-      'FYC (YTD)':     agentFyc,
-      '% FYC':          `${fycPct.toFixed(2)}%`,
-      'Shortage (FYC)': Math.max(DEFAULT_TARGET - agentFyc, 0),
-      'ACE (YTD)':     agentAce,
-      'NOC (YTD)':     agentNoc,
+      'Agent Code':      r.agent_code,
+      'Agent Name':      r.agent_name,
+      'FYCt Target':     fyctTarget,
+      'FYCt (YTD)':     agentFyct,
+      '% FYCt':          `${fyctPct.toFixed(2)}%`,
+      'FYC Target':      fycTarget,
+      'FYC (YTD)':      agentFyc,
+      '% FYC':           `${fycPct.toFixed(2)}%`,
+      'Shortage (FYC)':  Math.max(fycTarget - agentFyc, 0),
+      'ACE (YTD)':      agentAce,
+      'NOC (YTD)':      agentNoc,
     };
     MONTH_LABELS.forEach((m, idx) => {
       row[`${m} FYCt`] = r.month_fyct?.[idx] ?? 0;
@@ -321,7 +334,7 @@ const GroupSalesReport: React.FC = () => {
               <GroupBar
                 label="Group FYCt"
                 value={totalFyct}
-                total={groupTarget}
+                total={groupFyctTarget}
                 pct={groupFyctPct}
                 color="#3b82f6"
                 fillClass="bg-blue-500"
@@ -329,7 +342,7 @@ const GroupSalesReport: React.FC = () => {
               <GroupBar
                 label="Group FYC"
                 value={totalFyc}
-                total={groupTarget}
+                total={groupFycTarget}
                 pct={groupFycPct}
                 color="#22c55e"
                 fillClass="bg-green-500"
@@ -378,13 +391,15 @@ const GroupSalesReport: React.FC = () => {
                 </div>
               )}
               {filtered.map((r, idx) => {
-                const agentFyc  = sum(r, 'month_fyc');
-                const agentFyct = sum(r, 'month_fyct');
-                const agentAce  = sum(r, 'month_ace');
-                const agentNoc  = sum(r, 'month_noc');
-                const fyctPct   = (agentFyct / DEFAULT_TARGET) * 100;
-                const fycPct    = (agentFyc  / DEFAULT_TARGET) * 100;
-                const shortage  = Math.max(DEFAULT_TARGET - agentFyc, 0);
+                const agentFyc    = sum(r, 'month_fyc');
+                const agentFyct   = sum(r, 'month_fyct');
+                const agentAce    = sum(r, 'month_ace');
+                const agentNoc    = sum(r, 'month_noc');
+                const fyctTarget  = fyctTargetOf(r);
+                const fycTarget   = fycTargetOf(r);
+                const fyctPct     = (agentFyct / fyctTarget) * 100;
+                const fycPct      = (agentFyc  / fycTarget)  * 100;
+                const shortage    = Math.max(fycTarget - agentFyc, 0);
                 const statusCfg = fycPct >= 100
                   ? { badge: 'bg-green-100 text-green-700 border-green-200',  label: 'Target Met' }
                   : fycPct >= 75
@@ -425,6 +440,7 @@ const GroupSalesReport: React.FC = () => {
                       <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
                         <div className="h-2.5 rounded-full bg-blue-500 transition-all duration-700" style={{ width: `${Math.min(fyctPct, 100)}%` }} />
                       </div>
+                      <p className="text-[10px] text-gray-400 mt-1">Target {rm(fyctTarget)}</p>
                     </div>
 
                     {/* FYC progress bar */}
@@ -439,6 +455,7 @@ const GroupSalesReport: React.FC = () => {
                       <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
                         <div className={`h-2.5 rounded-full transition-all duration-700 ${fycPct >= 100 ? 'bg-green-500' : fycPct >= 75 ? 'bg-green-400' : fycPct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${Math.min(fycPct, 100)}%` }} />
                       </div>
+                      <p className="text-[10px] text-gray-400 mt-1">Target {rm(fycTarget)}</p>
                     </div>
 
                     {/* ACE · NOC · Shortage */}
