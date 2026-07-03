@@ -241,6 +241,20 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"] | components["schemas"]["ValidationErrorResponse"];
                     };
                 };
+                /** @description Forbidden. Returned when the user exists but their account has been deactivated by an admin. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Account is inactive"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 /** @description Tenant not found */
                 404: {
                     headers: {
@@ -542,19 +556,12 @@ export interface paths {
                         /**
                          * @example {
                          *       "message": "Validation failed",
-                         *       "errors": [
-                         *         {
-                         *           "code": "too_small",
-                         *           "minimum": 6,
-                         *           "type": "string",
-                         *           "inclusive": true,
-                         *           "exact": false,
-                         *           "message": "Password must be at least 6 characters",
-                         *           "path": [
-                         *             "newPassword"
-                         *           ]
-                         *         }
-                         *       ]
+                         *       "formErrors": [],
+                         *       "fieldErrors": {
+                         *         "newPassword": [
+                         *           "Password must be at least 6 characters"
+                         *         ]
+                         *       }
                          *     }
                          */
                         "application/json": components["schemas"]["ValidationErrorResponse"];
@@ -647,19 +654,12 @@ export interface paths {
                         /**
                          * @example {
                          *       "message": "Validation failed",
-                         *       "errors": [
-                         *         {
-                         *           "code": "too_small",
-                         *           "minimum": 6,
-                         *           "type": "string",
-                         *           "inclusive": true,
-                         *           "exact": false,
-                         *           "message": "Password must be at least 6 characters",
-                         *           "path": [
-                         *             "newPassword"
-                         *           ]
-                         *         }
-                         *       ]
+                         *       "formErrors": [],
+                         *       "fieldErrors": {
+                         *         "newPassword": [
+                         *           "Password must be at least 6 characters"
+                         *         ]
+                         *       }
                          *     }
                          */
                         "application/json": components["schemas"]["ValidationErrorResponse"];
@@ -835,7 +835,7 @@ export interface paths {
         };
         /**
          * Update a user
-         * @description Updates the user record for the given `userId`. The caller must supply a valid Bearer token. Non-admin users can only update themselves — a 403 is returned if they attempt to update another user. Non-admin callers cannot update the `role` or `status` fields; those fields are silently stripped from the request body. At least one field must be provided.
+         * @description Updates the user record for the given `userId`. The caller must supply a valid Bearer token. Non-admin users can only update themselves — a 403 is returned if they attempt to update another user. Non-admin callers cannot update the `role` field; it is silently stripped from the request body. At least one field must be provided.
          */
         put: {
             parameters: {
@@ -870,11 +870,20 @@ export interface paths {
                          */
                         role?: "admin" | "master_trainer" | "trainer" | "agent";
                         /**
-                         * @description Only honoured for admin callers. Non-admin callers may include this field but it is silently stripped.
-                         * @example active
-                         * @enum {string}
+                         * @description Annual FYCt sales target in RM. Pass null to clear the target.
+                         * @example 400000
                          */
-                        status?: "active" | "inactive";
+                        sales_target?: number | null;
+                        /**
+                         * @description The agent's FYCt annual target. Must be greater than 0 when provided. Pass null to clear the target.
+                         * @example 300000
+                         */
+                        fyct_target?: number | null;
+                        /**
+                         * @description The agent's FYC annual target. Must be greater than 0 when provided. Pass null to clear the target.
+                         * @example 250000
+                         */
+                        fyc_target?: number | null;
                     };
                 };
             };
@@ -901,13 +910,10 @@ export interface paths {
                         /**
                          * @example {
                          *       "message": "Validation failed",
-                         *       "errors": [
-                         *         {
-                         *           "code": "custom",
-                         *           "message": "At least one field must be provided",
-                         *           "path": []
-                         *         }
-                         *       ]
+                         *       "formErrors": [
+                         *         "At least one field must be provided"
+                         *       ],
+                         *       "fieldErrors": {}
                          *     }
                          */
                         "application/json": components["schemas"]["ValidationErrorResponse"];
@@ -1134,6 +1140,214 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{userId}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deactivate a user
+         * @description Admin-only. Sets the user's status to `inactive`, preventing them from logging in or making authenticated requests. The user's data and group membership are preserved for seamless reactivation. Idempotent — deactivating an already-inactive user returns 200.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID of the user to deactivate. */
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User deactivated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["UserObject"];
+                        };
+                    };
+                };
+                /** @description Bad request. Returned when the authenticated admin attempts to deactivate their own account. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Admins cannot deactivate themselves"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. Returned when the authenticated user is not an admin. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Not found. Returned when no user exists for the given `userId`. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "User not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{userId}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reactivate a user
+         * @description Admin-only. Restores the user's status to `active`, allowing them to log in and make authenticated requests again. Idempotent — reactivating an already-active user returns 200.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID of the user to reactivate. */
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User reactivated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["UserObject"];
+                        };
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. Returned when the authenticated user is not an admin. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Not found. Returned when no user exists for the given `userId`. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "User not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1763,19 +1977,12 @@ export interface paths {
                         /**
                          * @example {
                          *       "message": "Validation failed",
-                         *       "errors": [
-                         *         {
-                         *           "code": "too_small",
-                         *           "minimum": 1,
-                         *           "type": "string",
-                         *           "inclusive": true,
-                         *           "exact": false,
-                         *           "message": "String must contain at least 1 character(s)",
-                         *           "path": [
-                         *             "fullName"
-                         *           ]
-                         *         }
-                         *       ]
+                         *       "formErrors": [],
+                         *       "fieldErrors": {
+                         *         "fullName": [
+                         *           "String must contain at least 1 character(s)"
+                         *         ]
+                         *       }
                          *     }
                          */
                         "application/json": components["schemas"]["ValidationErrorResponse"];
@@ -2256,9 +2463,8 @@ export interface paths {
                          */
                         type: "Face to Face" | "Online";
                         /**
-                         * Format: uri
-                         * @description Optional URL for the event (e.g. a video call link).
-                         * @example https://meet.example.com/q2-kickoff
+                         * @description Optional URL for an online meeting link. If no protocol is provided (`http://` or `https://`), the server will auto-prefix `https://`.
+                         * @example meet.example.com/q2-kickoff
                          */
                         link?: string;
                         /**
@@ -2278,14 +2484,14 @@ export interface paths {
                          */
                         visibility?: "public" | "private";
                         /**
-                         * @description Array of group UUIDs the event is associated with. Must contain at least one UUID if provided, and must not contain duplicates. For trainers, all IDs must be groups they manage. At least one of `groupIds` or `agentIds` must be supplied (ignored for `agent` role — agents are always assigned to their own event automatically).
+                         * @description Array of group UUIDs the event is associated with. Must not contain duplicates. For trainers, all IDs must be groups they manage. At least one of `groupIds` or `agentIds` must be supplied (ignored for `agent` role — agents are always assigned to their own event automatically).
                          * @example [
                          *       "7c9e6679-7425-40de-944b-e07fc1f90ae7"
                          *     ]
                          */
                         groupIds?: string[];
                         /**
-                         * @description Array of agent user UUIDs to assign individually to the event via the `event_agents` junction table. Must contain at least one UUID if provided, and must not contain duplicates. At least one of `groupIds` or `agentIds` must be supplied (ignored for `agent` role — agents are always assigned to their own event automatically).
+                         * @description Array of agent user UUIDs to assign individually to the event via the `event_agents` junction table. Must not contain duplicates. At least one of `groupIds` or `agentIds` must be supplied (ignored for `agent` role — agents are always assigned to their own event automatically).
                          * @example [
                          *       "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
                          *     ]
@@ -2484,9 +2690,8 @@ export interface paths {
                          */
                         type?: "Face to Face" | "Online";
                         /**
-                         * Format: uri
-                         * @description Updated URL for the event.
-                         * @example https://meet.example.com/q2-kickoff-revised
+                         * @description Optional URL for an online meeting link. If no protocol is provided (`http://` or `https://`), the server will auto-prefix `https://`.
+                         * @example meet.example.com/q2-kickoff-revised
                          */
                         link?: string;
                         /**
@@ -2536,7 +2741,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Bad request. Returned when the request body fails validation (e.g. no fields provided, `startDate` is in the past, `endDate` is not after `startDate`, a supplied group UUID does not exist, or a trainer supplies a group they do not manage). */
+                /** @description Bad request. Returned when the request body fails validation (e.g. no fields provided, `startDate` is in the past, `endDate` is not after `startDate`, a supplied group UUID does not exist, or a trainer supplies a group they do not manage). Also returned if `groupIds` or `agentIds` is provided as an empty array (non-agent callers only). */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2601,7 +2806,7 @@ export interface paths {
         post?: never;
         /**
          * Delete an event
-         * @description Permanently deletes the event identified by `eventId`. The caller must supply a valid Bearer token. Admin users may delete any event within the tenant. Non-admin users may only delete events they themselves created — attempting to delete another user's event returns a 403.
+         * @description Permanently deletes the event identified by `eventId`. The caller must supply a valid Bearer token belonging to a user with the `admin`, `master_trainer`, `trainer`, `group_leader`, or `agent` role. Admin users may delete any event within the tenant. Non-admin users may only delete events they themselves created — attempting to delete another user's event returns a 403.
          */
         delete: {
             parameters: {
@@ -2636,7 +2841,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Forbidden — non-admin attempting to delete another user's event. */
+                /** @description Forbidden — caller does not have an allowed role (`admin`, `master_trainer`, `trainer`, `group_leader`, `agent`), or a non-admin caller is attempting to delete another user's event. */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -2743,13 +2948,10 @@ export interface paths {
                     content: {
                         /**
                          * @example {
-                         *       "success": false,
                          *       "message": "Event not found"
                          *     }
                          */
                         "application/json": {
-                            /** @example false */
-                            success: boolean;
                             /** @example Event not found */
                             message: string;
                         };
@@ -3088,19 +3290,12 @@ export interface paths {
                         /**
                          * @example {
                          *       "message": "Validation failed",
-                         *       "errors": [
-                         *         {
-                         *           "code": "too_small",
-                         *           "minimum": 1,
-                         *           "type": "number",
-                         *           "inclusive": true,
-                         *           "exact": false,
-                         *           "message": "Points must be greater than 0",
-                         *           "path": [
-                         *             "points"
-                         *           ]
-                         *         }
-                         *       ]
+                         *       "formErrors": [],
+                         *       "fieldErrors": {
+                         *         "points": [
+                         *           "Points must be greater than 0"
+                         *         ]
+                         *       }
                          *     }
                          */
                         "application/json": components["schemas"]["ValidationErrorResponse"];
@@ -3276,7 +3471,12 @@ export interface paths {
                         /**
                          * @example {
                          *       "message": "Validation failed",
-                         *       "errors": []
+                         *       "formErrors": [],
+                         *       "fieldErrors": {
+                         *         "period": [
+                         *           "Invalid enum value. Expected 'mtd' | 'ytd'"
+                         *         ]
+                         *       }
                          *     }
                          */
                         "application/json": components["schemas"]["ValidationErrorResponse"];
@@ -3364,7 +3564,12 @@ export interface paths {
                         /**
                          * @example {
                          *       "message": "Validation failed",
-                         *       "errors": []
+                         *       "formErrors": [],
+                         *       "fieldErrors": {
+                         *         "page": [
+                         *           "Expected number, received string"
+                         *         ]
+                         *       }
                          *     }
                          */
                         "application/json": components["schemas"]["ValidationErrorResponse"];
@@ -3393,6 +3598,1151 @@ export interface paths {
                         /**
                          * @example {
                          *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List agent codes (admin only)
+         * @description Returns all agent codes provisioned for the caller's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin` role; any other role returns 403. The tenant is derived from the JWT — clients cannot specify it.
+         *
+         *     The optional `isUsed` query parameter filters the result: pass `true` to return only codes that have been claimed by a user, `false` to return only unclaimed codes, or omit it entirely to return all codes. No pagination is applied — the full matching list is returned in a single response.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description When provided, filters to only used (`true`) or unused (`false`) codes. Omit to return all codes. Any value that is not a valid boolean returns 400. */
+                    isUsed?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Agent codes retrieved successfully. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true,
+                         *       "data": [
+                         *         {
+                         *           "agentCode": "T66701C",
+                         *           "isUsed": false,
+                         *           "userId": null,
+                         *           "createdAt": "2025-01-01T00:00:00.000Z",
+                         *           "updatedAt": "2025-01-01T00:00:00.000Z"
+                         *         },
+                         *         {
+                         *           "agentCode": "T66702C",
+                         *           "isUsed": true,
+                         *           "userId": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+                         *           "createdAt": "2025-01-01T00:00:00.000Z",
+                         *           "updatedAt": "2025-02-15T08:30:00.000Z"
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example true */
+                            success?: boolean;
+                            data?: components["schemas"]["AgentCodeListItem"][];
+                        };
+                    };
+                };
+                /** @description Bad request. Returned when the `isUsed` query parameter is present but is not a valid boolean value. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Validation failed",
+                         *       "errors": [
+                         *         {
+                         *           "code": "invalid_type",
+                         *           "expected": "boolean",
+                         *           "received": "string",
+                         *           "path": [
+                         *             "isUsed"
+                         *           ],
+                         *           "message": "Expected boolean, received string"
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. Returned when the authenticated user is not an admin. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Bulk create agent codes (admin only)
+         * @description Bulk upserts one or more agent codes into the caller's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin` role; any other role returns 403. The tenant is derived from the JWT — clients cannot specify it.
+         *
+         *     The operation is **idempotent**: codes are upserted on the `(tenant_id, agent_code)` conflict target, so re-submitting an existing code returns 200 with the existing row (its `created_at` is preserved and `is_used` is **not** reset). Intra-batch duplicates are deduped server-side, so the returned array length equals the **distinct** count of submitted codes — e.g. submitting `["X", "X", "Y"]` returns 2 rows. Returned order is not guaranteed to match input order.
+         *
+         *     There is no per-row partial-success path: the whole batch either succeeds (200) or fails (500). The response makes no distinction between freshly-inserted rows and pre-existing ones.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    /**
+                     * @example {
+                     *       "agentCodes": [
+                     *         "T66701C",
+                     *         "T66702C",
+                     *         "T66703C"
+                     *       ]
+                     *     }
+                     */
+                    "application/json": {
+                        /**
+                         * @description Array of agent code strings to upsert. Must contain between 1 and 500 entries (inclusive); each entry must be a non-empty string. Codes are stored case-sensitively and verbatim — no trimming or case-folding is performed server-side.
+                         * @example [
+                         *       "T66701C",
+                         *       "T66702C",
+                         *       "T66703C"
+                         *     ]
+                         */
+                        agentCodes: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Agent codes upserted successfully. The `data` array contains one entry per distinct submitted code. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true,
+                         *       "data": [
+                         *         {
+                         *           "agentCode": "T66701C",
+                         *           "isUsed": false,
+                         *           "createdAt": "2026-05-04T09:41:35.000Z",
+                         *           "updatedAt": "2026-05-04T09:41:35.000Z"
+                         *         },
+                         *         {
+                         *           "agentCode": "T66702C",
+                         *           "isUsed": false,
+                         *           "createdAt": "2026-05-04T09:41:35.000Z",
+                         *           "updatedAt": "2026-05-04T09:41:35.000Z"
+                         *         },
+                         *         {
+                         *           "agentCode": "T66703C",
+                         *           "isUsed": false,
+                         *           "createdAt": "2026-05-04T09:41:35.000Z",
+                         *           "updatedAt": "2026-05-04T09:41:35.000Z"
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["AgentCodeObject"][];
+                        };
+                    };
+                };
+                /** @description Bad request. Returned when the request body fails Zod validation — e.g. `agentCodes` missing, not an array, empty, exceeds 500 entries, contains a non-string or empty-string entry, or includes an unknown top-level field. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Validation failed",
+                         *       "errors": [
+                         *         {
+                         *           "code": "too_small",
+                         *           "minimum": 1,
+                         *           "type": "array",
+                         *           "inclusive": true,
+                         *           "exact": false,
+                         *           "message": "Array must contain at least 1 element(s)",
+                         *           "path": [
+                         *             "agentCodes"
+                         *           ]
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. Returned when the authenticated user is not an admin. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent-codes/{agentCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete an agent code
+         * @description Deletes an existing agent code within the caller's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin` role; any other role returns 403. The tenant is derived from the JWT — clients cannot specify it.
+         *
+         *     The path parameter `:agentCode` is the **current** value of the code to delete (case-sensitive). URL-encode it if it contains characters that are not safe in a URI path segment. Returns 404 if no code with that value exists in the tenant. Returns 409 if the code is currently in use (`isUsed: true`) — in-use codes cannot be deleted.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description The agent code to delete (case-sensitive, URL-encoded if necessary). */
+                    agentCode: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Agent code deleted successfully. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                        };
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. Returned when the authenticated user is not an admin. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Not found. Returned when no agent code matching the path parameter exists in the caller's tenant. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Agent code not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Conflict. Returned when the agent code is currently in use (`isUsed: true`) and cannot be deleted. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Agent code is in use"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Rename an agent code (admin only)
+         * @description Renames an existing agent code within the caller's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin` role; any other role returns 403. The tenant is derived from the JWT — clients cannot specify it.
+         *
+         *     Only the `agent_code` column is updated. The `is_used`, `user_id`, and `created_at` values are left unchanged. Renaming a code that is already in use (`isUsed: true`) is permitted — the associated user's claim is preserved under the new code value.
+         *
+         *     The path parameter `:agentCode` is the **current** value of the code to rename (case-sensitive). URL-encode it if it contains characters that are not safe in a URI path segment. Returns 404 if no code with that value exists in the tenant. Returns 409 if the requested new value already exists in the tenant.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description The current agent code to rename (case-sensitive, URL-encoded if necessary). */
+                    agentCode: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    /**
+                     * @example {
+                     *       "agentCode": "T77811M"
+                     *     }
+                     */
+                    "application/json": {
+                        /**
+                         * @description The new agent code value. Must be a non-empty string. Must not already exist in the tenant — a duplicate value returns 409.
+                         * @example T77811M
+                         */
+                        agentCode: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Agent code renamed successfully. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true,
+                         *       "data": {
+                         *         "agentCode": "T77811M",
+                         *         "isUsed": false,
+                         *         "userId": null,
+                         *         "createdAt": "2025-01-01T00:00:00.000Z",
+                         *         "updatedAt": "2026-05-12T10:00:00.000Z"
+                         *       }
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["AgentCodeListItem"];
+                        };
+                    };
+                };
+                /** @description Bad request. Returned when the request body fails Zod validation — e.g. `agentCode` missing, empty string, or an unknown top-level field is present. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Validation failed",
+                         *       "errors": [
+                         *         {
+                         *           "code": "too_small",
+                         *           "minimum": 1,
+                         *           "type": "string",
+                         *           "inclusive": true,
+                         *           "exact": false,
+                         *           "message": "String must contain at least 1 character(s)",
+                         *           "path": [
+                         *             "agentCode"
+                         *           ]
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. Returned when the authenticated user is not an admin. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Not found. Returned when no agent code matching the path parameter exists in the caller's tenant. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Agent code not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Conflict. Returned when the requested new `agentCode` value already exists in the caller's tenant. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Agent code already exists"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/taxonomies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List taxonomy values
+         * @description Returns the taxonomy lookup values provisioned for the authenticated user's tenant, ordered by `sort_order` ascending and then `value` ascending. The tenant is derived from the JWT — clients cannot specify it. All authenticated roles may access this endpoint.
+         *
+         *     The optional `type` query parameter filters the result to a single category (e.g. `lead_source`). When provided it must be a non-empty string; omit it to return every taxonomy value for the tenant.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description When provided, filters taxonomy values to the given category. Must be a non-empty string; an empty value returns 400. */
+                    type?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Taxonomy values retrieved successfully. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true,
+                         *       "data": [
+                         *         {
+                         *           "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                         *           "tenant_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                         *           "type": "lead_source",
+                         *           "value": "Referral",
+                         *           "sort_order": 0,
+                         *           "created_at": "2026-06-01T08:00:00.000Z",
+                         *           "updated_at": "2026-06-01T08:00:00.000Z"
+                         *         },
+                         *         {
+                         *           "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                         *           "tenant_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                         *           "type": "lead_source",
+                         *           "value": "Walk-in",
+                         *           "sort_order": 1,
+                         *           "created_at": "2026-06-01T08:00:00.000Z",
+                         *           "updated_at": "2026-06-01T08:00:00.000Z"
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["TaxonomyObject"][];
+                        };
+                    };
+                };
+                /** @description Bad request. Returned when the `type` query parameter is present but is an empty string. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Validation failed",
+                         *       "errors": [
+                         *         {
+                         *           "code": "too_small",
+                         *           "minimum": 1,
+                         *           "type": "string",
+                         *           "inclusive": true,
+                         *           "exact": false,
+                         *           "message": "String must contain at least 1 character(s)",
+                         *           "path": [
+                         *             "type"
+                         *           ]
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create a taxonomy value (admin only)
+         * @description Creates a new taxonomy lookup value under the authenticated user's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin` role; any other role returns 403. The tenant is derived from the JWT — clients cannot specify it.
+         *
+         *     The combination of `(tenant_id, type, value)` must be unique within the tenant — submitting a duplicate returns 409.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "lead_source",
+                     *       "value": "Referral",
+                     *       "sort_order": 0
+                     *     }
+                     */
+                    "application/json": {
+                        /**
+                         * @description The taxonomy category this value belongs to (e.g. `lead_source`). Required; must be a non-empty string.
+                         * @example lead_source
+                         */
+                        type: string;
+                        /**
+                         * @description The dropdown value to store. Required; must be a non-empty string.
+                         * @example Referral
+                         */
+                        value: string;
+                        /**
+                         * @description Sort position used when ordering values within a category. Optional; defaults to 0 when omitted.
+                         * @default 0
+                         * @example 0
+                         */
+                        sort_order?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Taxonomy value created successfully. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true,
+                         *       "data": {
+                         *         "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                         *         "tenant_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                         *         "type": "lead_source",
+                         *         "value": "Referral",
+                         *         "sort_order": 0,
+                         *         "created_at": "2026-06-01T08:00:00.000Z",
+                         *         "updated_at": "2026-06-01T08:00:00.000Z"
+                         *       }
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["TaxonomyObject"];
+                        };
+                    };
+                };
+                /** @description Bad request. Returned when the request body fails Zod validation — e.g. `type` or `value` missing or empty, `sort_order` not an integer, or an unknown top-level field is present. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Validation failed",
+                         *       "errors": [
+                         *         {
+                         *           "code": "too_small",
+                         *           "minimum": 1,
+                         *           "type": "string",
+                         *           "inclusive": true,
+                         *           "exact": false,
+                         *           "message": "String must contain at least 1 character(s)",
+                         *           "path": [
+                         *             "value"
+                         *           ]
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. Returned when the authenticated user is not an admin. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Conflict. Returned when a taxonomy value with the same `(type, value)` already exists in the caller's tenant. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "A taxonomy value with this type already exists"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/taxonomies/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update a taxonomy value (admin only)
+         * @description Updates the `value` and/or `sort_order` of an existing taxonomy value within the authenticated user's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin` role; any other role returns 403. The tenant is derived from the JWT — clients cannot specify it.
+         *
+         *     At least one of `value` or `sort_order` must be supplied; an empty body returns 400. Returns 404 if no taxonomy value with the given `id` exists in the tenant. Returns 409 if the new `value` collides with an existing `(type, value)` pair in the tenant.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID of the taxonomy value to update. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    /**
+                     * @example {
+                     *       "value": "Referral (updated)",
+                     *       "sort_order": 5
+                     *     }
+                     */
+                    "application/json": {
+                        /**
+                         * @description New dropdown value. Must be a non-empty string when provided.
+                         * @example Referral (updated)
+                         */
+                        value?: string;
+                        /**
+                         * @description New sort position within the category.
+                         * @example 5
+                         */
+                        sort_order?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Taxonomy value updated successfully. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true,
+                         *       "data": {
+                         *         "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                         *         "tenant_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                         *         "type": "lead_source",
+                         *         "value": "Referral (updated)",
+                         *         "sort_order": 5,
+                         *         "created_at": "2026-06-01T08:00:00.000Z",
+                         *         "updated_at": "2026-06-02T09:30:00.000Z"
+                         *       }
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            data: components["schemas"]["TaxonomyObject"];
+                        };
+                    };
+                };
+                /** @description Bad request. Returned when the request body fails Zod validation — e.g. an empty body, neither `value` nor `sort_order` provided, an empty `value`, `sort_order` not an integer, or an unknown top-level field is present. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Validation failed",
+                         *       "errors": [
+                         *         {
+                         *           "code": "custom",
+                         *           "message": "At least one of value or sort_order must be provided",
+                         *           "path": []
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ValidationErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. Returned when the authenticated user is not an admin. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Not found. Returned when no taxonomy value matching the `id` path parameter exists in the caller's tenant. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Taxonomy not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Conflict. Returned when the new `value` collides with an existing `(type, value)` pair in the caller's tenant. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "A taxonomy value with this type already exists"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Delete a taxonomy value (admin only)
+         * @description Deletes an existing taxonomy value within the authenticated user's tenant. The caller must supply a valid Bearer token belonging to a user with the `admin` role; any other role returns 403. The tenant is derived from the JWT — clients cannot specify it.
+         *
+         *     Returns 404 if no taxonomy value with the given `id` exists in the tenant. On success the endpoint returns 204 with no response body.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID of the taxonomy value to delete. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Taxonomy value deleted successfully. No response body. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Forbidden. Returned when the authenticated user is not an admin. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Forbidden"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Not found. Returned when no taxonomy value matching the `id` path parameter exists in the caller's tenant. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Taxonomy not found"
+                         *     }
+                         */
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get tenant labels
+         * @description Returns the resolved key→value display-label map for the authenticated tenant. Labels provide i18n-style resolution where the tenant acts as the locale: code references stable internal keys (e.g. `metric.ace`) and this endpoint resolves them to per-tenant display strings. The tenant is derived from the JWT — clients cannot specify it. All authenticated roles may read.
+         *
+         *     The response is a single merged map: a default label set provides fallbacks, and the tenant's own overrides (from the `tenant_labels` table) take precedence over the defaults.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Tenant labels retrieved successfully. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "success": true,
+                         *       "data": {
+                         *         "metric.ace": "ACE",
+                         *         "metric.fyc": "FYC",
+                         *         "metric.fyct": "FYCt",
+                         *         "metric.acs": "ACS (ACE/NOC)",
+                         *         "action.create_coaching": "Create Peer Circle Meeting"
+                         *       }
+                         *     }
+                         */
+                        "application/json": {
+                            /** @example true */
+                            success: boolean;
+                            /** @description Map of stable internal label keys to their resolved per-tenant display strings. */
+                            data: {
+                                [key: string]: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Unauthorized. Returned when the `Authorization` header is absent, malformed, or contains an invalid token. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "message": "Unauthorized"
                          *     }
                          */
                         "application/json": components["schemas"]["ErrorResponse"];
@@ -3554,7 +4904,12 @@ export interface paths {
                         /**
                          * @example {
                          *       "message": "Validation failed",
-                         *       "errors": []
+                         *       "formErrors": [],
+                         *       "fieldErrors": {
+                         *         "title": [
+                         *           "Required"
+                         *         ]
+                         *       }
                          *     }
                          */
                         "application/json": components["schemas"]["ValidationErrorResponse"];
@@ -4988,6 +6343,112 @@ export interface components {
              *     ]
              */
             managed_group_ids?: string[];
+            /**
+             * @description The agent's personal annual FYCt sales target in RM. Null if the agent has not set a target yet.
+             * @example 400000
+             */
+            sales_target?: number | null;
+            /**
+             * @description The agent's FYCt annual target (set via PUT /users/{userId}). Null if the agent has not set a target yet.
+             * @example 300000
+             */
+            fyct_target?: number | null;
+            /**
+             * @description The agent's FYC annual target (set via PUT /users/{userId}). Null if the agent has not set a target yet.
+             * @example 250000
+             */
+            fyc_target?: number | null;
+        };
+        AgentCodeObject: {
+            /**
+             * @description The agent code as stored, case-sensitive and verbatim.
+             * @example T66701C
+             */
+            agentCode: string;
+            /**
+             * @description `true` once a user has been onboarded against this code. Newly inserted rows are `false`. On upsert into an existing row, this value is **not** reset.
+             * @example false
+             */
+            isUsed: boolean;
+            /**
+             * Format: date-time
+             * @description ISO 8601 datetime of original row creation. For an upsert that hit an existing row, this is the original creation time, not the time of the current request.
+             * @example 2026-05-04T09:41:35.000Z
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 datetime the row was last touched (insert or upsert).
+             * @example 2026-05-04T09:41:35.000Z
+             */
+            updatedAt: string;
+        };
+        AgentCodeListItem: {
+            /**
+             * @description The agent code as stored, case-sensitive and verbatim.
+             * @example T66701C
+             */
+            agentCode: string;
+            /**
+             * @description `true` once a user has been onboarded against this code; `false` for unclaimed codes.
+             * @example false
+             */
+            isUsed: boolean;
+            /**
+             * Format: uuid
+             * @description UUID of the user who claimed this code, or `null` if the code has not yet been used.
+             * @example null
+             */
+            userId: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 datetime of original row creation.
+             * @example 2025-01-01T00:00:00.000Z
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 datetime the row was last modified.
+             * @example 2025-01-01T00:00:00.000Z
+             */
+            updatedAt: string;
+        };
+        TaxonomyObject: {
+            /**
+             * Format: uuid
+             * @example a1b2c3d4-e5f6-7890-abcd-ef1234567890
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            tenant_id: string;
+            /**
+             * @description The taxonomy category this value belongs to.
+             * @example lead_source
+             */
+            type: string;
+            /**
+             * @description The dropdown value stored for the category.
+             * @example Referral
+             */
+            value: string;
+            /**
+             * @description Sort position used when ordering values within a category.
+             * @example 0
+             */
+            sort_order: number;
+            /**
+             * Format: date-time
+             * @example 2026-06-01T08:00:00.000Z
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @example 2026-06-01T08:00:00.000Z
+             */
+            updated_at: string;
         };
         GroupObject: {
             /**
@@ -5550,6 +7011,26 @@ export interface components {
              * @example 26
              */
             total_points: number;
+            /**
+             * @description Annualized Commission Earnings. For `period=mtd`, the current calendar month's value sourced from `sales_report_mtd_fyc`; for `period=ytd`, the latest available month snapshot for the current year from `sales_report_ytd`. Defaults to 0 if no sales-report data is available.
+             * @example 12500.5
+             */
+            ace: number;
+            /**
+             * @description First Year Commission. For `period=mtd`, the month-to-date delta derived from the `sales_report_mtd_fyc` LAG view; for `period=ytd`, the cumulative year-to-date value from `sales_report_ytd`. Defaults to 0 if no sales-report data is available.
+             * @example 8400
+             */
+            fyc: number;
+            /**
+             * @description First Year Commission Target. For `period=mtd`, the month-to-date delta derived from the `sales_report_mtd_fyc` LAG view; for `period=ytd`, the cumulative year-to-date value from `sales_report_ytd`. Defaults to 0 if no sales-report data is available.
+             * @example 9000
+             */
+            fyct: number;
+            /**
+             * @description Average Case Size for the period. For `period=mtd`, the current calendar month's value sourced from `sales_report_mtd`; for `period=ytd`, the latest available month snapshot for the current year from `sales_report_ytd`. Defaults to 0 when no sales-report data is available.
+             * @example 12500.5
+             */
+            acs: number;
         };
         LeaderboardStatsGroupObject: {
             /**
@@ -5594,6 +7075,26 @@ export interface components {
              * @example 52
              */
             total_points: number;
+            /**
+             * @description Aggregated Annualized Commission Earnings across all group members in the period. For `period=mtd`, the current calendar month's value sourced from `sales_report_mtd_fyc`; for `period=ytd`, the latest available month snapshot for the current year from `sales_report_ytd`. Members with no sales-report data contribute 0.
+             * @example 62500.5
+             */
+            ace: number;
+            /**
+             * @description Aggregated First Year Commission across all group members in the period. For `period=mtd`, the month-to-date delta derived from the `sales_report_mtd_fyc` LAG view; for `period=ytd`, the cumulative year-to-date value from `sales_report_ytd`. Members with no sales-report data contribute 0.
+             * @example 42000
+             */
+            fyc: number;
+            /**
+             * @description Aggregated First Year Commission Target across all group members in the period. For `period=mtd`, the month-to-date delta derived from the `sales_report_mtd_fyc` LAG view; for `period=ytd`, the cumulative year-to-date value from `sales_report_ytd`. Members with no sales-report data contribute 0.
+             * @example 45000
+             */
+            fyct: number;
+            /**
+             * @description Average Case Size = ACE / NOC for the period. For period=mtd uses the current month's ACE and NOC; for period=ytd uses the latest cumulative snapshot for the current year. Returns 0 when there are no cases (NOC = 0).
+             * @example 18750.25
+             */
+            acs: number;
         };
         AgentPointsObject: {
             /**
@@ -5825,8 +7326,22 @@ export interface components {
         ValidationErrorResponse: {
             /** @example Validation failed */
             message: string;
-            /** @example [] */
-            errors: Record<string, never>[];
+            /**
+             * @description Top-level (non-field) validation error messages.
+             * @example []
+             */
+            formErrors: string[];
+            /**
+             * @description Per-field validation error messages keyed by field name.
+             * @example {
+             *       "fieldName": [
+             *         "Error message for the field"
+             *       ]
+             *     }
+             */
+            fieldErrors: {
+                [key: string]: string[];
+            };
         };
         /** @description ETL pipeline output as produced by the upstream `dynamic_excel_etl` template — the raw artifact, untouched by the caller. The intent metadata `report_year` / `report_month` lives one level up on the request body, not inside this object. Extra top-level fields (`success`, `etl_version`, `template_name`, `upload_id`, `output_excel`, `json_output`, `log_file`, `errors_found`, `columns_detected`, `layout_detected`, `errors`) are accepted and ignored. */
         EtlResultObject: {
@@ -5854,7 +7369,7 @@ export interface components {
                  * @example T66701C
                  */
                 agentCode: string;
-                /** @description Open-ended bag of column-name → value pairs. Recognised numeric keys include the YTD totals (`'ACE (YTD)'`, `'NOC (YTD)'`, `'FYCT (YTD)'`, `'% FYCT (YTD)'`, `'MDRT SHORTAGE FYCT'`, `'FYC (YTD)'`, `'% FYC (YTD)'`, `'MDRT SHORTAGE FYC'`) and per-month MTD pairs (`'JANUARY ACE'`, `'JANUARY NOC'`, etc.). String keys like `'AGENT CODE'` and `'AGENT NAME'` (which the ETL may include as duplicates of the outer fields) are accepted and ignored. Missing or non-numeric values default to 0. */
+                /** @description Open-ended bag of column-name → value pairs. Recognised numeric keys include the YTD totals (`'ACE (YTD)'`, `'NOC (YTD)'`, `'ACS (YTD)'`, `'FYCT (YTD)'`, `'% FYCT (YTD)'`, `'MDRT SHORTAGE FYCT'`, `'FYC (YTD)'`, `'% FYC (YTD)'`, `'MDRT SHORTAGE FYC'`) and per-month MTD groups (`'JANUARY ACE'`, `'JANUARY NOC'`, `'JANUARY ACS'`, etc.). String keys like `'AGENT CODE'` and `'AGENT NAME'` (which the ETL may include as duplicates of the outer fields) are accepted and ignored. Missing or non-numeric values default to 0. */
                 rowData: {
                     [key: string]: unknown;
                 };
@@ -6023,6 +7538,16 @@ export interface components {
              *     ]
              */
             month_fyc: number[];
+            /**
+             * @description The agent's FYCt annual target (set on their Profile via PUT /users/{userId}). Null if unset.
+             * @example 300000
+             */
+            fyct_target?: number | null;
+            /**
+             * @description The agent's FYC annual target (set on their Profile via PUT /users/{userId}). Null if unset.
+             * @example 250000
+             */
+            fyc_target?: number | null;
         };
         SalesReportListResponse: {
             /** @example true */
