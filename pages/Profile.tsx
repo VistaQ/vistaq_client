@@ -31,10 +31,18 @@ const Profile: React.FC = () => {
               email: currentUser.email,
               agent_code: currentUser.agent_code || '',
           });
-          const saved = localStorage.getItem(`salesTarget_${currentUser.id}`);
-          setSalesTarget(saved ?? '');
-          const savedFyc = localStorage.getItem(`fycTarget_${currentUser.id}`);
-          setFycTarget(savedFyc ?? '');
+          // Targets now live on the user record. Prefer the server value; fall back to
+          // any legacy localStorage value so pre-migration targets still prefill once.
+          setSalesTarget(
+            currentUser.fyct_target != null
+              ? String(currentUser.fyct_target)
+              : (localStorage.getItem(`salesTarget_${currentUser.id}`) ?? '')
+          );
+          setFycTarget(
+            currentUser.fyc_target != null
+              ? String(currentUser.fyc_target)
+              : (localStorage.getItem(`fycTarget_${currentUser.id}`) ?? '')
+          );
       }
   }, [currentUser]);
 
@@ -84,8 +92,9 @@ const Profile: React.FC = () => {
 
   const canSetTarget = currentUser.role === UserRole.AGENT || currentUser.role === UserRole.GROUP_LEADER;
 
-  const handleSaveTarget = (e: React.FormEvent) => {
+  const handleSaveTarget = async (e: React.FormEvent) => {
       e.preventDefault();
+      setStatus(null);
       const fyctVal = parseFloat(salesTarget.replace(/,/g, ''));
       const fycVal  = parseFloat(fycTarget.replace(/,/g, ''));
 
@@ -93,18 +102,24 @@ const Profile: React.FC = () => {
           setStatus({ msg: 'Please enter a valid FYCt target greater than 0.', type: 'error' });
           return;
       }
-      if (fycTarget && (isNaN(fycVal) || fycVal <= 0)) {
+      if (fycTarget.trim() && (isNaN(fycVal) || fycVal <= 0)) {
           setStatus({ msg: 'Please enter a valid FYC target greater than 0, or leave it blank.', type: 'error' });
           return;
       }
 
-      localStorage.setItem(`salesTarget_${currentUser.id}`, String(fyctVal));
-      if (!isNaN(fycVal) && fycVal > 0) {
-          localStorage.setItem(`fycTarget_${currentUser.id}`, String(fycVal));
-      } else {
+      try {
+          // Persist to the user record (server). fyc_target is null when left blank.
+          await updateProfile({
+              fyct_target: fyctVal,
+              fyc_target: fycTarget.trim() && fycVal > 0 ? fycVal : null,
+          });
+          // Clear legacy localStorage now that the server is the source of truth.
+          localStorage.removeItem(`salesTarget_${currentUser.id}`);
           localStorage.removeItem(`fycTarget_${currentUser.id}`);
+          setStatus({ msg: 'Sales targets saved successfully!', type: 'success' });
+      } catch (err: any) {
+          setStatus({ msg: err?.message || 'Failed to save targets. Please try again.', type: 'error' });
       }
-      setStatus({ msg: 'Sales targets saved successfully!', type: 'success' });
   };
 
   return (

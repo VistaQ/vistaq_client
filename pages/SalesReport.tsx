@@ -134,9 +134,11 @@ const SalesReportPage: React.FC = () => {
   const n = selectedMonth; // effective period index (1-based)
 
   // ─── Sales target ─────────────────────────────────────────────────────────
-  const salesTarget   = parseFloat(localStorage.getItem(`salesTarget_${currentUser.id}`) ?? '0') || DEFAULT_TARGET; // FYCt target
-  const fycTargetRaw  = parseFloat(localStorage.getItem(`fycTarget_${currentUser.id}`)   ?? '0');
-  const fycTarget     = fycTargetRaw > 0 ? fycTargetRaw : salesTarget; // falls back to FYCt target if FYC target not set
+  // Targets now live on the user record; fall back to legacy localStorage, then default.
+  const lsFyct        = parseFloat(localStorage.getItem(`salesTarget_${currentUser.id}`) ?? '0');
+  const salesTarget   = currentUser.fyct_target ?? (lsFyct > 0 ? lsFyct : DEFAULT_TARGET); // FYCt target
+  const lsFyc         = parseFloat(localStorage.getItem(`fycTarget_${currentUser.id}`)   ?? '0');
+  const fycTarget     = currentUser.fyc_target ?? (lsFyc > 0 ? lsFyc : salesTarget); // falls back to FYCt target if unset
   const monthlyTarget = salesTarget / 12;
 
   // Computed-from-arrays period values

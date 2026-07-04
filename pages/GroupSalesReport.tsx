@@ -20,12 +20,10 @@ const rm = (v: number) => 'RM ' + Math.round(v).toLocaleString('en-MY');
 
 const DEFAULT_TARGET = 400_000;
 
-// Per-agent profile targets. Optional until the backend persists & returns them —
-// today they live only in each user's own browser localStorage, so a manager can't
-// read them. Falls back to DEFAULT_TARGET so the UI stays correct until then.
-type AgentReport = SalesReportType & { fyct_target?: number; fyc_target?: number };
-const fyctTargetOf = (r: AgentReport) => r.fyct_target ?? DEFAULT_TARGET;
-const fycTargetOf  = (r: AgentReport) => r.fyc_target  ?? DEFAULT_TARGET;
+// Per-agent profile targets come from the sales report (echoed from the user record).
+// Fall back to DEFAULT_TARGET when an agent hasn't set one (null).
+const fyctTargetOf = (r: SalesReportType) => r.fyct_target ?? DEFAULT_TARGET;
+const fycTargetOf  = (r: SalesReportType) => r.fyc_target  ?? DEFAULT_TARGET;
 
 // ─── Trend line config ───────────────────────────────────────────────────────
 
@@ -106,7 +104,7 @@ const GroupSalesReport: React.FC = () => {
     );
   }
 
-  const reports: AgentReport[] = salesReports as AgentReport[];
+  const reports: SalesReportType[] = salesReports;
   const hasData = reports.length > 0;
   const n = selectedMonth;
   const periodLabel = `Jan–${MONTH_LABELS[n - 1]} ${selectedYear}`;
