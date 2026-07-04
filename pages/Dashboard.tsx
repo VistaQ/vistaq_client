@@ -444,10 +444,12 @@ const Dashboard: React.FC = () => {
    const totalAppointmentsYTD = personalYtd?.appointments_set ?? 0;
    const totalSalesMeetingsYTD = personalYtd?.sales_meetings ?? 0;
 
-   // Personal annual sales targets — set in Profile, stored in localStorage
-   const salesTarget = parseFloat(localStorage.getItem(`salesTarget_${currentUser?.id}`) ?? '0') || 400_000; // FYCt target
-   const fycTargetRaw = parseFloat(localStorage.getItem(`fycTarget_${currentUser?.id}`) ?? '0');
-   const fycTarget = fycTargetRaw > 0 ? fycTargetRaw : salesTarget; // falls back to FYCt target if FYC target not set
+   // Personal annual sales targets — now on the user record; fall back to legacy
+   // localStorage (pre-migration), then to the default.
+   const lsFyct = parseFloat(localStorage.getItem(`salesTarget_${currentUser?.id}`) ?? '0');
+   const salesTarget = currentUser?.fyct_target ?? (lsFyct > 0 ? lsFyct : 400_000); // FYCt target
+   const lsFyc = parseFloat(localStorage.getItem(`fycTarget_${currentUser?.id}`) ?? '0');
+   const fycTarget = currentUser?.fyc_target ?? (lsFyc > 0 ? lsFyc : salesTarget); // falls back to FYCt target if unset
 
    // --- ETL-sourced NOC / ACE / ACS — use mySalesReport (same source as Sales Report page) ---
    const myReport = mySalesReport ?? undefined;
