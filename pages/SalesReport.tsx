@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { SalesReport as SalesReportType, MONTH_LABELS, UserRole } from '../types';
@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 import {
   Download, TrendingUp, Users, Target, Award,
-  ChevronDown, AlertCircle, Loader2,
+  ChevronDown, AlertCircle, Loader2, ArrowLeft,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -90,8 +90,13 @@ const SectionCard: React.FC<{ id: string; title: string; subtitle?: string; chil
 
 const SalesReportPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { currentUser } = useAuth();
-  const { mySalesReport, isLoadingMySalesReport, refetchMySalesReport, getProspectsByScope } = useData();
+  const {
+    mySalesReport, isLoadingMySalesReport, refetchMySalesReport,
+    salesReports, isLoadingSalesReports, refetchSalesReports,
+    prospects, getProspectsByScope,
+  } = useData();
 
   const now          = new Date();
   const currentYear  = now.getFullYear();
@@ -105,7 +110,19 @@ const SalesReportPage: React.FC = () => {
 
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  useEffect(() => { refetchMySalesReport(selectedYear); }, [selectedYear]);
+  // "?agent=<id>" — a group leader / trainer / master trainer / admin drilling into a
+  // specific agent from the Group Sales Report. Agents can only ever view themselves.
+  const agentParam = searchParams.get('agent');
+  const viewedAgentId =
+    currentUser && currentUser.role !== UserRole.AGENT && agentParam && agentParam !== currentUser.id
+      ? agentParam
+      : null;
+
+  useEffect(() => {
+    // Agent drill-down reads from the bulk (role-scoped) list; own view uses /me.
+    if (viewedAgentId) refetchSalesReports(selectedYear);
+    else refetchMySalesReport(selectedYear);
+  }, [selectedYear, viewedAgentId]);
 
   const toggleTrendLine = (key: string) =>
     setTrendLines(prev => {
@@ -116,29 +133,34 @@ const SalesReportPage: React.FC = () => {
 
   if (!currentUser) return null;
 
-  // The individual Sales Report is a personal view — only agents & group leaders have
-  // their own production. Trainers/master trainers/admins use the Group Sales Report
-  // instead, so they don't get this page.
+  // Without an agent to drill into, the individual Sales Report is a personal view —
+  // trainers/master trainers/admins have no production of their own, so they're sent
+  // to the dashboard. (They reach this page via "View Report" on the Group Sales Report.)
   if (
-    currentUser.role === UserRole.ADMIN ||
-    currentUser.role === UserRole.MASTER_TRAINER ||
-    currentUser.role === UserRole.TRAINER
+    !viewedAgentId &&
+    (currentUser.role === UserRole.ADMIN ||
+      currentUser.role === UserRole.MASTER_TRAINER ||
+      currentUser.role === UserRole.TRAINER)
   ) {
     return <Navigate to="/dashboard" replace />;
   }
 
   // ─── ETL data ─────────────────────────────────────────────────────────────
-  const myReport: SalesReportType | undefined = mySalesReport ?? undefined;
+  const viewedReport = viewedAgentId ? salesReports.find(r => r.agent_id === viewedAgentId) : undefined;
+  const myReport: SalesReportType | undefined = viewedAgentId ? viewedReport : (mySalesReport ?? undefined);
   const hasEtlData = myReport !== undefined;
-  const isLoadingEtl = isLoadingMySalesReport;
+  const isLoadingEtl = viewedAgentId ? isLoadingSalesReports : isLoadingMySalesReport;
   const n = selectedMonth; // effective period index (1-based)
 
   // ─── Sales target ─────────────────────────────────────────────────────────
-  // Targets now live on the user record; fall back to legacy localStorage, then default.
+  // Own view: targets from the user record (legacy localStorage fallback, then default).
+  // Agent drill-down: targets echoed on the agent's sales report row.
   const lsFyct        = parseFloat(localStorage.getItem(`salesTarget_${currentUser.id}`) ?? '0');
-  const salesTarget   = currentUser.fyct_target ?? (lsFyct > 0 ? lsFyct : DEFAULT_TARGET); // FYCt target
+  const ownFyctTarget = currentUser.fyct_target ?? (lsFyct > 0 ? lsFyct : DEFAULT_TARGET);
   const lsFyc         = parseFloat(localStorage.getItem(`fycTarget_${currentUser.id}`)   ?? '0');
-  const fycTarget     = currentUser.fyc_target ?? (lsFyc > 0 ? lsFyc : salesTarget); // falls back to FYCt target if unset
+  const ownFycTarget  = currentUser.fyc_target ?? (lsFyc > 0 ? lsFyc : ownFyctTarget);
+  const salesTarget   = viewedAgentId ? (viewedReport?.fyct_target ?? DEFAULT_TARGET) : ownFyctTarget; // FYCt target
+  const fycTarget     = viewedAgentId ? (viewedReport?.fyc_target ?? (viewedReport?.fyct_target ?? DEFAULT_TARGET)) : ownFycTarget;
   const monthlyTarget = salesTarget / 12;
 
   // Computed-from-arrays period values
@@ -154,7 +176,11 @@ const SalesReportPage: React.FC = () => {
   const isMilYtd = milestoneTab === 'ytd';
 
   // ─── Prospect data ────────────────────────────────────────────────────────
-  const allProspects = getProspectsByScope(currentUser);
+  // Agent drill-down: only that agent's prospects (server RLS already limits what
+  // the viewer receives). Own view: the usual role scope.
+  const allProspects = viewedAgentId
+    ? prospects.filter(p => p.agent_id === viewedAgentId)
+    : getProspectsByScope(currentUser);
 
   const inMtd = (d: string | null | undefined): boolean => {
     if (!d) return false;
@@ -700,9 +726,28 @@ const SalesReportPage: React.FC = () => {
 
       {/* ── Page header ── */}
       <div className="flex flex-col gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Sales Report</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Sales data from company records · Progress calculated against your profile target</p>
+        <div className="flex items-start gap-3">
+          {viewedAgentId && (
+            <button
+              onClick={() => navigate('/group-sales-report')}
+              aria-label="Back to Group Sales Report"
+              className="p-2 mt-0.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {viewedAgentId
+                ? `Sales Report — ${viewedReport?.agent_name ?? 'Agent'}`
+                : 'Sales Report'}
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {viewedAgentId
+                ? `${viewedReport?.agent_code ?? ''} · Sales data from company records · Progress against the agent's profile targets`
+                : 'Sales data from company records · Progress calculated against your profile target'}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Month / Year selectors */}
@@ -791,21 +836,32 @@ const SalesReportPage: React.FC = () => {
               <div className="p-4 mb-6 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
                 <div className="flex items-start gap-3">
                   <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
-                  <span>
-                    Sales figures (FYCt, FYC, ACE, NOC) are sourced from your <strong>company's sales report</strong>.
-                    All progress bars and percentage calculations compare these figures against the{' '}
-                    <strong>annual target you have set in your Profile</strong>.
-                    You can update your target anytime from the Profile page.
-                  </span>
+                  {viewedAgentId ? (
+                    <span>
+                      Sales figures (FYCt, FYC, ACE, NOC) are sourced from the <strong>company's sales report</strong>.
+                      All progress bars and percentage calculations compare these figures against the{' '}
+                      <strong>annual targets this agent has set in their Profile</strong>
+                      {viewedReport?.fyct_target == null && ' (no target set yet — using the RM 400,000 default)'}.
+                    </span>
+                  ) : (
+                    <span>
+                      Sales figures (FYCt, FYC, ACE, NOC) are sourced from your <strong>company's sales report</strong>.
+                      All progress bars and percentage calculations compare these figures against the{' '}
+                      <strong>annual target you have set in your Profile</strong>.
+                      You can update your target anytime from the Profile page.
+                    </span>
+                  )}
                 </div>
-                <div className="mt-3 ml-7">
-                  <button
-                    onClick={() => navigate('/profile')}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                  >
-                    Update my annual target
-                  </button>
-                </div>
+                {!viewedAgentId && (
+                  <div className="mt-3 ml-7">
+                    <button
+                      onClick={() => navigate('/profile')}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                      Update my annual target
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Period toggle — YTD first */}
@@ -831,7 +887,7 @@ const SalesReportPage: React.FC = () => {
                       label: `FYCt ${milestoneTab.toUpperCase()}`,
                       value: isMilYtd ? rm(ytdFyct) : rm(mtdFyct),
                       sub:   isMilYtd
-                        ? `${((ytdFyct / salesTarget) * 100).toFixed(1)}% of your profile target`
+                        ? `${((ytdFyct / salesTarget) * 100).toFixed(1)}% of ${viewedAgentId ? "the agent's" : 'your'} profile target`
                         : `${((mtdFyct / monthlyTarget) * 100).toFixed(1)}% of monthly profile target`,
                       bg: 'bg-blue-50', icon: <TrendingUp className="w-5 h-5 text-blue-600" />,
                     },
@@ -839,7 +895,7 @@ const SalesReportPage: React.FC = () => {
                       label: `FYC ${milestoneTab.toUpperCase()}`,
                       value: isMilYtd ? rm(ytdFyc) : rm(mtdFyc),
                       sub:   isMilYtd
-                        ? `${(fycTarget > 0 ? (ytdFyc / fycTarget) * 100 : 0).toFixed(1)}% of your FYC target`
+                        ? `${(fycTarget > 0 ? (ytdFyc / fycTarget) * 100 : 0).toFixed(1)}% of ${viewedAgentId ? "the agent's" : 'your'} FYC target`
                         : `${((mtdFyc / monthlyTarget) * 100).toFixed(1)}% of monthly profile target`,
                       bg: 'bg-green-50', icon: <Award className="w-5 h-5 text-green-600" />,
                     },
