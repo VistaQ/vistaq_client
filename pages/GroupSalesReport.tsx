@@ -3,7 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import { UserRole, SalesReport as SalesReportType, MONTH_LABELS } from '../types';
+import { UserRole, SalesReport as SalesReportType, Group, MONTH_LABELS } from '../types';
+import { apiCall } from '../services/apiClient';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
@@ -71,7 +72,7 @@ const GroupBar: React.FC<{
 const GroupSalesReport: React.FC = () => {
   const navigate  = useNavigate();
   const { currentUser } = useAuth();
-  const { salesReports, isLoadingSalesReports, refetchSalesReports } = useData();
+  const { salesReports, isLoadingSalesReports, refetchSalesReports, users } = useData();
 
   const now          = new Date();
   const currentYear  = now.getFullYear();
@@ -82,11 +83,17 @@ const GroupSalesReport: React.FC = () => {
   const [trendLines,    setTrendLines]    = useState<Set<string>>(() => new Set(['FYCt', 'FYC']));
   const [showDownload,  setShowDownload]  = useState(false);
   const [agentSearch,   setAgentSearch]   = useState('');
+  // null = "All Groups" overview (multi-group viewers); a key = drilled into that group
+  const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
 
   const toggleTrend = (key: string) =>
     setTrendLines(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
 
   useEffect(() => { refetchSalesReports(selectedYear); }, [selectedYear]);
+  useEffect(() => {
+    apiCall('/groups').then(res => setGroups(Array.isArray(res.data) ? res.data : [])).catch(() => {});
+  }, []);
 
   if (!currentUser) return null;
 
@@ -104,15 +111,51 @@ const GroupSalesReport: React.FC = () => {
     );
   }
 
-  const reports: SalesReportType[] = salesReports;
-  const hasData = reports.length > 0;
+  const allReports: SalesReportType[] = salesReports;
+  const hasData = allReports.length > 0;
   const n = selectedMonth;
   const periodLabel = `Jan–${MONTH_LABELS[n - 1]} ${selectedYear}`;
 
-  // ── Aggregate YTD (month-array based, respects selectedMonth) ───────────
-
   const sum = (r: SalesReportType, key: 'month_fyct' | 'month_fyc' | 'month_ace' | 'month_noc') =>
     (r[key] ?? []).slice(0, n).reduce((s, v) => s + v, 0);
+
+  // ── Bucket reports by group (agent_id → users.group_id → group name) ────
+  // The server already scopes /sales-reports per role (admin/MT = all groups,
+  // trainer = managed groups, group leader = own group); here we present that
+  // scope group-by-group instead of as one flat list.
+  const UNASSIGNED = 'unassigned';
+  const groupIdByAgent = new Map(users.map(u => [u.id, u.group_id]));
+  const groupNameOf = (key: string) =>
+    key === UNASSIGNED ? 'Unassigned' : (groups.find(g => g.id === key)?.name ?? 'Unknown Group');
+
+  const buckets = new Map<string, SalesReportType[]>();
+  for (const r of allReports) {
+    const key = groupIdByAgent.get(r.agent_id) ?? UNASSIGNED;
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key)!.push(r);
+  }
+  const groupsInScope = [...buckets.entries()]
+    .map(([key, rs]) => ({ key, name: groupNameOf(key), reports: rs }))
+    .sort((a, b) =>
+      b.reports.reduce((s, r) => s + sum(r, 'month_fyct'), 0) -
+      a.reports.reduce((s, r) => s + sum(r, 'month_fyct'), 0)
+    );
+
+  // Group leaders are locked to their own group; a scope with exactly one group
+  // auto-selects it. Everyone else starts on the "All Groups" overview.
+  const lockedGroupKey = isGroupLeader
+    ? (buckets.has(currentUser.group_id ?? '') ? currentUser.group_id! : (groupsInScope[0]?.key ?? null))
+    : groupsInScope.length === 1 ? groupsInScope[0].key : null;
+  const effectiveGroupKey = lockedGroupKey ?? selectedGroupKey;
+  const selectedGroup = groupsInScope.find(g => g.key === effectiveGroupKey) ?? null;
+  const isOverview = selectedGroup === null;
+  const multiGroup = lockedGroupKey === null && groupsInScope.length > 1;
+  const scopeName = selectedGroup?.name ?? (isGroupLeader ? 'My Group' : 'All Groups');
+
+  // All aggregates below derive from the current selection.
+  const reports: SalesReportType[] = selectedGroup ? selectedGroup.reports : allReports;
+
+  // ── Aggregate YTD (month-array based, respects selectedMonth) ───────────
 
   const totalFyct = reports.reduce((s, r) => s + sum(r, 'month_fyct'), 0);
   const totalFyc  = reports.reduce((s, r) => s + sum(r, 'month_fyc'),  0);
@@ -154,6 +197,7 @@ const GroupSalesReport: React.FC = () => {
     const row: Record<string, unknown> = {
       'Agent Code':      r.agent_code,
       'Agent Name':      r.agent_name,
+      'Group':           groupNameOf(groupIdByAgent.get(r.agent_id) ?? UNASSIGNED),
       'FYCt Target':     fyctTarget,
       'FYCt (YTD)':     agentFyct,
       '% FYCt':          `${fyctPct.toFixed(2)}%`,
@@ -173,11 +217,13 @@ const GroupSalesReport: React.FC = () => {
     return row;
   });
 
+  const fileScope = selectedGroup ? selectedGroup.name.replace(/[^\w]+/g, '') : 'AllGroups';
+
   const downloadExcel = () => {
     const ws = XLSX.utils.json_to_sheet(buildRows());
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Group Sales Report');
-    XLSX.writeFile(wb, `VistaQ_GroupSalesReport_${MONTH_LABELS[n - 1]}_${selectedYear}.xlsx`);
+    XLSX.writeFile(wb, `VistaQ_GroupSalesReport_${fileScope}_${MONTH_LABELS[n - 1]}_${selectedYear}.xlsx`);
   };
 
   const downloadCSV = () => {
@@ -189,7 +235,7 @@ const GroupSalesReport: React.FC = () => {
     }).join(','))].join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `VistaQ_GroupSalesReport_${MONTH_LABELS[n - 1]}_${selectedYear}.csv`;
+    a.download = `VistaQ_GroupSalesReport_${fileScope}_${MONTH_LABELS[n - 1]}_${selectedYear}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -213,7 +259,9 @@ const GroupSalesReport: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Group Sales Report</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              Consolidated production analytics · {periodLabel}
+              {isOverview && multiGroup
+                ? `All groups · ${groupsInScope.length} group${groupsInScope.length !== 1 ? 's' : ''} · ${periodLabel}`
+                : `${scopeName} · ${periodLabel}`}
             </p>
           </div>
         </div>
@@ -288,31 +336,42 @@ const GroupSalesReport: React.FC = () => {
       {!isLoadingSalesReports && hasData && (
         <>
 
+        {/* ── Back to overview (when drilled into a group) ── */}
+        {!isOverview && multiGroup && (
+          <button
+            onClick={() => { setSelectedGroupKey(null); setAgentSearch(''); }}
+            className="flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            All Groups
+          </button>
+        )}
+
         {/* ── Section 1: Stat cards ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
-            label="FYCt YTD (Group)"
+            label="FYCt YTD"
             value={rm(totalFyct)}
-            sub={`${reports.length} agent${reports.length !== 1 ? 's' : ''} contributing`}
+            sub={`${scopeName} · ${reports.length} agent${reports.length !== 1 ? 's' : ''}`}
             bg="bg-blue-50"
             icon={<TrendingUp className="w-5 h-5 text-blue-600" />}
           />
           <StatCard
-            label="FYC YTD (Group)"
+            label="FYC YTD"
             value={rm(totalFyc)}
-            sub={`${groupFycPct.toFixed(1)}% of group target`}
+            sub={`${groupFycPct.toFixed(1)}% of ${isOverview ? 'combined' : scopeName} target`}
             bg="bg-green-50"
             icon={<Award className="w-5 h-5 text-green-600" />}
           />
           <StatCard
-            label="ACE YTD (Group)"
+            label="ACE YTD"
             value={rm(totalAce)}
             sub={`${rm(Math.round(totalAce / Math.max(reports.length, 1)))} avg per agent`}
             bg="bg-emerald-50"
             icon={<Target className="w-5 h-5 text-emerald-600" />}
           />
           <StatCard
-            label="NOC YTD (Group)"
+            label="NOC YTD"
             value={String(totalNoc)}
             sub={`Avg ${(totalNoc / Math.max(reports.length, 1)).toFixed(1)} per agent`}
             bg="bg-purple-50"
@@ -320,17 +379,96 @@ const GroupSalesReport: React.FC = () => {
           />
         </div>
 
-        {/* ── Section 2: Agent Sales Progress ── */}
+        {/* ── Section 1b: Group overview cards (multi-group "All Groups" view) ── */}
+        {isOverview && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-6 md:px-8 py-5 border-b border-gray-100 bg-gray-50/50">
+              <h2 className="text-lg font-bold text-gray-900">Groups — Sales Progress</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Select a group to view its agents and full report</p>
+            </div>
+            <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {groupsInScope.map(g => {
+                const gFyct       = g.reports.reduce((s, r) => s + sum(r, 'month_fyct'), 0);
+                const gFyc        = g.reports.reduce((s, r) => s + sum(r, 'month_fyc'),  0);
+                const gFyctTarget = g.reports.reduce((s, r) => s + fyctTargetOf(r), 0) || DEFAULT_TARGET;
+                const gFycTarget  = g.reports.reduce((s, r) => s + fycTargetOf(r),  0) || DEFAULT_TARGET;
+                const gFyctPct    = (gFyct / gFyctTarget) * 100;
+                const gFycPct     = (gFyc  / gFycTarget)  * 100;
+                const gOnTarget   = g.reports.filter(r => sum(r, 'month_fyc') >= fycTargetOf(r)).length;
+                return (
+                  <div key={g.key} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div className="min-w-0">
+                        <p className="text-base font-bold text-gray-900 truncate">{g.name}</p>
+                        <p className="text-sm text-gray-400">{g.reports.length} agent{g.reports.length !== 1 ? 's' : ''} · {gOnTarget} on target</p>
+                      </div>
+                      <button
+                        onClick={() => { setSelectedGroupKey(g.key); setAgentSearch(''); }}
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+                      >
+                        View Group
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* FYCt */}
+                    <div className="mb-3">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">FYCt</span>
+                        <div className="flex items-baseline gap-2.5">
+                          <span className="text-sm font-semibold text-gray-700">{rm(gFyct)}</span>
+                          <span className="text-base font-bold text-blue-700">{gFyctPct.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                      <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-3 rounded-full bg-blue-500 transition-all duration-700" style={{ width: `${Math.min(gFyctPct, 100)}%` }} />
+                      </div>
+                      <div className="flex justify-between items-center text-sm mt-1.5">
+                        <span className="text-gray-500">Target: <span className="font-semibold text-gray-700">{rm(gFyctTarget)}</span></span>
+                        {gFyct < gFyctTarget
+                          ? <span className="text-red-500 font-semibold">Shortage: {rm(gFyctTarget - gFyct)}</span>
+                          : <span className="text-green-600 font-semibold">Target met ✓</span>}
+                      </div>
+                    </div>
+
+                    {/* FYC */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs font-bold text-green-600 uppercase tracking-wide">FYC</span>
+                        <div className="flex items-baseline gap-2.5">
+                          <span className="text-sm font-semibold text-gray-700">{rm(gFyc)}</span>
+                          <span className="text-base font-bold text-green-700">{gFycPct.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                      <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-3 rounded-full transition-all duration-700 ${gFycPct >= 100 ? 'bg-green-500' : gFycPct >= 75 ? 'bg-green-400' : gFycPct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${Math.min(gFycPct, 100)}%` }} />
+                      </div>
+                      <div className="flex justify-between items-center text-sm mt-1.5">
+                        <span className="text-gray-500">Target: <span className="font-semibold text-gray-700">{rm(gFycTarget)}</span></span>
+                        {gFyc < gFycTarget
+                          ? <span className="text-red-500 font-semibold">Shortage: {rm(gFycTarget - gFyc)}</span>
+                          : <span className="text-green-600 font-semibold">Target met ✓</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Section 2: Agent Sales Progress (single-group detail view) ── */}
+        {!isOverview && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 md:px-8 py-5 border-b border-gray-100 bg-gray-50/50">
             <div>
               <div className="flex items-center gap-3 flex-wrap mb-1">
-                <h2 className="text-lg font-bold text-gray-900">Agent Sales Progress</h2>
-                <span className="text-xs text-gray-400">{agentsTargetAchieved} of {reports.length} reached target</span>
+                <h2 className="text-lg font-bold text-gray-900">{scopeName} — Sales Progress</h2>
+                <span className="text-sm text-gray-400">{agentsTargetAchieved} of {reports.length} reached target</span>
               </div>
               {/* Group progress bars — FYCt first, then FYC */}
               <GroupBar
-                label="Group FYCt"
+                label={`${scopeName} FYCt`}
                 value={totalFyct}
                 total={groupFyctTarget}
                 pct={groupFyctPct}
@@ -338,7 +476,7 @@ const GroupSalesReport: React.FC = () => {
                 fillClass="bg-blue-500"
               />
               <GroupBar
-                label="Group FYC"
+                label={`${scopeName} FYC`}
                 value={totalFyc}
                 total={groupFycTarget}
                 pct={groupFycPct}
@@ -501,7 +639,7 @@ const GroupSalesReport: React.FC = () => {
             {/* Group totals summary */}
             <div className="mt-4 bg-slate-50 border border-slate-200 rounded-2xl p-4">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-                Group Total · {periodLabel}
+                {scopeName} Total · {periodLabel}
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
@@ -522,13 +660,16 @@ const GroupSalesReport: React.FC = () => {
             </div>
           </div>
         </div>
+        )}
 
         {/* ── Section 3: Monthly Group Trend ── */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 md:px-8 py-5 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="text-lg font-bold text-gray-900">Monthly Group Trend</h2>
+            <h2 className="text-lg font-bold text-gray-900">Monthly Trend — {scopeName}</h2>
             <p className="text-sm text-gray-500 mt-0.5">
-              Month-by-month aggregate production across all group members
+              {isOverview
+                ? 'Month-by-month aggregate production across all groups combined'
+                : `Month-by-month aggregate production across ${scopeName} members`}
             </p>
           </div>
           <div className="p-6 md:p-8">

@@ -6,6 +6,7 @@ import { toLocalISO } from '../utils/dateUtils';
 
 interface DataContextType {
   prospects: Prospect[];
+  users: User[]; // tenant user list — for mapping agent_id → group_id
   badgeTiers: BadgeTier[];
   events: Event[];
   addProspect: (p: Partial<Prospect>) => Promise<Prospect>;
@@ -481,7 +482,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <DataContext.Provider value={{
-      prospects, badgeTiers, events,
+      prospects, users, badgeTiers, events,
       isLoadingProspects, isLoadingEvents, isLoadingCoaching,
       eventsError, coachingError,
       addProspect, updateProspect, importProspects, deleteProspect,
