@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 import {
   Download, TrendingUp, Award, Target, Users,
-  ChevronDown, AlertCircle, Loader2, ArrowLeft, Search, X,
+  ChevronDown, AlertCircle, Loader2, ArrowLeft, ArrowRight, Search, X,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -53,15 +53,15 @@ const GroupBar: React.FC<{
   label: string; value: number; total: number; pct: number; color: string; fillClass: string;
 }> = ({ label, value, total, pct, fillClass }) => (
   <div className="mt-3">
-    <div className="flex justify-between text-xs text-gray-500 mb-1">
-      <span className="font-semibold">{label}</span>
+    <div className="flex justify-between items-baseline text-sm text-gray-500 mb-1">
+      <span className="font-semibold text-gray-700">{label}</span>
       <span>
         <span className="hidden sm:inline">{rm(value)} of {rm(total)} · </span>
-        {pct.toFixed(1)}%
+        <span className="font-bold text-gray-800">{pct.toFixed(1)}%</span>
       </span>
     </div>
-    <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
-      <div className={`h-2.5 rounded-full transition-all duration-700 ${fillClass}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+    <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+      <div className={`h-3 rounded-full transition-all duration-700 ${fillClass}`} style={{ width: `${Math.min(pct, 100)}%` }} />
     </div>
   </div>
 );
@@ -389,15 +389,16 @@ const GroupSalesReport: React.FC = () => {
                 </div>
               )}
               {filtered.map((r, idx) => {
-                const agentFyc    = sum(r, 'month_fyc');
-                const agentFyct   = sum(r, 'month_fyct');
-                const agentAce    = sum(r, 'month_ace');
-                const agentNoc    = sum(r, 'month_noc');
-                const fyctTarget  = fyctTargetOf(r);
-                const fycTarget   = fycTargetOf(r);
-                const fyctPct     = (agentFyct / fyctTarget) * 100;
-                const fycPct      = (agentFyc  / fycTarget)  * 100;
-                const shortage    = Math.max(fycTarget - agentFyc, 0);
+                const agentFyc     = sum(r, 'month_fyc');
+                const agentFyct    = sum(r, 'month_fyct');
+                const agentAce     = sum(r, 'month_ace');
+                const agentNoc     = sum(r, 'month_noc');
+                const fyctTarget   = fyctTargetOf(r);
+                const fycTarget    = fycTargetOf(r);
+                const fyctPct      = (agentFyct / fyctTarget) * 100;
+                const fycPct       = (agentFyc  / fycTarget)  * 100;
+                const fyctShortage = Math.max(fyctTarget - agentFyct, 0);
+                const fycShortage  = Math.max(fycTarget  - agentFyc,  0);
                 const statusCfg = fycPct >= 100
                   ? { badge: 'bg-green-100 text-green-700 border-green-200',  label: 'Target Met' }
                   : fycPct >= 75
@@ -408,70 +409,87 @@ const GroupSalesReport: React.FC = () => {
                 return (
                   <div
                     key={r.id}
-                    className="bg-gray-50 border border-gray-100 rounded-2xl p-4"
+                    className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
                   >
                     {/* Name + status */}
-                    <div className="flex items-start justify-between gap-2 mb-4">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="flex-shrink-0 w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-500">
+                    <div className="flex items-start justify-between gap-3 mb-5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="flex-shrink-0 w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-sm font-bold text-slate-600">
                           {idx + 1}
                         </span>
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-gray-900 truncate leading-snug">{r.agent_name}</p>
-                          <p className="text-xs text-gray-400">{r.agent_code}</p>
+                          <p className="text-base font-bold text-gray-900 truncate leading-snug">{r.agent_name}</p>
+                          <p className="text-sm text-gray-400">{r.agent_code}</p>
                         </div>
                       </div>
-                      <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-full border ${statusCfg.badge}`}>
+                      <span className={`flex-shrink-0 text-xs font-bold px-2.5 py-1 rounded-full border ${statusCfg.badge}`}>
                         {statusCfg.label}
                       </span>
                     </div>
 
-                    {/* FYCt progress bar */}
-                    <div className="mb-3">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wide">FYCt</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">{rm(agentFyct)}</span>
-                          <span className="text-xs font-bold text-blue-700">{fyctPct.toFixed(1)}%</span>
-                        </div>
-                      </div>
-                      <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div className="h-2.5 rounded-full bg-blue-500 transition-all duration-700" style={{ width: `${Math.min(fyctPct, 100)}%` }} />
-                      </div>
-                      <p className="text-[10px] text-gray-400 mt-1">Target {rm(fyctTarget)}</p>
-                    </div>
-
-                    {/* FYC progress bar */}
+                    {/* FYCt — achieved / % / bar / target + shortage on one line */}
                     <div className="mb-4">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-bold text-green-500 uppercase tracking-wide">FYC</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">{rm(agentFyc)}</span>
-                          <span className="text-xs font-bold text-green-700">{fycPct.toFixed(1)}%</span>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">FYCt</span>
+                        <div className="flex items-baseline gap-2.5">
+                          <span className="text-sm font-semibold text-gray-700">{rm(agentFyct)}</span>
+                          <span className="text-base font-bold text-blue-700">{fyctPct.toFixed(1)}%</span>
                         </div>
                       </div>
-                      <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div className={`h-2.5 rounded-full transition-all duration-700 ${fycPct >= 100 ? 'bg-green-500' : fycPct >= 75 ? 'bg-green-400' : fycPct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${Math.min(fycPct, 100)}%` }} />
+                      <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-3 rounded-full bg-blue-500 transition-all duration-700" style={{ width: `${Math.min(fyctPct, 100)}%` }} />
                       </div>
-                      <p className="text-[10px] text-gray-400 mt-1">Target {rm(fycTarget)}</p>
+                      <div className="flex justify-between items-center text-sm mt-1.5">
+                        <span className="text-gray-500">Target: <span className="font-semibold text-gray-700">{rm(fyctTarget)}</span></span>
+                        {fyctShortage > 0 ? (
+                          <span className="text-red-500 font-semibold">Shortage: {rm(fyctShortage)}</span>
+                        ) : (
+                          <span className="text-green-600 font-semibold">Target met ✓</span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* ACE · NOC · Shortage */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="bg-white rounded-xl px-3 py-2 border border-gray-100 flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase">ACE</span>
-                        <span className="text-xs font-bold text-gray-700">{rm(agentAce)}</span>
-                      </div>
-                      <div className="bg-white rounded-xl px-3 py-2 border border-gray-100 flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-purple-400 uppercase">NOC</span>
-                        <span className="text-xs font-bold text-purple-700">{agentNoc}</span>
-                      </div>
-                      {shortage > 0 && (
-                        <div className="flex items-center gap-1.5 text-xs text-red-500 font-semibold">
-                          <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                          Shortage {rm(shortage)}
+                    {/* FYC — achieved / % / bar / target + shortage on one line */}
+                    <div className="mb-5">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs font-bold text-green-600 uppercase tracking-wide">FYC</span>
+                        <div className="flex items-baseline gap-2.5">
+                          <span className="text-sm font-semibold text-gray-700">{rm(agentFyc)}</span>
+                          <span className="text-base font-bold text-green-700">{fycPct.toFixed(1)}%</span>
                         </div>
-                      )}
+                      </div>
+                      <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-3 rounded-full transition-all duration-700 ${fycPct >= 100 ? 'bg-green-500' : fycPct >= 75 ? 'bg-green-400' : fycPct >= 25 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${Math.min(fycPct, 100)}%` }} />
+                      </div>
+                      <div className="flex justify-between items-center text-sm mt-1.5">
+                        <span className="text-gray-500">Target: <span className="font-semibold text-gray-700">{rm(fycTarget)}</span></span>
+                        {fycShortage > 0 ? (
+                          <span className="text-red-500 font-semibold">Shortage: {rm(fycShortage)}</span>
+                        ) : (
+                          <span className="text-green-600 font-semibold">Target met ✓</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ACE · NOC · View Report */}
+                    <div className="flex items-center justify-between gap-3 flex-wrap pt-4 border-t border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-gray-50 rounded-xl px-3.5 py-2 border border-gray-100 flex items-center gap-2">
+                          <span className="text-xs font-bold text-gray-400 uppercase">ACE</span>
+                          <span className="text-sm font-bold text-gray-700">{rm(agentAce)}</span>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl px-3.5 py-2 border border-gray-100 flex items-center gap-2">
+                          <span className="text-xs font-bold text-purple-400 uppercase">NOC</span>
+                          <span className="text-sm font-bold text-purple-700">{agentNoc}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/sales-report?agent=${r.agent_id}`)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+                      >
+                        View Report
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 );
